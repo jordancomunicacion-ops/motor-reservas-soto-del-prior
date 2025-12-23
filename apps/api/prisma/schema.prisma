@@ -1,0 +1,242 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- Core Hospitality Models ---
+
+model Hotel {
+  id        String   @id @default(uuid())
+  name      String
+  domain    String?  @unique
+  timezone  String   @default("UTC")
+  currency  String   @default("EUR")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  roomTypes RoomType[]
+  bookings  Booking[]
+  ratePlans RatePlan[]
+  seasons   Season[]
+  users     User[]
+  
+  // Widget Config
+  widgetConfig WidgetConfig?
+}
+
+model WidgetConfig {
+  id          String   @id @default(uuid())
+  hotelId     String   @unique
+  hotel       Hotel    @relation(fields: [hotelId], references: [id])
+  
+  primaryColor   String  @default("#3b82f6") // Blue-500
+  secondaryColor String  @default("#1e40af") // Blue-800
+  customCss      String? 
+  
+  showLogo       Boolean @default(true)
+  title          String? // Override default title
+}
+
+model RoomType {
+  id          String   @id @default(uuid())
+  hotelId     String
+  hotel       Hotel    @relation(fields: [hotelId], references: [id])
+  name        String
+  description String?
+  basePrice   Decimal  @default(0)
+  capacity    Int      @default(2)
+  amenities   Json?    // ["wifi", "tv"]
+  
+  rooms       Room[]
+  icalFeeds   ICalFeed[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Room {
+  id          String   @id @default(uuid())
+  roomTypeId  String
+  roomType    RoomType @relation(fields: [roomTypeId], references: [id])
+  name        String   // "101", "Villa A"
+  isActive    Boolean  @default(true)
+  
+  bookingRooms BookingRoom[]
+}
+
+model RatePlan {
+  id          String   @id @default(uuid())
+  hotelId     String
+  hotel       Hotel    @relation(fields: [hotelId], references: [id])
+  name        String   // "Standard", "Non-Refundable"
+  isDefault   Boolean  @default(false)
+  
+  // Can add calculated overrides here
+}
+
+model Season {
+  id          String   @id @default(uuid())
+  hotelId     String
+  hotel       Hotel    @relation(fields: [hotelId], references: [id])
+  name        String   // "High Season"
+  startDate   DateTime
+  endDate     DateTime
+  priceMultiplier Decimal @default(1.0)
+}
+
+// --- Restaurant Models (New Sprint 6) ---
+
+model Restaurant {
+  id        String   @id @default(uuid())
+  name      String
+  currency  String   @default("EUR")
+  
+  zones     Zone[]
+  bookings  ResBooking[]
+}
+
+model Zone {
+  id           String   @id @default(uuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  name         String   // "Interior", "Terraza"
+  
+  tables       Table[]
+}
+
+model Table {
+  id        String   @id @default(uuid())
+  zoneId    String
+  zone      Zone     @relation(fields: [zoneId], references: [id])
+  name      String   // "Mesa 1"
+  capacity  Int      @default(4)
+  
+  resBookings ResBooking[]
+}
+
+model ResBooking {
+   id           String   @id @default(uuid())
+   restaurantId String
+   restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+   
+   tableId      String?
+   table        Table?   @relation(fields: [tableId], references: [id])
+   
+   guestName    String
+   date         DateTime // Date + Time
+   pax          Int
+   status       String   @default("CONFIRMED") // PENDING, CONFIRMED, CANCELLED
+   
+   createdAt    DateTime @default(now())
+}
+
+
+// --- Booking Module ---
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  CHECKED_IN
+  COMPLETED
+}
+
+enum BookingSource {
+  DIRECT
+  BOOKING_COM
+  AIRBNB
+  MANUAL
+}
+
+model Booking {
+  id            String   @id @default(uuid())
+  hotelId       String
+  hotel         Hotel    @relation(fields: [hotelId], references: [id])
+  
+  referenceCode String   @unique // "RES-XXXX"
+  
+  guestName     String
+  guestEmail    String?
+  guestPhone    String?
+  
+  status        BookingStatus @default(PENDING)
+  source        BookingSource @default(DIRECT)
+  
+  totalPrice    Decimal
+  currency      String   @default("EUR")
+  isPaid        Boolean  @default(false)
+  
+  checkInDate   DateTime
+  checkOutDate  DateTime
+  nights        Int
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  bookingRooms  BookingRoom[]
+  payments      Payment[]
+  
+  // External Mapping
+  externalId    String?  // UID from iCal
+}
+
+// Specific Unit Assignment
+model BookingRoom {
+  id          String   @id @default(uuid())
+  bookingId   String
+  booking     Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  roomId      String
+  room        Room     @relation(fields: [roomId], references: [id])
+  
+  rateSnapshot Decimal
+  date         DateTime // For single-day granularity if needed, or just rely on parent dates
+  
+  // Ideally, we just check overlap on parent dates, but this allows split rooms
+}
+
+// --- Channel Manager ---
+
+enum ChannelType {
+  BOOKING
+  AIRBNB
+  GENERIC
+}
+
+model ICalFeed {
+  id          String   @id @default(uuid())
+  roomTypeId  String
+  roomType    RoomType @relation(fields: [roomTypeId], references: [id])
+  
+  url         String
+  name        String?
+  source      ChannelType
+  
+  lastSync    DateTime?
+  isActive    Boolean  @default(true)
+}
+
+// --- CRM & Finance ---
+
+model Payment {
+  id          String   @id @default(uuid())
+  bookingId   String
+  booking     Booking  @relation(fields: [bookingId], references: [id])
+  amount      Decimal
+  gateway     String   // "stripe"
+  transactionId String?
+  status      String   // "succeeded"
+  createdAt   DateTime @default(now())
+}
+
+model User {
+  id          String   @id @default(uuid())
+  hotelId     String?
+  hotel       Hotel?   @relation(fields: [hotelId], references: [id])
+  email       String   @unique
+  password    String   
+  role        String   @default("ADMIN")
+}
