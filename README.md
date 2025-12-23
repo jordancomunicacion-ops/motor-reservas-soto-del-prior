@@ -63,8 +63,9 @@ npm run dev
 ## 🔑 Default Ports
 
 - **API**: `http://localhost:4000`
-- **Web**: `http://localhost:3001`
-- **Cocina (TPV)**: `http://localhost:3002`
+- **Web Widget**: `http://localhost:3001`
+- **App Cocina**: `http://localhost:3002`
+- **App Ganadera**: `http://localhost:3003`
 
 ## 📄 License
 
