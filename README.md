@@ -62,7 +62,7 @@ npm run dev
 
 ## 🔑 Default Ports
 
-- **API**: `http://localhost:3000`
+- **API**: `http://localhost:4000`
 - **Web**: `http://localhost:3001`
 
 ## 📄 License
