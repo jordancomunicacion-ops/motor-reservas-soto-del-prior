@@ -19,4 +19,14 @@ export class ChannelManagerController {
         res.setHeader('Content-Disposition', 'attachment; filename="calendar.ics"');
         res.send(ics);
     }
+
+    @Get('feeds')
+    async getFeeds() {
+        return this.channelService.getFeeds();
+    }
+
+    @Post('feeds')
+    async createFeed(@Body() body: { roomTypeId: string; url: string; name: string; source: string }) {
+        return this.channelService.createFeed(body);
+    }
 }

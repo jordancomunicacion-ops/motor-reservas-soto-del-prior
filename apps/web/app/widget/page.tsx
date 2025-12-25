@@ -1,11 +1,11 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { fetchAPI } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
-export default function WidgetPage() {
+function WidgetContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const hotelId = searchParams.get('hotelId') || "DEMO-HOTEL-ID";
@@ -65,62 +65,69 @@ export default function WidgetPage() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-zinc-950 flex items-center justify-center p-4" style={{ '--primary': styles.primary } as any}>
-            <Card className="w-full max-w-lg">
-                <CardHeader className="text-center">
-                    <img src="/logo-text.png" alt="SOTO DEL PRIOR" className="h-16 mx-auto mb-2" />
-                    <CardTitle style={{ color: styles.primary }}>Reserva tu Estancia</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    {/* STEP 1: SEARCH */}
-                    {step === 1 && (
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-sm font-medium">Entrada</label>
-                                    <input type="date" className="w-full border p-2 rounded" value={dates.from} onChange={e => setDates({ ...dates, from: e.target.value })} />
-                                </div>
-                                <div>
-                                    <label className="text-sm font-medium">Salida</label>
-                                    <input type="date" className="w-full border p-2 rounded" value={dates.to} onChange={e => setDates({ ...dates, to: e.target.value })} />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium">Huéspedes</label>
-                                <select className="w-full border p-2 rounded" value={pax} onChange={e => setPax(+e.target.value)}>
-                                    <option value="1">1 Adulto</option>
-                                    <option value="2">2 Adultos</option>
-                                    <option value="3">3 Adultos</option>
-                                    <option value="4">4 Adultos</option>
-                                </select>
-                            </div>
-                            <Button className="w-full" style={{ backgroundColor: styles.primary }} onClick={handleSearch} disabled={loading}>
-                                {loading ? 'Buscando...' : 'Buscar Disponibilidad'}
-                            </Button>
-                        </div>
-                    )}
-
-                    {/* STEP 2: SELECT */}
-                    {step === 2 && (
-                        <div className="space-y-4">
-                            <Button variant="outline" size="sm" onClick={() => setStep(1)}>&larr; Atrás</Button>
-                            <h3 className="font-semibold">Habitaciones Disponibles</h3>
-
+        <>
+            <link rel="stylesheet" href="/custom-widget.css" />
+            <div className="widget-container" style={{ '--primary': styles.primary } as any}>
+                <Card className="w-full max-w-lg">
+                    <CardContent>
+                        {/* STEP 1: SEARCH */}
+                        {step === 1 && (
                             <div className="space-y-2">
-                                {results.map(r => (
-                                    <div key={r.id} className="border p-3 rounded cursor-pointer hover:bg-gray-50" onClick={() => alert('¡Flujo de reserva completado!')}>
-                                        <div className="flex justify-between">
-                                            <span className="font-medium">{r.name}</span>
-                                            <span className="font-bold">€{r.totalPrice}</span>
-                                        </div>
-                                        <p className="text-sm text-gray-500">{r.description}</p>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-sm font-medium">Entrada</label>
+                                        <input type="date" className="w-full border p-2 rounded" value={dates.from} onChange={e => setDates({ ...dates, from: e.target.value })} />
                                     </div>
-                                ))}
+                                    <div>
+                                        <label className="text-sm font-medium">Salida</label>
+                                        <input type="date" className="w-full border p-2 rounded" value={dates.to} onChange={e => setDates({ ...dates, to: e.target.value })} />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-sm font-medium">Huéspedes</label>
+                                    <select className="w-full border p-2 rounded" value={pax} onChange={e => setPax(+e.target.value)}>
+                                        <option value="1">1 Adulto</option>
+                                        <option value="2">2 Adultos</option>
+                                        <option value="3">3 Adultos</option>
+                                        <option value="4">4 Adultos</option>
+                                    </select>
+                                </div>
+                                <Button className="w-full" style={{ backgroundColor: styles.primary }} onClick={handleSearch} disabled={loading}>
+                                    {loading ? 'Buscando...' : 'Buscar Disponibilidad'}
+                                </Button>
                             </div>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-        </div>
+                        )}
+
+                        {/* STEP 2: SELECT */}
+                        {step === 2 && (
+                            <div className="space-y-4">
+                                <Button variant="outline" size="sm" onClick={() => setStep(1)}>&larr; Atrás</Button>
+                                <h3 className="font-semibold">Habitaciones Disponibles</h3>
+
+                                <div className="space-y-2">
+                                    {results.map(r => (
+                                        <div key={r.id} className="border p-3 rounded cursor-pointer hover:bg-gray-50" onClick={() => alert('¡Flujo de reserva completado!')}>
+                                            <div className="flex justify-between">
+                                                <span className="font-medium">{r.name}</span>
+                                                <span className="font-bold">€{r.totalPrice}</span>
+                                            </div>
+                                            <p className="text-sm text-gray-500">{r.description}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+        </>
+    );
+}
+
+export default function WidgetPage() {
+    return (
+        <Suspense fallback={<div>Loading widget...</div>}>
+            <WidgetContent />
+        </Suspense>
     );
 }

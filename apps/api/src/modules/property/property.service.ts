@@ -10,6 +10,10 @@ export class PropertyService {
         return this.prisma.hotel.create({ data });
     }
 
+    async getHotels() {
+        return this.prisma.hotel.findMany();
+    }
+
     async getHotel(id: string) {
         return this.prisma.hotel.findUnique({
             where: { id },

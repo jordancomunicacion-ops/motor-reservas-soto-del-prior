@@ -45,23 +45,28 @@ export default function HotelsPage() {
 
     return (
         <div>
-            <h1 className="text-2xl font-bold mb-6">Hotels</h1>
+            <h1 className="text-2xl font-bold mb-6">Hoteles</h1>
 
             <div className="bg-white dark:bg-zinc-800 p-6 rounded-lg shadow mb-8">
-                <h2 className="text-lg font-semibold mb-4">Create New Hotel</h2>
-                <div className="flex gap-4">
-                    <input
-                        className="border p-2 rounded w-full dark:bg-zinc-900"
-                        placeholder="Hotel Name"
-                        value={newName}
-                        onChange={e => setNewName(e.target.value)}
-                    />
-                    <Button onClick={handleCreate}>Create</Button>
+                <h2 className="text-lg font-semibold mb-4">Crear Nuevo Hotel</h2>
+                <div className="flex flex-col gap-2">
+                    <label htmlFor="new-hotel-name" className="text-sm font-medium text-gray-700 dark:text-gray-300">Nombre del Hotel</label>
+                    <div className="flex gap-4">
+                        <input
+                            id="new-hotel-name"
+                            name="hotel-name"
+                            className="border p-2 rounded w-full dark:bg-zinc-900"
+                            placeholder="Nombre del Hotel"
+                            value={newName}
+                            onChange={e => setNewName(e.target.value)}
+                        />
+                        <Button onClick={handleCreate}>Crear</Button>
+                    </div>
                 </div>
             </div>
 
             <p className="text-gray-500">
-                * Note: Multi-hotel list view not yet implemented in API.
+                * Nota: La vista de lista multi-hotel aún no está implementada en la API.
             </p>
         </div>
     );

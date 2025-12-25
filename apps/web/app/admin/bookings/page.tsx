@@ -19,19 +19,19 @@ export default function BookingsPage() {
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold">All Bookings</h1>
-                <Button onClick={() => alert('Feature coming in Public Widget Sprint')}>+ New Booking</Button>
+                <h1 className="text-2xl font-bold">Listado de Reservas</h1>
+                <Button onClick={() => alert('Función disponible en próxima actualización')}>+ Nueva Reserva</Button>
             </div>
 
             <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded border border-blue-100 dark:border-blue-800 text-sm mb-4">
                 <div className="flex gap-2">
                     <input
-                        className="border p-1 rounded"
-                        placeholder="Paste Hotel ID here..."
+                        className="border p-1 rounded w-64"
+                        placeholder="Pegar ID del Hotel aquí..."
                         value={hotelId}
                         onChange={e => setHotelId(e.target.value)}
                     />
-                    <Button size="sm" onClick={loadBookings}>Load Bookings</Button>
+                    <Button size="sm" onClick={loadBookings}>Cargar Reservas</Button>
                 </div>
             </div>
 
@@ -40,10 +40,10 @@ export default function BookingsPage() {
                     <TableHeader>
                         <TableRow>
                             <TableHead>Ref</TableHead>
-                            <TableHead>Guest</TableHead>
-                            <TableHead>Check-in</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Amount</TableHead>
+                            <TableHead>Huésped</TableHead>
+                            <TableHead>Entrada</TableHead>
+                            <TableHead>Estado</TableHead>
+                            <TableHead>Importe</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -62,7 +62,7 @@ export default function BookingsPage() {
                         ))}
                         {bookings.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={5} className="text-center py-8 text-gray-500">No bookings found</TableCell>
+                                <TableCell colSpan={5} className="text-center py-8 text-gray-500">No se encontraron reservas</TableCell>
                             </TableRow>
                         )}
                     </TableBody>

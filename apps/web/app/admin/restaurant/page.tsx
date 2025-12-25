@@ -46,16 +46,16 @@ export default function RestaurantManager() {
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold">Restaurant Manager</h2>
-                <Button onClick={loadData}>Refresh</Button>
+                <h2 className="text-2xl font-bold">Gestión de Restaurante</h2>
+                <Button onClick={loadData}>Refrescar</Button>
             </div>
 
             <div className="flex gap-4 items-end">
                 <div>
-                    <label className="text-sm font-medium">New Zone Name</label>
-                    <input className="border p-2 rounded w-64 block" value={newZone} onChange={e => setNewZone(e.target.value)} placeholder="e.g. Roof Top" />
+                    <label className="text-sm font-medium">Nombre de Nueva Zona</label>
+                    <input className="border p-2 rounded w-64 block" value={newZone} onChange={e => setNewZone(e.target.value)} placeholder="ej. Terraza Superior" />
                 </div>
-                <Button onClick={addZone} disabled={loading}>+ Add Zone</Button>
+                <Button onClick={addZone} disabled={loading}>+ Añadir Zona</Button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -65,7 +65,7 @@ export default function RestaurantManager() {
                             <CardTitle>{zone.name}</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-sm text-gray-500 mb-4">{zone.tables?.length || 0} Tables</p>
+                            <p className="text-sm text-gray-500 mb-4">{zone.tables?.length || 0} Mesas</p>
                             <div className="space-y-2">
                                 {zone.tables?.map((t: any) => (
                                     <div key={t.id} className="flex justify-between border p-2 rounded text-sm">
@@ -73,7 +73,7 @@ export default function RestaurantManager() {
                                         <span className="text-xs bg-gray-100 px-2 py-1 rounded">Pax: {t.capacity}</span>
                                     </div>
                                 ))}
-                                <Button variant="outline" size="sm" className="w-full mt-2">+ Add Table</Button>
+                                <Button variant="outline" size="sm" className="w-full mt-2">+ Añadir Mesa</Button>
                             </div>
                         </CardContent>
                     </Card>

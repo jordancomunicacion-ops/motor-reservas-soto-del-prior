@@ -10,6 +10,11 @@ export class PropertyController {
         return this.propertyService.createHotel(body);
     }
 
+    @Get('hotels')
+    getHotels() {
+        return this.propertyService.getHotels();
+    }
+
     @Get('hotels/:id')
     getHotel(@Param('id') id: string) {
         return this.propertyService.getHotel(id);

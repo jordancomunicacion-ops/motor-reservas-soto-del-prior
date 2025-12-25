@@ -9,6 +9,9 @@ import { ChannelManagerModule } from './modules/channel-manager/channel-manager.
 import { InstallerModule } from './modules/installer/installer.module';
 import { RestaurantModule } from './modules/restaurant/restaurant.module';
 import { WidgetConfigModule } from './modules/config/widget-config.module';
+import { RatesModule } from './modules/rates/rates.module';
+import { CrmModule } from './modules/crm/crm.module';
+import { CampaignsModule } from './modules/campaigns/campaigns.module';
 
 @Module({
   imports: [
@@ -19,7 +22,12 @@ import { WidgetConfigModule } from './modules/config/widget-config.module';
     ChannelManagerModule,
     InstallerModule,
     RestaurantModule,
-    WidgetConfigModule
+    WidgetConfigModule,
+    RestaurantModule,
+    WidgetConfigModule,
+    RatesModule,
+    CrmModule,
+    CampaignsModule
   ],
   controllers: [AppController],
   providers: [AppService],

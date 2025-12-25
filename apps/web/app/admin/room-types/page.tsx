@@ -27,20 +27,25 @@ export default function RoomTypesPage() {
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold">Room Types</h1>
-                <Button>+ Add Room Type</Button>
+                <h1 className="text-2xl font-bold">Tipos de Habitación</h1>
+                <Button>+ Añadir Tipo</Button>
             </div>
 
             <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded border border-blue-100 dark:border-blue-800 text-sm">
-                <p><strong>Dev Note:</strong> Please create a Hotel first in the Hotels tab and paste the ID here to manage its rooms.</p>
-                <div className="flex gap-2 mt-2">
-                    <input
-                        className="border p-1 rounded"
-                        placeholder="Paste Hotel ID here..."
-                        value={hotelId}
-                        onChange={e => setHotelId(e.target.value)}
-                    />
-                    <Button size="sm" onClick={loadTypes}>Load</Button>
+                <p><strong>Nota Dev:</strong> Por favor crea un Hotel primero en la pestaña Hoteles y pega el ID aquí para gestionar sus habitaciones.</p>
+                <div className="flex flex-col gap-2 mt-2">
+                    <label htmlFor="hotel-id-input" className="font-medium">ID del Hotel</label>
+                    <div className="flex gap-2">
+                        <input
+                            id="hotel-id-input"
+                            name="hotelId"
+                            className="border p-1 rounded w-64"
+                            placeholder="Pegar ID del Hotel aquí..."
+                            value={hotelId}
+                            onChange={e => setHotelId(e.target.value)}
+                        />
+                        <Button size="sm" onClick={loadTypes}>Cargar</Button>
+                    </div>
                 </div>
             </div>
 
@@ -51,9 +56,9 @@ export default function RoomTypesPage() {
                             <CardTitle>{type.name}</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p>Base Price: €{type.basePrice}</p>
-                            <p>Capacity: {type.capacity} pax</p>
-                            <p className="text-xs text-gray-500 mt-2">{type.rooms?.length || 0} units</p>
+                            <p>Precio Base: €{type.basePrice}</p>
+                            <p>Capacidad: {type.capacity} pax</p>
+                            <p className="text-xs text-gray-500 mt-2">{type.rooms?.length || 0} unidades</p>
                         </CardContent>
                     </Card>
                 ))}

@@ -1,5 +1,24 @@
-import { AdminLayout } from '@/components/admin/layout';
+import { Sidebar } from "@/components/admin/Sidebar";
+import { Button } from "@/components/ui/button";
 
-export default function Layout({ children }: { children: React.ReactNode }) {
-    return <AdminLayout>{children}</AdminLayout>;
+export default function AdminLayout({
+    children,
+}: {
+    children: React.ReactNode;
+}) {
+    return (
+        <div className="min-h-screen bg-muted/40">
+            <Sidebar />
+            <div className="flex flex-col md:pl-64 transition-all duration-300">
+                <header className="flex h-14 items-center gap-4 border-b bg-background px-6 lg:h-[60px] sticky top-0 z-20">
+                    <div className="w-full flex-1">
+                        <h1 className="text-lg font-semibold text-foreground">Panel de Control</h1>
+                    </div>
+                </header>
+                <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">
+                    {children}
+                </main>
+            </div>
+        </div>
+    );
 }
