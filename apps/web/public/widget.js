@@ -29,7 +29,7 @@
         btn.style.bottom = '20px';
         btn.style.right = '20px';
         btn.style.padding = '15px 25px';
-        btn.style.backgroundColor = '#9333EA'; // Vibrant Purple
+        btn.style.backgroundColor = '#C59D5F'; // Corporate Gold
         btn.style.color = '#fff';
         btn.style.border = 'none';
         btn.style.borderRadius = '50px';
