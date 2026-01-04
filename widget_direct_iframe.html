@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Direct Widget Test</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background: #e0e0e0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .iframe-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="iframe-container">
+        <h2>Prueba Directa de Iframe</h2>
+        <p>Si ves el diseño horizontal aquí, el problema es el script <code>widget.js</code> en el otro archivo.</p>
+
+        <!-- Direct Iframe Embed -->
+        <iframe src="http://localhost:3001/widget/restaurant" width="850" height="600"
+            style="border: 1px solid #ccc; border-radius: 8px;"></iframe>
+    </div>
+
+</body>
+
+</html>

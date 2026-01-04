@@ -1,71 +1,164 @@
-(function (window, document) {
-    // Config
+(function () {
     const SCRIPT_ID = 'soto-widget-script';
     const CONTAINER_ID = 'soto-widget-container';
-    const IFRAME_URL = 'http://localhost:3001/widget'; // Updated port to 3001
+    // const IFRAME_URL = 'http://localhost:3001/widget/restaurant'; 
+    // Dynamically detecting if valid url or localhost
+    const IFRAME_URL = 'http://localhost:3001/widget/restaurant';
 
     function init() {
-        const existingContainer = document.getElementById(CONTAINER_ID);
-        if (existingContainer) return;
+        // Prevent multiple initializations
+        if (document.getElementById(CONTAINER_ID)) return;
 
-        // Create container
-        const container = document.createElement('div');
-        container.id = CONTAINER_ID;
-        container.style.position = 'fixed';
-        container.style.bottom = '80px'; // Moved up slightly
-        container.style.right = '20px';
-        container.style.width = '400px';
-        container.style.height = '600px';
-        container.style.zIndex = '9999';
-        container.style.boxShadow = '0 10px 25px rgba(0,0,0,0.1)';
-        container.style.borderRadius = '12px';
-        container.style.overflow = 'hidden';
-        container.style.display = 'none'; // Start hidden
+        // 1. Inject CSS
+        const style = document.createElement('style');
+        style.innerHTML = `
+            #soto-widget-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 999999;
+                display: none; /* Hidden by default */
+                justify-content: center;
+                align-items: center;
+                backdrop-filter: blur(4px);
+                opacity: 0;
+                transition: opacity 0.3s ease;
+            }
+            #soto-widget-overlay.open {
+                display: flex;
+                opacity: 1;
+            }
+            #soto-widget-modal {
+                background: white;
+                width: 900px;
+                max-width: 95vw;
+                height: auto;
+                max-height: 90vh;
+                border-radius: 8px;
+                box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+                position: relative;
+                overflow: hidden;
+                transform: scale(0.95);
+                transition: transform 0.3s ease;
+            }
+            #soto-widget-overlay.open #soto-widget-modal {
+                transform: scale(1);
+            }
+            #soto-widget-close {
+                position: absolute;
+                top: 15px;
+                right: 15px;
+                background: #f4f4f4;
+                border: none;
+                font-size: 24px;
+                cursor: pointer;
+                color: #333;
+                width: 32px;
+                height: 32px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10;
+                padding-bottom: 4px;
+            }
+            #soto-widget-close:hover {
+                background: #e0e0e0;
+            }
+            #soto-widget-launcher {
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                background: #0A0A0A;
+                color: #C59D5F;
+                border: 1px solid #C59D5F;
+                padding: 12px 24px;
+                font-family: 'Oswald', sans-serif;
+                font-weight: bold;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+                cursor: pointer;
+                z-index: 999990;
+                box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+                transition: all 0.3s ease;
+            }
+            #soto-widget-launcher:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+            }
+            #soto-widget-iframe {
+                width: 100%;
+                height: 650px; /* Fixed height for the widget content */
+                border: none;
+            }
+        `;
+        document.head.appendChild(style);
 
-        // Launcher Button (Round FAB)
-        const btn = document.createElement('button');
-        btn.innerHTML = '📅 Reserva Ahora';
-        btn.style.position = 'fixed';
-        btn.style.bottom = '20px';
-        btn.style.right = '20px';
-        btn.style.padding = '15px 25px';
-        btn.style.backgroundColor = '#C59D5F'; // Corporate Gold
-        btn.style.color = '#fff';
-        btn.style.border = 'none';
-        btn.style.borderRadius = '50px';
-        btn.style.cursor = 'pointer';
-        btn.style.zIndex = '10000';
-        btn.style.fontWeight = 'bold';
-        btn.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-        btn.onmouseover = () => btn.style.transform = 'scale(1.05)';
-        btn.onmouseout = () => btn.style.transform = 'scale(1)';
-        btn.style.transition = 'transform 0.2s';
+        // 2. Create Elements
 
-        // Iframe
+        // Overlay & Modal
+        const overlay = document.createElement('div');
+        overlay.id = 'soto-widget-overlay';
+
+        const modal = document.createElement('div');
+        modal.id = 'soto-widget-modal';
+
+        const closeBtn = document.createElement('button');
+        closeBtn.id = 'soto-widget-close';
+        closeBtn.innerHTML = '&times;';
+        closeBtn.onclick = closeModal;
+
         const iframe = document.createElement('iframe');
+        iframe.id = 'soto-widget-iframe';
         iframe.src = IFRAME_URL;
-        iframe.style.width = '100%';
-        iframe.style.height = '100%';
-        iframe.style.border = 'none';
 
-        container.appendChild(iframe);
-        document.body.appendChild(container);
-        document.body.appendChild(btn);
+        modal.appendChild(closeBtn);
+        modal.appendChild(iframe);
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
 
-        // Toggle Logic
-        let isOpen = false;
-        btn.onclick = () => {
-            isOpen = !isOpen;
-            container.style.display = isOpen ? 'block' : 'none';
-            btn.innerHTML = isOpen ? '✖ Cerrar' : '📅 Reserva Ahora';
+        // 3. Logic
+        function openModal(e) {
+            if (e) e.preventDefault();
+            overlay.classList.add('open');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal() {
+            overlay.classList.remove('open');
+            document.body.style.overflow = '';
+        }
+
+        // Close on clicking outside
+        overlay.onclick = function (e) {
+            if (e.target === overlay) {
+                closeModal();
+            }
         };
+
+        // 4. Expose API and Bind Triggers
+        window.SotoWidget = {
+            open: openModal,
+            close: closeModal
+        };
+
+        // Bind to any element with class 'soto-widget-trigger'
+        document.querySelectorAll('.soto-widget-trigger').forEach(btn => {
+            btn.addEventListener('click', openModal);
+        });
+
+        // Also listen for future elements (optional, but good for SPAs) or just run on init
+        console.log('Soto Widget Initialized. Use SotoWidget.open() or class .soto-widget-trigger');
     }
 
-    // Auto-init
-    if (document.readyState === 'complete') {
-        init();
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
     } else {
-        window.addEventListener('load', init);
+        init();
     }
 
-})(window, document);
+})();

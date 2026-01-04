@@ -10,8 +10,11 @@ import { InstallerModule } from './modules/installer/installer.module';
 import { RestaurantModule } from './modules/restaurant/restaurant.module';
 import { WidgetConfigModule } from './modules/config/widget-config.module';
 import { RatesModule } from './modules/rates/rates.module';
+import { PaymentModule } from './modules/payments/payment.module';
 import { CrmModule } from './modules/crm/crm.module';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';
+import { GlobalModule } from './modules/global/global.module';
+import { MailModule } from './modules/mail/mail.module';
 
 @Module({
   imports: [
@@ -27,7 +30,9 @@ import { CampaignsModule } from './modules/campaigns/campaigns.module';
     WidgetConfigModule,
     RatesModule,
     CrmModule,
-    CampaignsModule
+    CampaignsModule,
+    PaymentModule,
+    MailModule
   ],
   controllers: [AppController],
   providers: [AppService],

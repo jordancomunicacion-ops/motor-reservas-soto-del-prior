@@ -113,6 +113,10 @@ model RatePlan {
   cancellationPolicy String? // "Free up to 7 days..."
   mealsIncluded      String? // "None", "Breakfast"
 
+  // Payment Policy
+  requireCreditCard  Boolean @default(false)
+  noShowFee          Decimal @default(0)
+
   dailyPrices      DailyPrice[]
   restrictions     Restriction[]
   channelMappings  ChannelMapping[]
@@ -192,6 +196,11 @@ model Booking {
   totalPrice    Decimal
   currency      String   @default("EUR")
   isPaid        Boolean  @default(false)
+  
+  // Stripe Integration
+  stripeCustomerId      String?
+  stripePaymentMethodId String? 
+  stripePaymentIntentId String?
   
   checkInDate   DateTime
   checkOutDate  DateTime
@@ -310,6 +319,7 @@ model Restaurant {
   currency  String   @default("EUR")
   zones     Zone[]
   bookings  ResBooking[]
+  waitlist  RestaurantWaitlist[]
 }
 
 model Zone {
@@ -317,6 +327,8 @@ model Zone {
   restaurantId String
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
   name         String   // "Interior", "Terraza"
+  index        Int      @default(0) // Sorting order
+  isActive     Boolean  @default(true)
   tables       Table[]
 }
 
@@ -326,35 +338,60 @@ model Table {
   zone      Zone     @relation(fields: [zoneId], references: [id])
   name      String   // "Mesa 1"
   capacity  Int      @default(4)
+  
+  // Visual Plan Coords
+  x         Int      @default(0)
+  y         Int      @default(0)
+  width     Int      @default(60) // px or grid units
+  height    Int      @default(60)
+  shape     String   @default("RECTANGLE") // RECTANGLE, ROUND
+  rotation  Int      @default(0)
+  
+  isActive  Boolean  @default(true)
+  minPax    Int      @default(1)
+  maxPax    Int      @default(4)
+
   resBookings ResBooking[]
-  tableHolds  TableHold[] // Synergy
+  tableHolds  TableHold[] 
 }
 
 model ResBooking {
    id           String   @id @default(uuid())
    restaurantId String
    restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+   
    tableId      String?
    table        Table?   @relation(fields: [tableId], references: [id])
+   
+   // Guest Info
    guestName    String
-   date         DateTime // Date + Time
+   guestPhone   String?
+   guestEmail   String?
    pax          Int
-   status       String   @default("CONFIRMED") 
+   
+   date         DateTime // Date + Time
+   duration     Int      @default(90) // Minutes
+
+   status       String   @default("CONFIRMED") // PENDING, CONFIRMED, SEATED, FINISHED, CANCELLED, NO_SHOW
+   
+   // CRM & Metadata
+   tags         String?  // JSON array ["VIP", "ALLERGIES"]
+   notes        String?
+   origin       String   @default("MANUAL") // GOOGLE, WEB, PHONE, WALK_IN
+      // Stripe Integration
+    stripeCustomerId      String?
+    stripePaymentMethodId String?
+    
+    smsSent      Boolean  @default(false)
+   emailSent    Boolean  @default(false)
+
    createdAt    DateTime @default(now())
+   updatedAt    DateTime @updatedAt // Added
    
    // Synergy: Architectural Upgrades
    idempotencyKey String? @unique
    channelId      String?
    channel        RestaurantChannel? @relation(fields: [channelId], references: [id])
-}
-
-model TableHold {
-  id        String   @id @default(uuid())
-  tableId   String
-  table     Table    @relation(fields: [tableId], references: [id])
-  token     String   @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
 }
 
 model RestaurantChannel {
@@ -369,11 +406,37 @@ model ResPolicy {
   name        String // "Standard", "Strict"
   cancelHours Int    // 24
   noShowFee   Decimal @default(0)
+  requireCreditCard Boolean @default(true) 
   isActive    Boolean @default(true)
 }
 
-// --- Hotel Synergy Extensions ---
+model TableHold {
+  id        String   @id @default(uuid())
+  tableId   String
+  table     Table    @relation(fields: [tableId], references: [id])
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
 
+model RestaurantWaitlist {
+  id           String   @id @default(uuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  
+  name         String
+  phone        String?
+  pax          Int
+  notes        String?
+  
+  status       String   @default("WAITING") // WAITING, NOTIFIED, SEATED, CANCELLED
+  
+  createdAt    DateTime @default(now())
+  notifiedAt   DateTime?
+}
+
+// Reuse HotelWaitlist for consistency or keep separate? 
+// Provided schema had HotelWaitlist. Keeping it as is.
 model HotelWaitlist {
   id          String   @id @default(uuid())
   hotelId     String

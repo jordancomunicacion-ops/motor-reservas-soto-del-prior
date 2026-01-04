@@ -27,11 +27,11 @@ export function Sidebar() {
         { href: '/admin', label: 'Panel Control', icon: LayoutDashboard },
         { href: '/admin/calendar', label: 'Calendario', icon: Calendar },
         { href: '/admin/bookings', label: 'Reservas', icon: BookCheck },
-        { href: '/admin/hotels', label: 'Hoteles', icon: Building2 },
-        { href: '/admin/rates', label: 'Tarifas y Restricciones', icon: Tags },
         { href: '/admin/restaurant', label: 'Restaurante', icon: Utensils },
-        { href: '/admin/widget-config', label: 'Configuración Widget', icon: Settings2 },
+        { href: '/admin/hotels', label: 'Hotel', icon: Building2 },
+        { href: '/admin/rates', label: 'Tarifas y Restricciones', icon: Tags },
         { href: '/admin/channels', label: 'Gestor de Canales', icon: Share2 },
+        { href: '/admin/widget-config', label: 'Configuración Widget', icon: Settings2 },
     ];
 
     return (

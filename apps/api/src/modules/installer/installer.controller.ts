@@ -11,7 +11,14 @@ export class InstallerController {
     }
 
     @Post('setup')
-    setup(@Body() body: any) {
+    async setup(@Body() body: {
+        hotelName: string;
+        currency: string;
+        adminEmail: string;
+        createRestaurant?: boolean;
+        restaurantName?: string;
+        zones?: { name: string; tables: number }[]
+    }) {
         return this.installerService.setupSystem(body);
     }
 }
