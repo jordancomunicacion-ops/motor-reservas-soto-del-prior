@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class RestaurantService {
@@ -27,18 +28,17 @@ export class RestaurantService {
         const start = new Date(data.date); // Assuming YYYY-MM-DD
         start.setHours(hours, minutes, 0, 0);
 
-        // 2. Initial Status PENDING (Wait for email confirmation usually, or auto-confirm if no payment needed)
-        // For this flow, we set PENDING and ask for confirmation email.
+        // 2. Initial Status PENDING
         const booking = await this.prisma.resBooking.create({
             data: {
                 restaurantId: data.restaurantId,
                 date: start,
                 pax: data.pax,
-                name: data.name,
-                email: data.email,
-                phone: data.phone,
+                guestName: data.name,
+                guestEmail: data.email,
+                guestPhone: data.phone,
                 notes: data.notes,
-                status: 'PENDING_CONFIRMATION', // Ensure this enum exists or use 'PENDING'
+                status: 'PENDING_CONFIRMATION',
                 origin: 'WIDGET'
             }
         });
@@ -53,7 +53,7 @@ export class RestaurantService {
         const booking = await this.prisma.resBooking.findUnique({ where: { id: bookingId } });
         if (!booking) throw new Error('Reserva no encontrada');
 
-        if (booking.status === 'CONFIRMED') return booking; // Idempotent
+        if (booking.status === 'CONFIRMED') return booking;
 
         const updated = await this.prisma.resBooking.update({
             where: { id: bookingId },
@@ -77,8 +77,6 @@ export class RestaurantService {
         return updated;
     }
 
-    // ... (existing code methods) ...
-
     async createRestaurant(data: { name: string; currency: string }) {
         return this.prisma.restaurant.create({ data });
     }
@@ -89,10 +87,8 @@ export class RestaurantService {
 
     // --- Visual Plan & Zones ---
     async syncZones(restaurantId: string, zones: any[]) {
-        // Batch update/create zones
-        // Simplification: Iterate and upsert. For re-ordering.
         for (const z of zones) {
-            if (z.id && z.id.length > 10) { // Existing UUID likely
+            if (z.id && z.id.length > 10) {
                 await this.prisma.zone.update({ where: { id: z.id }, data: { name: z.name, index: z.index, isActive: z.isActive } });
             } else {
                 await this.prisma.zone.create({ data: { restaurantId, name: z.name, index: z.index } });
@@ -110,7 +106,7 @@ export class RestaurantService {
     // --- Tables ---
     async syncTables(zoneId: string, tables: any[]) {
         // Bulk update positions for visual editor
-        const results = [];
+        const results: any[] = [];
         for (const t of tables) {
             if (t.id && t.id.includes('-')) {
                 const updated = await this.prisma.table.update({

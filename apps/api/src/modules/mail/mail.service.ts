@@ -11,7 +11,7 @@ export class MailService {
         // TO-DO: Use Environment Variables for production
         this.transporter = nodemailer.createTransport({
             host: process.env.SMTP_HOST || 'localhost',
-            port: parseInt(process.env.SMTP_PORT) || 1025, // Default to Mailhog/Mailpit port or 587
+            port: parseInt(process.env.SMTP_PORT || '1025'), // Default to Mailhog/Mailpit port or 587
             secure: false, // true for 465, false for other ports
             auth: {
                 user: process.env.SMTP_USER || 'user',

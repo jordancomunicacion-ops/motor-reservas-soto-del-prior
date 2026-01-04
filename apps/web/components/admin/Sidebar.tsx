@@ -13,7 +13,8 @@ import {
     Settings2,
     Share2,
     Users,
-    ArrowLeft
+    ArrowLeft,
+    Globe
 } from 'lucide-react';
 
 function classNames(...classes: string[]) {
@@ -31,6 +32,7 @@ export function Sidebar() {
         { href: '/admin/hotels', label: 'Hotel', icon: Building2 },
         { href: '/admin/rates', label: 'Tarifas y Restricciones', icon: Tags },
         { href: '/admin/channels', label: 'Gestor de Canales', icon: Share2 },
+        { href: '/admin/infrastructure/domains', label: 'Infraestructura', icon: Globe },
         { href: '/admin/widget-config', label: 'Configuración Widget', icon: Settings2 },
     ];
 
