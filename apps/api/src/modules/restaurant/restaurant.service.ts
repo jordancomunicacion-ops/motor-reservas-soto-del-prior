@@ -2,7 +2,7 @@ import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 
 @Injectable()
 export class RestaurantService {
-    private readonly ENGINE_URL = 'http://localhost:4001';
+    private readonly ENGINE_URL = process.env.ENGINE_URL || 'http://localhost:4001';
 
     constructor() { }
 

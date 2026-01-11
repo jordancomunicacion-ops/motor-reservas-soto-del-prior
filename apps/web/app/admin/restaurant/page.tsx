@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { CalendarIcon, ChevronLeft, ChevronRight, Plus, RefreshCw, LayoutGrid, List } from 'lucide-react';
@@ -14,7 +14,7 @@ import { fetchAPI } from '@/lib/api';
 import { useSearchParams } from 'next/navigation';
 import { DateSelector } from '@/components/admin/DateSelector';
 
-export default function RestaurantManager() {
+function RestaurantManagerContent() {
     const searchParams = useSearchParams();
     const context = searchParams.get('context') || 'hotel'; // hotel | restaurant
 
@@ -26,7 +26,7 @@ export default function RestaurantManager() {
     const [zones, setZones] = useState<any[]>([]);
     const [bookings, setBookings] = useState<any[]>([]);
     const [waitlist, setWaitlist] = useState<any[]>([]);
-    const [rawTables, setRawTables] = useState<any[]>([]); // Flattened tables
+    const [rawTables, setRawTables] = useState<any>([]); // Flattened tables
 
     // UI State
     const [isFormOpen, setIsFormOpen] = useState(false);
@@ -219,5 +219,13 @@ export default function RestaurantManager() {
                 initialDate={date}
             />
         </div>
+    );
+}
+
+export default function RestaurantManager() {
+    return (
+        <Suspense fallback={<div className="flex items-center justify-center h-screen">Cargando...</div>}>
+            <RestaurantManagerContent />
+        </Suspense>
     );
 }

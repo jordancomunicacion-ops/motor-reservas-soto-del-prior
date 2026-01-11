@@ -1,7 +1,7 @@
 'use client';
 
 import { Building2, Utensils, ChevronsUpDown, Check } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 // import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command"
 // import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -11,7 +11,7 @@ import { fetchAPI } from '@/lib/api';
 
 type ContextItem = { id: string; name: string };
 
-export function LocationSwitcher() {
+function LocationSwitcherContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [open, setOpen] = useState(false);
@@ -113,5 +113,13 @@ export function LocationSwitcher() {
                 </div>
             )}
         </div>
+    );
+}
+
+export function LocationSwitcher() {
+    return (
+        <Suspense fallback={<div className="w-[250px] h-10 bg-gray-100 animate-pulse rounded" />}>
+            <LocationSwitcherContent />
+        </Suspense>
     );
 }
