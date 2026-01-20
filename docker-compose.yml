@@ -1,18 +1,109 @@
-version: '3.8'
-
-services:
-  db:
-    image: postgres:15-alpine
-    container_name: sotodelprior_db
-    restart: always
-    environment:
-      POSTGRES_USER: soto_user
-      POSTGRES_PASSWORD: soto_password
-      POSTGRES_DB: sotodelprior
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+networks:
+  proxy-net:
+    external: true
+  reservas-internal-net:
+    driver: bridge
+    internal: true
 
 volumes:
-  postgres_data:
+  reservas_db_data:
+
+
+services:
+  reservas-db:
+    image: postgres:15-alpine
+    container_name: reservas-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-reservas}
+      POSTGRES_USER: ${DB_USER:-reservas_user}
+      POSTGRES_PASSWORD: ${DB_PASS:-reservas_pass}
+    volumes:
+      - reservas_db_data:/var/lib/postgresql/data
+    networks:
+      - reservas-internal-net
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:-reservas_user}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  reservas-engine:
+    build:
+      context: ./apps/motor-reservas
+      dockerfile: Dockerfile
+    container_name: reservas-engine
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-reservas_user}:${DB_PASS:-reservas_pass}@reservas-db:5432/${DB_NAME:-reservas}
+      PORT: 3000
+    networks:
+      - reservas-internal-net
+    depends_on:
+      reservas-db:
+        condition: service_healthy
+    expose:
+      - "3000"
+
+  reservas-api:
+    build:
+      context: ./apps/motor-reservas
+      dockerfile: Dockerfile
+    container_name: reservas-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-reservas_user}:${DB_PASS:-reservas_pass}@reservas-db:5432/${DB_NAME:-reservas}
+      ENGINE_URL: http://reservas-engine:3000
+      PORT: 3000
+    networks:
+      - reservas-internal-net
+      - proxy-net
+    depends_on:
+      reservas-db:
+        condition: service_healthy
+      reservas-engine:
+        condition: service_started
+    expose:
+      - "3000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.reservas-api.rule=Host(`api.reservas.sotodelprior.com`)"
+      - "traefik.http.routers.reservas-api.entrypoints=websecure"
+      - "traefik.http.routers.reservas-api.tls=true"
+      - "traefik.http.services.reservas-api.loadbalancer.server.port=3000"
+
+  reservas-web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: https://api.reservas.sotodelprior.com
+    container_name: reservas-web
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: https://api.reservas.sotodelprior.com
+      AUTH_TRUST_HOST: "true"
+      AUTH_URL: "https://reservas.sotodelprior.com"
+      AUTH_SECRET: "${AUTH_SECRET:-supersecretkeyreservas123}"
+      DATABASE_URL: postgresql://${DB_USER:-reservas_user}:${DB_PASS:-reservas_pass}@reservas-db:5432/${DB_NAME:-reservas}
+    networks:
+      - proxy-net
+      - reservas-internal-net
+    depends_on:
+      - reservas-api
+    expose:
+      - "3000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.reservas-web.rule=Host(`reservas.sotodelprior.com`)"
+      - "traefik.http.routers.reservas-web.entrypoints=websecure"
+      - "traefik.http.routers.reservas-web.tls=true"
+      - "traefik.http.routers.reservas-web.tls.certresolver=le"
+      - "traefik.http.services.reservas-web.loadbalancer.server.port=3000"
+
+      # Redirect HTTP -> HTTPS
+      - "traefik.http.routers.reservas-web-http.rule=Host(`reservas.sotodelprior.com`)"
+      - "traefik.http.routers.reservas-web-http.entrypoints=web"
+      - "traefik.http.routers.reservas-web-http.middlewares=reservas-https-redirect"
+      - "traefik.http.middlewares.reservas-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.reservas-https-redirect.redirectscheme.permanent=true"

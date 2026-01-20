@@ -4,7 +4,17 @@ import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
+import { deployApp } from '@/app/actions/deploy';
+
 export default function AdminDashboard() {
+    const handleDeploy = async () => {
+        try {
+            await deployApp();
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
     return (
         <div className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -150,6 +160,13 @@ export default function AdminDashboard() {
                                 Crear Nueva Reserva
                             </Button>
                         </Link>
+                        <Button
+                            className="w-full bg-orange-600 hover:bg-orange-700 text-white"
+                            variant="default"
+                            onClick={handleDeploy}
+                        >
+                            Desplegar Reservas
+                        </Button>
                     </CardContent>
                 </Card>
             </div>

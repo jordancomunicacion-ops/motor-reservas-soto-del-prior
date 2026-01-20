@@ -3,7 +3,7 @@
     const CONTAINER_ID = 'soto-widget-container';
     // const IFRAME_URL = 'http://localhost:3001/widget/restaurant'; 
     // Dynamically detecting if valid url or localhost
-    const IFRAME_URL = 'http://localhost:3001/widget/restaurant';
+    const IFRAME_URL = 'https://reservas.sotodelprior.com/widget/restaurant';
 
     function init() {
         // Prevent multiple initializations

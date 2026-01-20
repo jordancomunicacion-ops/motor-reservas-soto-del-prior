@@ -309,7 +309,7 @@ model User {
   hotel       Hotel?   @relation(fields: [hotelId], references: [id])
   email       String   @unique
   name        String?
-  passwordHash String   
+  password     String   
   role        String   @default("ADMIN")
 }
 

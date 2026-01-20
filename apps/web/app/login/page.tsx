@@ -11,8 +11,8 @@ export default function Page() {
     );
 
     return (
-        <div className="flex h-screen items-center justify-center bg-gray-50">
-            <div className="w-full max-w-md rounded-lg bg-white p-8 shadow-md">
+        <div className="flex h-screen items-center justify-center bg-gradient-to-br from-purple-50 to-violet-100">
+            <div className="w-full max-w-md rounded-lg bg-white p-8 shadow-lg border border-purple-100">
                 <div className="flex justify-center mb-6">
                     <img src="/logo-icon.png" alt="SOTO DEL PRIOR" className="h-24" />
                 </div>
@@ -28,7 +28,7 @@ export default function Page() {
                             Email
                         </label>
                         <input
-                            className="block w-full rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                            className="block w-full rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-purple-500 focus:outline-none focus:ring-purple-500 sm:text-sm"
                             id="email"
                             type="email"
                             name="email"
@@ -45,7 +45,7 @@ export default function Page() {
                             Contraseña
                         </label>
                         <input
-                            className="block w-full rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                            className="block w-full rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-purple-500 focus:outline-none focus:ring-purple-500 sm:text-sm"
                             id="password"
                             type="password"
                             name="password"
@@ -71,7 +71,7 @@ export default function Page() {
                                 id="remember-me"
                                 name="remember-me"
                                 type="checkbox"
-                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                             />
                             <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
                                 Recuérdame
@@ -80,7 +80,7 @@ export default function Page() {
                     </div>
 
                     <button
-                        className="flex w-full justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
+                        className="flex w-full justify-center rounded-md border border-transparent bg-purple-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50"
                         aria-disabled={isPending}
                         disabled={isPending}
                     >
@@ -88,7 +88,7 @@ export default function Page() {
                     </button>
 
                     <div className="text-center text-xs mt-4">
-                        <Link href="/forgot-password" className="font-medium text-gray-500 hover:text-gray-700">
+                        <Link href="/forgot-password" className="font-medium text-purple-600 hover:text-purple-800">
                             ¿Olvidaste tu contraseña?
                         </Link>
                     </div>

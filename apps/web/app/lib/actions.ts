@@ -8,8 +8,16 @@ export async function authenticate(
     formData: FormData,
 ) {
     try {
-        await signIn('credentials', formData);
+        await signIn('credentials', {
+            email: formData.get('email'),
+            password: formData.get('password'),
+            redirectTo: '/admin',
+        });
     } catch (error) {
+        if ((error as Error).message.includes('NEXT_REDIRECT')) {
+            throw error;
+        }
+
         if (error instanceof AuthError) {
             switch (error.type) {
                 case 'CredentialsSignin':

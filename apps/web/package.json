@@ -42,5 +42,8 @@
     "typescript": "^5",
     "@types/bcryptjs": "^2.4.6",
     "prisma": "^5.22.0"
+  },
+  "prisma": {
+    "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
   }
 }
