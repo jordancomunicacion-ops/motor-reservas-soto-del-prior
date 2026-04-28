@@ -1,0 +1,143 @@
+services:
+  sotocrm-db:
+    image: postgres:15-alpine
+    container_name: sotocrm-db
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - crm_db_data:/var/lib/postgresql/data
+    networks:
+      - crm-internal-net
+    ports:
+      - "5435:5432"
+    restart: unless-stopped
+
+  sotocrm-api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: sotocrm-api
+    depends_on:
+      - sotocrm-db
+    environment:
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASS}@sotocrm-db:5432/${DB_NAME}
+      PORT: 3000
+      ENGINE_URL: http://sotocrm-engine:3000
+    networks:
+      - crm-internal-net
+      - proxy-net
+    expose:
+      - "3000"
+    labels:
+      - "traefik.enable=true"
+      # Router HTTP
+      - "traefik.http.routers.sotocrm-api-http.rule=Host(`api.crm.sotodelprior.com`)"
+      - "traefik.http.routers.sotocrm-api-http.entrypoints=web"
+      - "traefik.http.routers.sotocrm-api-http.middlewares=redirect-to-https"
+      # Router HTTPS
+      - "traefik.http.routers.sotocrm-api.rule=Host(`api.crm.sotodelprior.com`)"
+      - "traefik.http.routers.sotocrm-api.entrypoints=websecure"
+      - "traefik.http.routers.sotocrm-api.tls=true"
+      - "traefik.http.routers.sotocrm-api.tls.certresolver=le"
+      # Servicio
+      - "traefik.http.services.sotocrm-api.loadbalancer.server.port=3000"
+      # Middleware
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+    restart: unless-stopped
+
+  sotocrm-engine:
+    build:
+      context: ./apps/crm-engine
+      dockerfile: Dockerfile
+    container_name: sotocrm-engine
+    depends_on:
+      - sotocrm-db
+    environment:
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASS}@sotocrm-db:5432/${DB_NAME}
+      PORT: 3000
+    networks:
+      - crm-internal-net
+    expose:
+      - "3000"
+    restart: unless-stopped
+
+  sotocrm-redis:
+    image: redis:7-alpine
+    container_name: sotocrm-redis
+    networks:
+      - crm-internal-net
+    restart: unless-stopped
+
+  sotocrm-web:
+    image: crm-web:manual
+    container_name: sotocrm-web
+    depends_on:
+      - sotocrm-db
+      - sotocrm-redis
+    environment:
+      NEXT_PUBLIC_API_URL: https://api.crm.sotodelprior.com
+      API_INTERNAL_URL: http://sotocrm-api:3000
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASS}@sotocrm-db:5432/${DB_NAME}
+      REDIS_URL: redis://sotocrm-redis:6379
+      NEXT_PUBLIC_APP_URL: https://crm.sotodelprior.com
+      LINKEDIN_CLIENT_ID: ${LINKEDIN_CLIENT_ID}
+      LINKEDIN_CLIENT_SECRET: ${LINKEDIN_CLIENT_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      FACEBOOK_APP_ID: ${FACEBOOK_APP_ID}
+      FACEBOOK_APP_SECRET: ${FACEBOOK_APP_SECRET}
+      TIKTOK_CLIENT_KEY: ${TIKTOK_CLIENT_KEY}
+      TIKTOK_CLIENT_SECRET: ${TIKTOK_CLIENT_SECRET}
+    networks:
+      - crm-internal-net
+      - proxy-net
+    expose:
+      - "3000"
+    labels:
+      - "traefik.enable=true"
+      # Router HTTP
+      - "traefik.http.routers.sotocrm-web-http.rule=Host(`crm.sotodelprior.com`)"
+      - "traefik.http.routers.sotocrm-web-http.entrypoints=web"
+      - "traefik.http.routers.sotocrm-web-http.middlewares=redirect-to-https"
+      # Router HTTPS
+      - "traefik.http.routers.sotocrm-web.rule=Host(`crm.sotodelprior.com`)"
+      - "traefik.http.routers.sotocrm-web.entrypoints=websecure"
+      - "traefik.http.routers.sotocrm-web.tls=true"
+      - "traefik.http.routers.sotocrm-web.tls.certresolver=le"
+      # Servicio
+      - "traefik.http.services.sotocrm-web.loadbalancer.server.port=3000"
+      # Middleware
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+    volumes:
+      - crm_uploads:/app/public/uploads
+    restart: unless-stopped
+
+  sotocrm-tiktok-verify:
+    image: nginx:alpine
+    container_name: sotocrm-tiktok-verify
+    volumes:
+      - ./tiktok_verification.txt:/usr/share/nginx/html/tiktok4N7cWMXKsAoRetPcrdAnsjvj7EBZe8hH.txt
+    networks:
+      - proxy-net
+    labels:
+      - "traefik.enable=true"
+      # Verificación TikTok (Prioridad alta para este archivo específico)
+      - "traefik.http.routers.tiktok-verify.rule=Host(`crm.sotodelprior.com`) && Path(`/tiktok4N7cWMXKsAoRetPcrdAnsjvj7EBZe8hH.txt`)"
+      - "traefik.http.routers.tiktok-verify.entrypoints=websecure"
+      - "traefik.http.routers.tiktok-verify.tls=true"
+      - "traefik.http.routers.tiktok-verify.tls.certresolver=le"
+      - "traefik.http.routers.tiktok-verify.priority=100"
+      - "traefik.http.services.tiktok-verify.loadbalancer.server.port=80"
+    restart: unless-stopped
+
+networks:
+  crm-internal-net:
+    driver: bridge
+  proxy-net:
+    external: true
+
+volumes:
+  crm_db_data:
+  crm_uploads:

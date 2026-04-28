@@ -21,6 +21,13 @@ export class PropertyService {
         });
     }
 
+    async updateHotel(id: string, data: any) {
+        return this.prisma.hotel.update({
+            where: { id },
+            data,
+        });
+    }
+
     // ROOM TYPES
     async createRoomType(hotelId: string, data: { name: string; basePrice: number; capacity: number }) {
         return this.prisma.roomType.create({

@@ -85,6 +85,17 @@ export class RestaurantService {
         return this.prisma.restaurant.findMany({ include: { zones: true } });
     }
 
+    async getRestaurant(id: string) {
+        return this.prisma.restaurant.findUnique({ where: { id } });
+    }
+
+    async updateRestaurant(id: string, data: any) {
+        return this.prisma.restaurant.update({
+            where: { id },
+            data
+        });
+    }
+
     // --- Visual Plan & Zones ---
     async syncZones(restaurantId: string, zones: any[]) {
         for (const z of zones) {
@@ -169,7 +180,50 @@ export class RestaurantService {
     // --- Bookings ---
     async createBooking(data: any) {
         // Basic impl, can be expanded for validation
-        return this.prisma.resBooking.create({ data });
+        const booking = await this.prisma.resBooking.create({ data });
+        
+        // Sync with CRM
+        this.syncWithCRM(booking);
+        
+        return booking;
+    }
+
+    private async syncWithCRM(booking: any) {
+        if (!booking.guestEmail) return;
+
+        try {
+            const rest = await this.prisma.restaurant.findUnique({
+                where: { id: booking.restaurantId },
+                select: { integrations: true }
+            });
+
+            const integrations = (rest?.integrations as any) || {};
+            const crm = integrations.crm;
+
+            if (!crm || !crm.enabled || !crm.url) return;
+
+            await fetch(crm.url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    guest: {
+                        email: booking.guestEmail,
+                        phone: booking.guestPhone,
+                        name: booking.guestName
+                    },
+                    reservation: {
+                        id: booking.id,
+                        restaurantId: booking.restaurantId,
+                        date: booking.date,
+                        pax: booking.pax,
+                        status: booking.status
+                    }
+                })
+            });
+            console.log(`[REST-CRM-SYNC] Synced reservation ${booking.id} to ${crm.url}`);
+        } catch (error) {
+            console.error('[REST-CRM-SYNC] Failed to sync reservation:', error);
+        }
     }
 
     async getBookings(restaurantId: string, dateStr: string) {

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Patch } from '@nestjs/common';
 import { PropertyService } from './property.service';
 
 @Controller('property')
@@ -18,6 +18,11 @@ export class PropertyController {
     @Get('hotels/:id')
     getHotel(@Param('id') id: string) {
         return this.propertyService.getHotel(id);
+    }
+
+    @Patch('hotels/:id')
+    updateHotel(@Param('id') id: string, @Body() body: any) {
+        return this.propertyService.updateHotel(id, body);
     }
 
     @Post('hotels/:id/room-types')

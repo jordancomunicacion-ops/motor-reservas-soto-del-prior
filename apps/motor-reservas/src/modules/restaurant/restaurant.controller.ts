@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, Patch } from '@nestjs/common';
 import { RestaurantService } from './restaurant.service';
 
 @Controller('restaurant')
@@ -13,6 +13,16 @@ export class RestaurantController {
     @Get()
     getRestaurants() {
         return this.service.getRestaurants();
+    }
+
+    @Get(':id')
+    getRestaurant(@Param('id') id: string) {
+        return this.service.getRestaurant(id);
+    }
+
+    @Patch(':id')
+    updateRestaurant(@Param('id') id: string, @Body() body: any) {
+        return this.service.updateRestaurant(id, body);
     }
 
     @Post('zones')

@@ -15,6 +15,7 @@ import { CrmModule } from './modules/crm/crm.module';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';
 import { GlobalModule } from './modules/global/global.module';
 import { MailModule } from './modules/mail/mail.module';
+import { EventModule } from './modules/event/event.module';
 
 @Module({
   imports: [
@@ -26,13 +27,12 @@ import { MailModule } from './modules/mail/mail.module';
     InstallerModule,
     RestaurantModule,
     WidgetConfigModule,
-    RestaurantModule,
-    WidgetConfigModule,
     RatesModule,
     CrmModule,
     CampaignsModule,
     PaymentModule,
-    MailModule
+    MailModule,
+    EventModule
   ],
   controllers: [AppController],
   providers: [AppService],

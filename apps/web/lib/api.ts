@@ -31,6 +31,10 @@ function getMockData(endpoint: string) {
     ];
     if (endpoint.includes('bookings')) return [];
     if (endpoint.includes('channels')) return [];
+    if (endpoint.includes('event')) return [
+        { id: 'ev1', name: 'Cata de Vinos Ribera', date: new Date().toISOString(), capacity: 20, price: 35, _count: { bookings: 2 }, isActive: true },
+        { id: 'ev2', name: 'Cena de Gala Verano', date: new Date(Date.now() + 86400000 * 7).toISOString(), capacity: 100, price: 85, _count: { bookings: 45 }, isActive: true }
+    ];
 
     // Restaurant Utilities Recovery
     if (endpoint.includes('restaurant')) {

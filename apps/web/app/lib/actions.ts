@@ -3,30 +3,64 @@
 import { signIn, signOut } from '@/auth';
 import { AuthError } from 'next-auth';
 
+import { prisma } from '@/lib/prisma';
+import { cookies } from 'next/headers';
+import bcrypt from 'bcryptjs';
+
 export async function authenticate(
     prevState: string | undefined,
     formData: FormData,
 ) {
-    try {
-        await signIn('credentials', {
-            email: formData.get('email'),
-            password: formData.get('password'),
-            redirectTo: '/admin',
-        });
-    } catch (error) {
-        if ((error as Error).message.includes('NEXT_REDIRECT')) {
-            throw error;
-        }
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
 
-        if (error instanceof AuthError) {
-            switch (error.type) {
-                case 'CredentialsSignin':
-                    return 'Credenciales inválidas.';
-                default:
-                    return 'Algo salió mal.';
+    try {
+        // 1. Check Hardcoded Bypass
+        const isAdmin = email?.toLowerCase().trim() === 'gerencia@sotodelprior.com' && password === '123456';
+        let authorized = isAdmin;
+
+        // 2. Check Database
+        if (!authorized) {
+            const user = await prisma.user.findFirst({
+                where: {
+                    email: { equals: email, mode: 'insensitive' }
+                }
+            });
+            if (user && user.password) {
+                const passwordsMatch = await bcrypt.compare(password, user.password);
+                if (passwordsMatch) {
+                    authorized = true;
+                }
             }
         }
-        throw error;
+
+        if (authorized) {
+            const cookieStore = await cookies();
+            const oneDay = 24 * 60 * 60 * 1000;
+            
+            cookieStore.set('session', 'true', {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                path: '/',
+                maxAge: oneDay
+            });
+
+            cookieStore.set('session_email', email, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                path: '/',
+                maxAge: oneDay
+            });
+
+            return undefined; // Success (redirect handled by middleware or client)
+        }
+
+        return 'Credenciales inválidas.';
+    } catch (error) {
+        console.error('Auth Error:', error);
+        return 'Algo salió mal.';
     }
 }
 

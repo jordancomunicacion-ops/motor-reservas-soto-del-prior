@@ -7,7 +7,7 @@ echo.
 cd /d "%~dp0"
 
 echo [1/3] Empaquetando App Reservas...
-tar --exclude="node_modules" --exclude=".next" --exclude=".git" --exclude=".idea" --exclude=".vscode" --exclude="dist" --exclude="build" --exclude="db_data" --exclude="pg_data" --exclude="*.log" --exclude="deploy.tar.gz" -czvf deploy.tar.gz .
+tar --exclude="node_modules" --exclude=".next" --exclude=".git" --exclude=".idea" --exclude=".vscode" --exclude="dist" --exclude="build" --exclude="db_data" --exclude="pg_data" --exclude="*.log" --exclude="*.db" --exclude="*.db-journal" --exclude="deploy.tar.gz" -czvf deploy.tar.gz .
 
 echo.
 echo [2/4] Limpiando despliegue anterior en el servidor...

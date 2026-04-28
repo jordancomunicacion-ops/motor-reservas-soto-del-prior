@@ -13,6 +13,12 @@ fi
 echo "Levantando contenedores..."
 docker compose up -d --build
 
+# Aplicar esquema y seed
+echo "Configurando base de datos..."
+# Usamos db push porque las migraciones actuales son para SQLite o no existen para PostgreSQL
+docker compose exec -T sotoreservas-web npx prisma db push --accept-data-loss
+docker compose exec -T sotoreservas-web npx prisma db seed
+
 # Verificar estado
 echo "Estado de los contenedores:"
 docker compose ps

@@ -32,6 +32,9 @@ model Hotel {
   
   // Synergy
   waitlistEntries HotelWaitlist[]
+  
+  // Integrations (JSON)
+  integrations Json? @default("{}")
 }
 
 model WidgetConfig {
@@ -321,6 +324,9 @@ model Restaurant {
   zones     Zone[]
   bookings  ResBooking[]
   waitlist  RestaurantWaitlist[]
+  
+  // Integrations (JSON)
+  integrations Json? @default("{}")
 }
 
 model Zone {
@@ -533,4 +539,41 @@ model Workflow {
   
   runCount    Int      @default(0)
   createdAt   DateTime @default(now())
+}
+
+// --- Events Module (NEW) ---
+
+model Event {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  date        DateTime
+  price       Decimal  @default(0)
+  capacity    Int
+  isActive    Boolean  @default(true)
+  
+  // Integrations (JSON)
+  integrations Json? @default("{}")
+  
+  bookings    EventBooking[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model EventBooking {
+  id          String   @id @default(uuid())
+  eventId     String
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  
+  guestName   String
+  guestEmail  String?
+  guestPhone  String?
+  pax         Int      @default(1)
+  
+  totalPrice  Decimal
+  status      String   @default("CONFIRMED") // PENDING, CONFIRMED, CANCELLED
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

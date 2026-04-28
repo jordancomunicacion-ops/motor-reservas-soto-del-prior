@@ -7,17 +7,25 @@ import Link from 'next/link';
 export default function Page() {
     const [errorMessage, formAction, isPending] = useActionState(
         authenticate,
-        undefined,
+        '',
     );
 
+    const { push } = require('next/navigation').useRouter();
+
+    require('react').useEffect(() => {
+        if (errorMessage === undefined) {
+            window.location.href = '/admin';
+        }
+    }, [errorMessage]);
+
     return (
-        <div className="flex h-screen items-center justify-center bg-gradient-to-br from-purple-50 to-violet-100">
+        <div className="flex h-screen items-center justify-center bg-white">
             <div className="w-full max-w-md rounded-lg bg-white p-8 shadow-lg border border-purple-100">
                 <div className="flex justify-center mb-6">
                     <img src="/logo-icon.png" alt="SOTO DEL PRIOR" className="h-24" />
                 </div>
                 <h1 className="text-2xl font-bold text-center text-gray-800 mb-6">
-                    Motor de Reservas
+                    MOTOR de RESERVAS
                 </h1>
                 <form action={formAction} className="space-y-4">
                     <div>
@@ -25,14 +33,14 @@ export default function Page() {
                             className="mb-2 block text-sm font-medium text-gray-700"
                             htmlFor="email"
                         >
-                            Email
+                            Usuario
                         </label>
                         <input
                             className="block w-full rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-purple-500 focus:outline-none focus:ring-purple-500 sm:text-sm"
                             id="email"
                             type="email"
                             name="email"
-                            placeholder="gerencia@sotodelprior.com"
+                            placeholder=""
                             required
                             autoComplete="email"
                         />
@@ -49,7 +57,7 @@ export default function Page() {
                             id="password"
                             type="password"
                             name="password"
-                            placeholder="••••••"
+                            placeholder=""
                             required
                             minLength={4}
                             autoComplete="current-password"
@@ -87,10 +95,13 @@ export default function Page() {
                         {isPending ? 'Iniciando...' : 'Iniciar Sesión'}
                     </button>
 
-                    <div className="text-center text-xs mt-4">
-                        <Link href="/forgot-password" className="font-medium text-purple-600 hover:text-purple-800">
-                            ¿Olvidaste tu contraseña?
-                        </Link>
+                    <div className="text-center mt-4 space-y-2">
+
+                        <div>
+                            <Link href="/forgot-password" className="text-sm font-medium text-purple-600 hover:text-purple-800">
+                                ¿Olvidaste tu contraseña?
+                            </Link>
+                        </div>
                     </div>
                 </form>
             </div>

@@ -191,7 +191,10 @@ export default function ChannelWizard() {
                                     <div className="pt-2 border-t mt-2">
                                         <div className="text-[10px] font-bold text-muted-foreground mb-1">EXPORT LINK (Copy to OTA):</div>
                                         <code className="block bg-black/5 p-1 rounded text-[10px] break-all select-all cursor-pointer hover:bg-black/10 transition-colors"
-                                            onClick={() => navigator.clipboard.writeText(`${window.location.origin}/api/channels/export/${feed.roomType.id}/calendar.ics`)}>
+                                            onClick={() => {
+                                                const origin = typeof window !== 'undefined' ? window.location.origin : '';
+                                                navigator.clipboard.writeText(`${origin}/api/channels/export/${feed.roomType.id}/calendar.ics`);
+                                            }}>
                                             {`/api/channels/export/${feed.roomType.id}/calendar.ics`}
                                         </code>
                                     </div>

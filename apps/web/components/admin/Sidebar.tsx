@@ -1,8 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import {
     LayoutDashboard,
     Calendar,
@@ -12,17 +12,18 @@ import {
     Utensils,
     Settings2,
     Share2,
-    Users,
     ArrowLeft,
-    Globe
+    PartyPopper
 } from 'lucide-react';
 
 function classNames(...classes: string[]) {
     return classes.filter(Boolean).join(' ');
 }
 
-export function Sidebar() {
+function SidebarNav() {
     const pathname = usePathname();
+    const searchParams = useSearchParams();
+    const queryString = searchParams.toString();
 
     const navItems = [
         { href: '/admin', label: 'Panel Control', icon: LayoutDashboard },
@@ -32,36 +33,45 @@ export function Sidebar() {
         { href: '/admin/hotels', label: 'Hotel', icon: Building2 },
         { href: '/admin/rates', label: 'Tarifas y Restricciones', icon: Tags },
         { href: '/admin/channels', label: 'Gestor de Canales', icon: Share2 },
-        { href: '/admin/infrastructure/domains', label: 'Infraestructura', icon: Globe },
+        { href: '/admin/events', label: 'Eventos', icon: PartyPopper },
         { href: '/admin/widget-config', label: 'Configuración Widget', icon: Settings2 },
     ];
 
+    return (
+        <nav className="flex-1 overflow-y-auto p-4 space-y-1 mt-2">
+            {navItems.map((item) => {
+                const isActive = pathname === item.href;
+                const href = queryString ? `${item.href}?${queryString}` : item.href;
+                return (
+                    <Link
+                        key={item.href}
+                        href={href}
+                        className={classNames(
+                            "flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-colors",
+                            isActive
+                                ? "bg-sidebar-accent text-sidebar-primary shadow-sm"
+                                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        )}
+                    >
+                        <item.icon className="h-5 w-5" />
+                        {item.label}
+                    </Link>
+                );
+            })}
+        </nav>
+    );
+}
+
+export function Sidebar() {
     return (
         <aside className="hidden w-64 flex-col border-r bg-sidebar h-screen fixed left-0 top-0 z-30 shadow-sm md:flex">
             <div className="p-4 flex justify-center border-b border-gray-100 h-16 items-center">
                 <img src="/logo-text.png" alt="SOTO DEL PRIOR" className="h-10 w-auto" />
             </div>
 
-            <nav className="flex-1 overflow-y-auto p-4 space-y-1 mt-2">
-                {navItems.map((item) => {
-                    const isActive = pathname === item.href;
-                    return (
-                        <Link
-                            key={item.href}
-                            href={item.href}
-                            className={classNames(
-                                "flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-colors",
-                                isActive
-                                    ? "bg-sidebar-accent text-sidebar-primary shadow-sm"
-                                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                            )}
-                        >
-                            <item.icon className="h-5 w-5" />
-                            {item.label}
-                        </Link>
-                    );
-                })}
-            </nav>
+            <Suspense fallback={<div className="flex-1 p-4">Cargando...</div>}>
+                <SidebarNav />
+            </Suspense>
 
             <div className="p-4 border-t border-gray-100 space-y-2 mt-auto">
                 <Link

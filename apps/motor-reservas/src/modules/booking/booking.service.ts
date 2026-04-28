@@ -101,14 +101,27 @@ export class BookingService {
     }
 
     private async syncWithCRM(booking: any, email?: string, phone?: string) {
-        if (!email) return; // Email is required for CRM identity
-
-        const [firstName, ...rest] = booking.guestName.split(' ');
-        const lastName = rest.join(' ') || '';
+        if (!email) return;
 
         try {
-            // Hardcoded URL for MVP - in prod use env var
-            await fetch('http://localhost:3004/api/integrations/hotel', {
+            // 1. Get Hotel Integrations
+            const hotel = await this.prisma.hotel.findUnique({
+                where: { id: booking.hotelId },
+                select: { integrations: true }
+            });
+
+            const integrations = (hotel?.integrations as any) || {};
+            const crm = integrations.crm;
+
+            if (!crm || !crm.enabled || !crm.url) {
+                console.log(`[CRM-SYNC] CRM integration disabled or no URL for hotel ${booking.hotelId}`);
+                return;
+            }
+
+            const [firstName, ...rest] = booking.guestName.split(' ');
+            const lastName = rest.join(' ') || '';
+
+            await fetch(crm.url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -119,16 +132,18 @@ export class BookingService {
                         lastName
                     },
                     booking: {
+                        id: booking.id,
+                        reference: booking.referenceCode,
                         total: Number(booking.totalPrice),
                         nights: booking.nights,
-                        roomType: 'Standard' // TODO: Fetch room type name
+                        checkIn: booking.checkInDate,
+                        checkOut: booking.checkOutDate
                     }
                 })
             });
-            console.log(`[CRM-SYNC] Synced booking ${booking.referenceCode} to CRM.`);
+            console.log(`[CRM-SYNC] Synced booking ${booking.referenceCode} to ${crm.url}`);
         } catch (error) {
             console.error('[CRM-SYNC] Failed to sync booking:', error);
-            // Don't throw, we don't want to rollback the booking
         }
     }
 
