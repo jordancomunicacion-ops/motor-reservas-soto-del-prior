@@ -1,15 +1,18 @@
 import { Sidebar } from "@/components/admin/Sidebar";
 import { LocationSwitcher } from "@/components/admin/LocationSwitcher";
-import { Button } from "@/components/ui/button";
+import { auth } from "@/auth";
 
-export default function AdminLayout({
+export default async function AdminLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
+    const session = await auth();
+    const userRole = session?.user?.role;
+
     return (
         <div className="min-h-screen bg-muted/40">
-            <Sidebar />
+            <Sidebar userRole={userRole} />
             <div className="flex flex-col md:pl-64 transition-all duration-300">
                 <header className="flex h-14 items-center gap-4 border-b bg-background px-6 lg:h-[60px] sticky top-0 z-20 justify-between">
                     <div className="flex items-center gap-4">

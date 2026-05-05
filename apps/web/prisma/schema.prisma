@@ -24,6 +24,14 @@ model Hotel {
   seasons   Season[]
   users     User[]
   
+  // Synergy: Link to associated Restaurant
+  restaurantId String? @unique
+  restaurant   Restaurant? @relation("HotelRestaurant", fields: [restaurantId], references: [id])
+  
+  // Purchasable services/meals
+  extras      Extra[]
+
+  
   // Widget Config
   widgetConfig WidgetConfig?
   
@@ -212,6 +220,13 @@ model Booking {
   bookingRooms  BookingRoom[]
   payments      Payment[]
   
+  // Synergy: Linked Restaurant Reservations
+  resBookings   ResBooking[]
+  
+  // Selected Addons/Meals
+  selectedExtras BookingExtra[]
+
+  
   // External OTA Info
   otaId         String?  // Booking.com ID
   otaRawData    String?  // JSON debug
@@ -310,7 +325,7 @@ model User {
   email       String   @unique
   name        String?
   password     String   
-  role        String   @default("ADMIN")
+  role        String   @default("ADMIN") // ADMIN, EMPLOYEE, CUSTOMER
 }
 
 // --- Restaurant Models (Preserved) ---
@@ -321,7 +336,28 @@ model Restaurant {
   zones     Zone[]
   bookings  ResBooking[]
   waitlist  RestaurantWaitlist[]
+  
+  // Synergy: Link to Hotel
+  hotel     Hotel? @relation("HotelRestaurant")
+  
+  // Service configuration
+  shifts    Shift[]
 }
+
+model Shift {
+  id           String   @id @default(uuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  name         String   // "Comida", "Cena"
+  type         String   @default("LUNCH") // BREAKFAST, LUNCH, DINNER
+  startTime    String   // "13:00"
+  endTime      String   // "16:00"
+  slotInterval Int      @default(30) // Minutes between slots
+  daysOfWeek   String   @default("1,2,3,4,5,6,0") // 0-6 CSV
+  isActive     Boolean  @default(true)
+}
+
+
 
 model Zone {
   id           String   @id @default(uuid())
@@ -389,11 +425,13 @@ model ResBooking {
    createdAt    DateTime @default(now())
    updatedAt    DateTime @updatedAt // Added
    
-   // Synergy: Architectural Upgrades
-   idempotencyKey String? @unique
-   channelId      String?
-   channel        RestaurantChannel? @relation(fields: [channelId], references: [id])
+   // Synergy: Link to Hotel Booking
+   hotelBookingId String?
+   hotelBooking   Booking? @relation(fields: [hotelBookingId], references: [id])
+   
+   isMealPlan     Boolean  @default(false)
 }
+
 
 model RestaurantChannel {
   id        String   @id @default(uuid())
@@ -534,3 +572,34 @@ model Workflow {
   runCount    Int      @default(0)
   createdAt   DateTime @default(now())
 }
+
+// --- Synergy Models (Extras & Meal Plans) ---
+
+model Extra {
+  id          String   @id @default(uuid())
+  hotelId     String
+  hotel       Hotel    @relation(fields: [hotelId], references: [id])
+  name        String   // "Desayuno Buffet", "Cena Gourmet"
+  description String?
+  price       Decimal
+  type        String   @default("MEAL") // MEAL, SERVICE, PRODUCT
+  
+  restaurantId String? // If specific to a restaurant
+  
+  bookingExtras BookingExtra[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model BookingExtra {
+  id        String   @id @default(uuid())
+  bookingId String
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  extraId   String
+  extra     Extra    @relation(fields: [extraId], references: [id])
+  quantity  Int      @default(1)
+  price     Decimal  // Captured at booking
+  date      DateTime? // Specific date if it's a one-time extra
+}
+

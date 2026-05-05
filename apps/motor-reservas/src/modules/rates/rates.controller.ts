@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, HttpCode, Patch, Delete } from '@nestjs/common';
 import { RatesService } from './rates.service';
 import { AvailabilityService } from './availability.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -13,9 +13,23 @@ export class RatesController {
 
     @Get('plans/:hotelId')
     async getRatePlans(@Param('hotelId') hotelId: string) {
-        return this.prisma.ratePlan.findMany({
+        const plans = await this.prisma.ratePlan.findMany({
             where: { hotelId }
         });
+
+        if (plans.length === 0) {
+            const defaultPlan = await this.prisma.ratePlan.create({
+                data: {
+                    hotelId,
+                    name: 'Tarifa Estándar',
+                    isDefault: true,
+                    mealsIncluded: 'Desayuno incluido'
+                }
+            });
+            return [defaultPlan];
+        }
+
+        return plans;
     }
 
     @Post('plans')
@@ -23,8 +37,25 @@ export class RatesController {
         return this.prisma.ratePlan.create({ data: body });
     }
 
+    @Patch('plans/:id')
+    async updateRatePlan(@Param('id') id: string, @Body() body: any) {
+        const { id: _, ...data } = body;
+        return this.prisma.ratePlan.update({
+            where: { id },
+            data
+        });
+    }
+
+    @Delete('plans/:id')
+    async deleteRatePlan(@Param('id') id: string) {
+        return this.prisma.ratePlan.delete({
+            where: { id }
+        });
+    }
+
     // Bulk Update Prices
     @Post('prices/bulk')
+    @HttpCode(200)
     async updatePrices(@Body() body: {
         hotelId: string;
         ratePlanId: string;
@@ -32,20 +63,25 @@ export class RatesController {
         fromDate: string;
         toDate: string;
         price: number;
+        daysOfWeek?: number[]; // [0, 6] for Sun, Sat
     }) {
-        // Logic to generate DailyPrice records for range
-        // Simplified: Loop and create/update
         const start = new Date(body.fromDate);
         const end = new Date(body.toDate);
+        let count = 0;
 
+        // Iterate through each day in the range
         for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
             const dateKey = new Date(d);
-            // Validating existence of params would be good here
+            dateKey.setUTCHours(0, 0, 0, 0); // Normalize to midnight UTC
+
+            // Filter by day of week if provided
+            if (body.daysOfWeek && body.daysOfWeek.length > 0) {
+                if (!body.daysOfWeek.includes(dateKey.getUTCDay())) {
+                    continue;
+                }
+            }
 
             // Upsert DailyPrice
-            // Note: Since DailyPrice might be missing in Stale Client, we use raw query or Prisma any cast
-            // Ideally:
-            /*
             await this.prisma.dailyPrice.upsert({
                 where: {
                     roomTypeId_ratePlanId_date: {
@@ -56,16 +92,15 @@ export class RatesController {
                 },
                 update: { price: body.price },
                 create: {
-                    hotelId: body.hotelId,
                     roomTypeId: body.roomTypeId,
                     ratePlanId: body.ratePlanId,
                     date: dateKey,
                     price: body.price
                 }
             });
-            */
-            // Placeholder for now until Client Refreshed
+            count++;
         }
-        return { status: 'success', count: 0 };
+        
+        return { status: 'success', count };
     }
 }

@@ -94,58 +94,11 @@ export class BookingService {
             include: { bookingRooms: true }
         });
 
-        // 5. Sync with CRM (Fire and Forget)
-        this.syncWithCRM(booking, data.guestEmail, data.guestPhone);
-
+        // Sync with CRM removed
+        
         return booking;
     }
 
-    private async syncWithCRM(booking: any, email?: string, phone?: string) {
-        if (!email) return;
-
-        try {
-            // 1. Get Hotel Integrations
-            const hotel = await this.prisma.hotel.findUnique({
-                where: { id: booking.hotelId },
-                select: { integrations: true }
-            });
-
-            const integrations = (hotel?.integrations as any) || {};
-            const crm = integrations.crm;
-
-            if (!crm || !crm.enabled || !crm.url) {
-                console.log(`[CRM-SYNC] CRM integration disabled or no URL for hotel ${booking.hotelId}`);
-                return;
-            }
-
-            const [firstName, ...rest] = booking.guestName.split(' ');
-            const lastName = rest.join(' ') || '';
-
-            await fetch(crm.url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    guest: {
-                        email,
-                        phone,
-                        firstName,
-                        lastName
-                    },
-                    booking: {
-                        id: booking.id,
-                        reference: booking.referenceCode,
-                        total: Number(booking.totalPrice),
-                        nights: booking.nights,
-                        checkIn: booking.checkInDate,
-                        checkOut: booking.checkOutDate
-                    }
-                })
-            });
-            console.log(`[CRM-SYNC] Synced booking ${booking.referenceCode} to ${crm.url}`);
-        } catch (error) {
-            console.error('[CRM-SYNC] Failed to sync booking:', error);
-        }
-    }
 
     async getBookings(hotelId: string) {
         return this.prisma.booking.findMany({
@@ -153,6 +106,17 @@ export class BookingService {
             include: { bookingRooms: { include: { room: true } } },
             orderBy: { createdAt: 'desc' },
         });
+    }
+
+    async cancelBooking(bookingId: string) {
+        const booking = await this.prisma.booking.update({
+            where: { id: bookingId },
+            data: { status: BookingStatus.CANCELLED }
+        });
+
+        // Sync with CRM removed
+        
+        return booking;
     }
 
     // PUBLIC AVAILABILITY

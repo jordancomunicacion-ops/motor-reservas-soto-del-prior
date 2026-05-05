@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { fetchAPI } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
+import { Building2, Settings, Share2, LayoutDashboard, BedDouble, Users, RefreshCw } from 'lucide-react';
 
 export default function HotelsPage() {
     const [hotels, setHotels] = useState<any[]>([]);
@@ -30,16 +31,21 @@ export default function HotelsPage() {
     }
 
     async function handleCreate() {
-        if (!newName) return;
+        if (!newName) {
+            alert('Por favor, introduce un nombre para el hotel antes de crearlo.');
+            return;
+        }
         try {
             await fetchAPI('/property/hotels', {
                 method: 'POST',
                 body: JSON.stringify({ name: newName, currency: 'EUR', timezone: 'Europe/Madrid' })
             });
+            alert('Hotel creado con éxito');
             setNewName('');
             loadHotels();
         } catch (e) {
-            alert('Error creando hotel');
+            console.error('Error creating hotel:', e);
+            alert('Error creando hotel. Por favor, asegúrese de que el servidor está funcionando.');
         }
     }
 
@@ -94,12 +100,46 @@ export default function HotelsPage() {
                                     <span>{hotel.timezone}</span>
                                 </div>
                             </div>
-                            <div className="flex gap-2">
-                                <Button variant="outline" className="flex-1" onClick={() => window.location.href = `/admin/hotels/${hotel.id}/config`}>
-                                    Configurar
+                            <div className="grid grid-cols-2 gap-2 mt-6">
+                                <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    className="gap-2 text-xs" 
+                                    onClick={() => window.location.href = `/admin/hotels/${hotel.id}`}
+                                >
+                                    <LayoutDashboard className="w-3 h-3" /> Dashboard
                                 </Button>
-                                <Button variant="outline" className="flex-1" onClick={() => window.location.href = `/admin/hotels/${hotel.id}/connections`}>
-                                    Conexiones
+                                <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    className="gap-2 text-xs" 
+                                    onClick={() => window.location.href = `/admin/hotels/${hotel.id}/config?tab=general`}
+                                >
+                                    <Settings className="w-3 h-3" /> Ajustes
+                                </Button>
+                                <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    className="gap-2 text-xs" 
+                                    onClick={() => window.location.href = `/admin/hotels/${hotel.id}/inventory`}
+                                >
+                                    <BedDouble className="w-3 h-3" /> Inventario
+                                </Button>
+                                <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    className="gap-2 text-xs" 
+                                    onClick={() => window.location.href = `/admin/hotels/${hotel.id}/connections`}
+                                >
+                                    <Share2 className="w-3 h-3" /> Conexiones
+                                </Button>
+                                <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    className="gap-2 text-xs col-span-2" 
+                                    onClick={() => window.location.href = `/admin/hotels/${hotel.id}/config?tab=access`}
+                                >
+                                    <Users className="w-3 h-3" /> Accesos
                                 </Button>
                             </div>
                         </div>

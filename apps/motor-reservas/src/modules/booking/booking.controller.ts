@@ -24,4 +24,9 @@ export class BookingController {
     getBookings(@Param('hotelId') hotelId: string) {
         return this.bookingService.getBookings(hotelId);
     }
+
+    @Post(':id/cancel')
+    cancelBooking(@Param('id') id: string) {
+        return this.bookingService.cancelBooking(id);
+    }
 }

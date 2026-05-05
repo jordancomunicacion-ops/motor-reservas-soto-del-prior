@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Patch } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Patch, Delete } from '@nestjs/common';
 import { PropertyService } from './property.service';
 
 @Controller('property')
@@ -25,12 +25,27 @@ export class PropertyController {
         return this.propertyService.updateHotel(id, body);
     }
 
+    @Delete('hotels/:id')
+    deleteHotel(@Param('id') id: string) {
+        return this.propertyService.deleteHotel(id);
+    }
+
     @Post('hotels/:id/room-types')
     createRoomType(
         @Param('id') hotelId: string,
-        @Body() body: { name: string; basePrice: number; capacity: number },
+        @Body() body: any,
     ) {
         return this.propertyService.createRoomType(hotelId, body);
+    }
+
+    @Patch('room-types/:id')
+    updateRoomType(@Param('id') id: string, @Body() body: any) {
+        return this.propertyService.updateRoomType(id, body);
+    }
+
+    @Delete('room-types/:id')
+    deleteRoomType(@Param('id') id: string) {
+        return this.propertyService.deleteRoomType(id);
     }
 
     @Get('hotels/:id/room-types')

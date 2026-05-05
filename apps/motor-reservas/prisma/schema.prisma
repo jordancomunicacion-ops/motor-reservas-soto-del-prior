@@ -32,15 +32,27 @@ model Hotel {
   
   // Synergy
   waitlistEntries HotelWaitlist[]
+  restaurantId    String? @unique
+  restaurant      Restaurant? @relation(fields: [restaurantId], references: [id])
   
   // Integrations (JSON)
   integrations Json? @default("{}")
+
+  // Notifications
+  contactEmail   String?
+  emailTemplates Json? @default("{\"created\": \"\", \"confirmed\": \"\", \"cancelled\": \"\", \"modified\": \"\", \"reminder\": \"\", \"waitlist_join\": \"\", \"waitlist_available\": \"\"}")
+
+  events      Event[]
 }
 
 model WidgetConfig {
   id          String   @id @default(uuid())
-  hotelId     String   @unique
-  hotel       Hotel    @relation(fields: [hotelId], references: [id])
+  
+  hotelId     String?  @unique
+  hotel       Hotel?   @relation(fields: [hotelId], references: [id])
+  
+  restaurantId String? @unique
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
   
   primaryColor   String  @default("#3b82f6") // Blue-500
   secondaryColor String  @default("#1e40af") // Blue-800
@@ -321,12 +333,51 @@ model Restaurant {
   id        String   @id @default(uuid())
   name      String
   currency  String   @default("EUR")
+  defaultDuration Int @default(90)
   zones     Zone[]
   bookings  ResBooking[]
   waitlist  RestaurantWaitlist[]
+  hotel     Hotel?
+  shifts    Shift[]
+  closures  RestaurantClosure[]
   
+  // Widget Config
+  widgetConfig WidgetConfig?
+
   // Integrations (JSON)
   integrations Json? @default("{}")
+
+  // Notifications
+  contactEmail   String?
+  emailTemplates Json? @default("{\"created\": \"\", \"confirmed\": \"\", \"cancelled\": \"\", \"modified\": \"\", \"reminder\": \"\", \"waitlist_join\": \"\", \"waitlist_available\": \"\"}")
+
+  events    Event[]
+}
+
+model Shift {
+  id           String     @id @default(uuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  
+  name         String
+  type         String     @default("LUNCH") // BREAKFAST, LUNCH, DINNER
+  startTime    String     // "13:00"
+  endTime      String     // "16:00"
+  slotInterval Int        @default(30)
+  daysOfWeek   String     @default("1,2,3,4,5,6,0")
+  isActive     Boolean    @default(true)
+  
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model RestaurantClosure {
+  id           String     @id @default(uuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  date         DateTime
+  reason       String?
+  createdAt    DateTime   @default(now())
 }
 
 model Zone {
@@ -355,8 +406,11 @@ model Table {
   rotation  Int      @default(0)
   
   isActive  Boolean  @default(true)
-  minPax    Int      @default(1)
-  maxPax    Int      @default(4)
+  minPax           Int      @default(1)
+  maxPax           Int      @default(4)
+  seatsLostPerJoin Int      @default(1)
+  
+  metadata  Json?    @default("{}")
 
   resBookings ResBooking[]
   tableHolds  TableHold[] 
@@ -382,6 +436,8 @@ model ResBooking {
    status       String   @default("CONFIRMED") // PENDING, CONFIRMED, SEATED, FINISHED, CANCELLED, NO_SHOW
    
    // CRM & Metadata
+   hotelBookingId String?
+   isMealPlan     Boolean  @default(false)
    tags         String?  // JSON array ["VIP", "ALLERGIES"]
    notes        String?
    origin       String   @default("MANUAL") // GOOGLE, WEB, PHONE, WALK_IN
@@ -551,6 +607,12 @@ model Event {
   price       Decimal  @default(0)
   capacity    Int
   isActive    Boolean  @default(true)
+  
+  // Relations
+  hotelId     String?
+  hotel       Hotel?    @relation(fields: [hotelId], references: [id])
+  restaurantId String?
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
   
   // Integrations (JSON)
   integrations Json? @default("{}")

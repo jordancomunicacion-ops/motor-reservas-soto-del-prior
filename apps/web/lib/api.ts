@@ -1,6 +1,7 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
+    const method = options.method || 'GET';
     try {
         const res = await fetch(`${API_URL}/${endpoint.replace(/^\//, '')}`, {
             ...options,
@@ -11,14 +12,25 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
         });
 
         if (!res.ok) {
-            console.warn(`API Error ${endpoint}: Server might be offline. Returning backup data.`);
+            console.warn(`API Error ${endpoint}: Server returned ${res.status}`);
             throw new Error(`Server returned ${res.status}`);
         }
 
-        return res.json();
+        // Check if there's content to parse
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            return res.json();
+        }
+
+        // Handle empty or non-JSON responses
+        return { success: true };
     } catch (err) {
-        console.warn(`Network Error ${endpoint}: Server offline. Using mock data.`, err);
-        return getMockData(endpoint);
+        // Only use mock data for GET requests. Mutations should fail explicitly.
+        if (method === 'GET') {
+            console.warn(`Network/API Error ${endpoint}: Returning mock data.`, err);
+            return getMockData(endpoint);
+        }
+        throw err;
     }
 }
 
@@ -44,6 +56,11 @@ function getMockData(endpoint: string) {
                 { id: 'z2', name: 'Salón Interior', tables: [] }
             ];
         }
+        return [
+            { id: 'res1', name: 'MONTAGU', currency: 'EUR' },
+            { id: 'res2', name: 'SOROETA', currency: 'EUR' },
+            { id: 'res3', name: 'SOTO del PRIOR', currency: 'EUR' }
+        ];
     }
 
     return [];

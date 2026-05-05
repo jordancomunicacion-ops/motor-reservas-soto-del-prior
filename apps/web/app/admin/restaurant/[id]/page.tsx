@@ -1,9 +1,9 @@
 "use client";
 import { useState, useEffect, Suspense } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { CalendarIcon, ChevronLeft, ChevronRight, Plus, RefreshCw, LayoutGrid, List } from 'lucide-react';
+import { CalendarIcon, ChevronLeft, ChevronRight, Plus, RefreshCw, LayoutGrid, List, Users } from 'lucide-react';
 import { format, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -11,15 +11,19 @@ import TablePlan from '@/components/restaurant/TablePlan';
 import ReservationList from '@/components/restaurant/ReservationList';
 import WaitlistPanel from '@/components/restaurant/WaitlistPanel';
 import ReservationForm from '@/components/restaurant/ReservationForm';
+import GuestProfileSheet from '@/components/restaurant/GuestProfileSheet';
 import { fetchAPI } from '@/lib/api';
 import { DateSelector } from '@/components/admin/DateSelector';
 
+import AccessManager from '@/components/admin/AccessManager';
+
 function RestaurantDashboardContent() {
     const params = useParams();
+    const router = useRouter();
     const restaurantId = params.id as string;
     
     const [date, setDate] = useState(new Date());
-    const [view, setView] = useState("PLAN"); // PLAN, LIST
+    const [view, setView] = useState("PLAN"); // PLAN, LIST, ACCESS
     const [loading, setLoading] = useState(false);
 
     // Data
@@ -31,6 +35,7 @@ function RestaurantDashboardContent() {
 
     // UI State
     const [isFormOpen, setIsFormOpen] = useState(false);
+    const [selectedBookingForProfile, setSelectedBookingForProfile] = useState<any>(null);
 
     useEffect(() => {
         loadData();
@@ -61,10 +66,6 @@ function RestaurantDashboardContent() {
         setLoading(false);
     }
 
-    const handleUpdateTable = async (tableId: string, updates: any) => {
-        setRawTables(prev => prev.map(t => t.id === tableId ? { ...t, ...updates } : t));
-    };
-
     const handleCreateBooking = async (data: any) => {
         try {
             await fetchAPI(`/restaurant/bookings`, { method: 'POST', body: JSON.stringify({ ...data, restaurantId }) });
@@ -74,12 +75,41 @@ function RestaurantDashboardContent() {
         }
     };
 
+    const handleUpdateTable = async (tableId: string, updates: any) => {
+        // If it's a status update from the manual menu
+        if (updates.bookingStatus) {
+            const table = rawTables.find((t: any) => t.id === tableId);
+            const booking = table?.resBookings?.[0];
+            if (booking) {
+                handleStatusChange(booking.id, updates.bookingStatus);
+            }
+            return;
+        }
+        setRawTables(prev => prev.map(t => t.id === tableId ? { ...t, ...updates } : t));
+    };
+
     const handleStatusChange = async (bookingId: string, status: string) => {
-        console.log("Change status", bookingId, status);
+        try {
+            await fetchAPI(`/restaurant/reservation/${bookingId}/status`, { 
+                method: 'PATCH', 
+                body: JSON.stringify({ status }) 
+            });
+            loadData();
+        } catch (e) {
+            console.error("Error updating status", e);
+        }
     };
 
     const handleAssignTable = async (bookingId: string, tableId: string) => {
-        console.log("Assign", bookingId, tableId);
+        try {
+            await fetchAPI(`/restaurant/reservation/${bookingId}/status`, { 
+                method: 'PATCH', 
+                body: JSON.stringify({ tableId, status: 'CONFIRMED' }) 
+            });
+            loadData();
+        } catch (e) {
+            console.error("Error assigning table", e);
+        }
     };
 
     const totalPax = bookings.reduce((sum, b) => sum + (b.status !== 'CANCELLED' ? b.pax : 0), 0);
@@ -176,12 +206,24 @@ function RestaurantDashboardContent() {
                     </div>
 
                     <div className="flex-1 overflow-hidden relative">
+                        {view === 'ACCESS' && (
+                            <div className="h-full overflow-auto p-6">
+                                <AccessManager contextId={restaurantId} contextType="restaurant" />
+                            </div>
+                        )}
+
                         {view === 'PLAN' && (
                             <TablePlan
                                 zones={zones}
                                 tables={rawTables}
+                                restaurantId={restaurantId}
+                                mode="SERVICE"
                                 onTableUpdate={handleUpdateTable}
                                 onBookingMove={handleAssignTable}
+                                onSelectProfile={(b) => setSelectedBookingForProfile(b)}
+                                onTableSelect={(id) => {
+                                    console.log("Service click table:", id);
+                                }}
                                 className="h-full w-full"
                             />
                         )}
@@ -191,6 +233,7 @@ function RestaurantDashboardContent() {
                                 <ReservationList
                                     bookings={bookings}
                                     onStatusChange={handleStatusChange}
+                                    onSelectProfile={(b) => setSelectedBookingForProfile(b)}
                                     onEdit={(b) => console.log("Edit", b)}
                                 />
                             </div>
@@ -204,6 +247,12 @@ function RestaurantDashboardContent() {
                 onClose={() => setIsFormOpen(false)}
                 onSubmit={handleCreateBooking}
                 initialDate={date}
+            />
+
+            <GuestProfileSheet
+                booking={selectedBookingForProfile}
+                isOpen={!!selectedBookingForProfile}
+                onClose={() => setSelectedBookingForProfile(null)}
             />
         </div>
     );

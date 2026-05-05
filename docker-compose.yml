@@ -5,7 +5,6 @@ networks:
     external: true
   reservas-internal-net:
     driver: bridge
-    internal: true
 
 volumes:
   reservas_db_data:
@@ -23,6 +22,8 @@ services:
       - reservas_db_data:/var/lib/postgresql/data
     networks:
       - reservas-internal-net
+    ports:
+      - "5442:5432"
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:-reservas_user}" ]
       interval: 10s
@@ -68,14 +69,12 @@ services:
       - "3000"
     labels:
       - "traefik.enable=true"
-      # Router HTTPS
       - "traefik.http.routers.sotoreservas-api.rule=Host(`api.reservas.sotodelprior.com`)"
-      - "traefik.http.routers.sotoreservas-api.entrypoints=websecure"
-      - "traefik.http.routers.sotoreservas-api.service=sotoreservas-api"
-      - "traefik.http.routers.sotoreservas-api.tls=true"
-      - "traefik.http.routers.sotoreservas-api.tls.certresolver=le"
+      - "traefik.http.routers.sotoreservas-api.entrypoints=web"
+      - "traefik.http.routers.sotoreservas-api.middlewares=sotoreservas-headers"
+      - "traefik.http.middlewares.sotoreservas-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.sotoreservas-headers.headers.customrequestheaders.X-Forwarded-Scheme=https"
       - "traefik.docker.network=proxy-net"
-      # Servicio
       - "traefik.http.services.sotoreservas-api.loadbalancer.server.port=3000"
 
   sotoreservas-web:
@@ -83,15 +82,20 @@ services:
       context: ./apps/web
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: https://api.reservas.sotodelprior.com
+        NEXT_PUBLIC_API_URL: http://api.reservas.sotodelprior.com
     container_name: sotoreservas-web
     restart: unless-stopped
     environment:
-      NEXT_PUBLIC_API_URL: https://api.reservas.sotodelprior.com
+      NEXT_PUBLIC_API_URL: http://api.reservas.sotodelprior.com
       AUTH_TRUST_HOST: "true"
-      AUTH_URL: "https://reservas.sotodelprior.com"
+      AUTH_URL: "http://reservas.sotodelprior.com"
+      NEXTAUTH_URL: "http://reservas.sotodelprior.com"
+      NEXTAUTH_TRUST_HOST: "true"
+      NEXTAUTH_URL_INTERNAL: "http://localhost:3000"
+      NEXTAUTH_SKIP_ENV_VALIDATION: "true"
+      NODE_ENV: "development"
       AUTH_SECRET: "${AUTH_SECRET:-supersecretkeyreservas123}"
-      DATABASE_URL: postgresql://${DB_USER:-reservas_user}:${DB_PASS:-reservas_pass}@sotoreservas-db:5432/${DB_NAME:-reservas}
+      DATABASE_URL: postgresql://${DB_USER:-reservas_user}:${DB_PASS:-reservas_pass}@sotoreservas-db:5432/${DB_NAME:-reservas}"
     networks:
       - proxy-net
       - reservas-internal-net
@@ -99,21 +103,12 @@ services:
       - sotoreservas-api
     expose:
       - "3000"
-    ports:
-      - "3001:3000"
     labels:
       - "traefik.enable=true"
-      # Router HTTPS
       - "traefik.http.routers.sotoreservas-web.rule=Host(`reservas.sotodelprior.com`)"
-      - "traefik.http.routers.sotoreservas-web.entrypoints=websecure"
-      - "traefik.http.routers.sotoreservas-web.service=sotoreservas-web"
-      - "traefik.http.routers.sotoreservas-web.tls=true"
-      - "traefik.http.routers.sotoreservas-web.tls.certresolver=le"
+      - "traefik.http.routers.sotoreservas-web.entrypoints=web"
+      - "traefik.http.routers.sotoreservas-web.middlewares=sotoreservas-web-headers"
+      - "traefik.http.middlewares.sotoreservas-web-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.sotoreservas-web-headers.headers.customrequestheaders.X-Forwarded-Scheme=https"
       - "traefik.docker.network=proxy-net"
-      # Servicio
       - "traefik.http.services.sotoreservas-web.loadbalancer.server.port=3000"
-      # Redirect HTTP -> HTTPS
-      - "traefik.http.routers.sotoreservas-web-http.rule=Host(`reservas.sotodelprior.com`)"
-      - "traefik.http.routers.sotoreservas-web-http.entrypoints=web"
-      - "traefik.http.routers.sotoreservas-web-http.middlewares=redirect-to-https"
-      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"

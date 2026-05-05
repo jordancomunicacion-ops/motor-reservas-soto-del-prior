@@ -20,16 +20,19 @@ export const authConfig = {
             return true;
         },
         async session({ session, token }) {
+            console.log('[AUTH SESSION] Token:', token);
             if (token.sub && session.user) {
                 session.user.id = token.sub;
             }
             if (token.role && session.user) {
                 session.user.role = token.role as string;
             }
+            console.log('[AUTH SESSION] Final session user:', session.user);
             return session;
         },
         async jwt({ token, user }) {
             if (user) {
+                console.log('[AUTH JWT] User:', user);
                 token.role = user.role;
             }
             return token;

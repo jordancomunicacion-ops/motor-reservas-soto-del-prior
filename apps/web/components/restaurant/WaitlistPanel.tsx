@@ -72,7 +72,11 @@ export default function WaitlistPanel({ entries, onAdd, onSeat }: WaitlistProps)
                                 <Badge variant="secondary" className="bg-gray-200 text-gray-700">{entry.pax}p</Badge>
                             </div>
                             <div className="flex justify-between items-center text-xs text-gray-500">
-                                <span>Hace {formatDistanceToNow(new Date(entry.createdAt), { locale: es })}</span>
+                                <span>
+                                    Hace {isNaN(new Date(entry.createdAt).getTime()) 
+                                        ? '??' 
+                                        : formatDistanceToNow(new Date(entry.createdAt), { locale: es })}
+                                </span>
                                 <Button size="icon" variant="ghost" className="h-6 w-6 opacity-0 group-hover:opacity-100 text-green-600" onClick={() => onSeat(entry.id)}>
                                     <ArrowRight className="w-4 h-4" />
                                 </Button>

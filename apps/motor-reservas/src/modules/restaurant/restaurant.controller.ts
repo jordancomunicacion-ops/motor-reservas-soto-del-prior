@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query, Patch } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, Patch, Delete } from '@nestjs/common';
 import { RestaurantService } from './restaurant.service';
 
 @Controller('restaurant')
@@ -23,6 +23,11 @@ export class RestaurantController {
     @Patch(':id')
     updateRestaurant(@Param('id') id: string, @Body() body: any) {
         return this.service.updateRestaurant(id, body);
+    }
+
+    @Delete(':id')
+    deleteRestaurant(@Param('id') id: string) {
+        return this.service.deleteRestaurant(id);
     }
 
     @Post('zones')
@@ -52,8 +57,13 @@ export class RestaurantController {
 
     // --- Bookings ---
     @Get(':id/bookings')
-    getBookings(@Param('id') id: string, @Query('date') date: string) {
-        return this.service.getBookings(id, date);
+    getBookings(
+        @Param('id') id: string, 
+        @Query('date') date?: string,
+        @Query('startDate') startDate?: string,
+        @Query('endDate') endDate?: string
+    ) {
+        return this.service.getBookings(id, date, startDate, endDate);
     }
 
     @Post('bookings')
@@ -88,4 +98,57 @@ export class RestaurantController {
     cancelReservation(@Param('id') id: string) {
         return this.service.cancelReservation(id);
     }
+
+    @Patch('reservation/:id/status')
+    updateBookingStatus(@Param('id') id: string, @Body() body: { status: string; tableId?: string }) {
+        return this.service.updateBookingStatus(id, body.status, body.tableId);
+    }
+
+    // --- Synergy & Shifts ---
+    @Get(':id/slots')
+    getAvailableSlots(
+        @Param('id') id: string,
+        @Query('date') date: string,
+        @Query('pax') pax: string,
+        @Query('type') type?: string
+    ) {
+        return this.service.getAvailableSlots(id, date, parseInt(pax), type);
+    }
+
+
+    @Get(':id/shifts')
+    getShifts(@Param('id') id: string) {
+        return this.service.getShifts(id);
+    }
+
+    @Post(':id/shifts')
+    createShift(@Param('id') id: string, @Body() body: any) {
+        return this.service.createShift(id, body);
+    }
+
+    @Post('linked-reservation')
+    createLinkedReservation(@Body() body: any) {
+        return this.service.createLinkedReservation(body);
+    }
+
+    @Delete(':id/shifts/:shiftId')
+    deleteShift(@Param('shiftId') shiftId: string) {
+        return this.service.deleteShift(shiftId);
+    }
+
+    @Get(':id/closures')
+    getClosures(@Param('id') id: string) {
+        return this.service.getClosures(id);
+    }
+
+    @Post(':id/closures')
+    createClosure(@Param('id') id: string, @Body() body: any) {
+        return this.service.createClosure(id, body);
+    }
+
+    @Delete(':id/closures/:closureId')
+    deleteClosure(@Param('closureId') closureId: string) {
+        return this.service.deleteClosure(closureId);
+    }
 }
+

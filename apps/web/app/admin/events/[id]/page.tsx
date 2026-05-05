@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { fetchAPI } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { PartyPopper, Calendar, Users, Euro, ArrowLeft, Mail, Phone, Trash2 } from 'lucide-react';
+import { PartyPopper, Calendar, Users, Euro, ArrowLeft, Mail, Phone, Trash2, Building2, Utensils } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -144,6 +144,22 @@ export default function EventDetailPage() {
                                     <p className="font-bold text-lg text-green-600">{event.price}€ / pax</p>
                                 </div>
                             </div>
+
+                            {(event.hotel || event.restaurant) && (
+                                <div className="pt-4 border-t border-gray-100 dark:border-zinc-700">
+                                    <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider mb-2">Viculación</p>
+                                    {event.hotel && (
+                                        <div className="flex items-center gap-2 text-sm font-medium text-blue-600 bg-blue-50 px-3 py-2 rounded-lg">
+                                            <Building2 className="w-4 h-4" /> Hotel: {event.hotel.name}
+                                        </div>
+                                    )}
+                                    {event.restaurant && (
+                                        <div className="flex items-center gap-2 text-sm font-medium text-orange-600 bg-orange-50 px-3 py-2 rounded-lg">
+                                            <Utensils className="w-4 h-4" /> Restaurante: {event.restaurant.name}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                             
                             <div className="pt-4 border-t border-gray-100 dark:border-zinc-700">
                                 <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider mb-2">Descripción</p>

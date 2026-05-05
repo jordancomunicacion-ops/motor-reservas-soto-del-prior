@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspaces",
+    "dev": "concurrently \"npm run dev -w web\" \"npm run dev -w motor-reservas\"",
     "build": "npm run build --workspaces",
     "lint": "npm run lint --workspaces"
   },

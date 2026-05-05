@@ -3,11 +3,15 @@ import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class EventService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService
+  ) {}
 
   async findAll() {
     return this.prisma.event.findMany({
       include: {
+        hotel: { select: { name: true } },
+        restaurant: { select: { name: true } },
         _count: {
           select: { bookings: true },
         },
@@ -20,6 +24,8 @@ export class EventService {
     const event = await this.prisma.event.findUnique({
       where: { id },
       include: {
+        hotel: true,
+        restaurant: true,
         bookings: {
           orderBy: { createdAt: 'desc' },
         },
@@ -64,7 +70,7 @@ export class EventService {
       throw new Error('Not enough capacity for this event');
     }
 
-    return this.prisma.eventBooking.create({
+    const booking = await this.prisma.eventBooking.create({
       data: {
         eventId,
         guestName: data.guestName,
@@ -75,5 +81,20 @@ export class EventService {
         status: 'CONFIRMED',
       },
     });
+
+    // Sync with CRM removed for now
+
+    return booking;
+  }
+
+  async cancelBooking(bookingId: string) {
+    const booking = await this.prisma.eventBooking.update({
+      where: { id: bookingId },
+      data: { status: 'CANCELLED' },
+    });
+
+    // Sync with CRM removed
+    
+    return booking;
   }
 }

@@ -32,7 +32,8 @@ import { EventModule } from './modules/event/event.module';
     CampaignsModule,
     PaymentModule,
     MailModule,
-    EventModule
+    EventModule,
+    GlobalModule
   ],
   controllers: [AppController],
   providers: [AppService],

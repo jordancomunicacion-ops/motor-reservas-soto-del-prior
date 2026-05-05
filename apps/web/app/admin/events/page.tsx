@@ -17,12 +17,35 @@ export default function EventsListPage() {
         date: '',
         capacity: 50,
         price: 0,
-        description: ''
+        description: '',
+        hotelId: '',
+        restaurantId: ''
     });
+
+    const [hotels, setHotels] = useState<any[]>([]);
+    const [restaurants, setRestaurants] = useState<any[]>([]);
 
     useEffect(() => {
         loadEvents();
+        loadEstablishments();
     }, []);
+
+    async function loadEstablishments() {
+        try {
+            const hotelsData = await fetchAPI('/property/hotels');
+            const restaurantsData = await fetchAPI('/restaurant');
+            
+            console.log('Hotels loaded:', hotelsData);
+            console.log('Restaurants loaded:', restaurantsData);
+            
+            setHotels(Array.isArray(hotelsData) ? hotelsData : []);
+            setRestaurants(Array.isArray(restaurantsData) ? restaurantsData : []);
+        } catch (e) {
+            console.error('Error loading establishments', e);
+            setHotels([]);
+            setRestaurants([]);
+        }
+    }
 
     async function loadEvents() {
         setLoading(true);
@@ -43,14 +66,20 @@ export default function EventsListPage() {
         try {
             await fetchAPI('/event', {
                 method: 'POST',
-                body: JSON.stringify(formData)
+                body: JSON.stringify({
+                    ...formData,
+                    hotelId: formData.hotelId || null,
+                    restaurantId: formData.restaurantId || null
+                })
             });
             setFormData({
                 name: '',
                 date: '',
                 capacity: 50,
                 price: 0,
-                description: ''
+                description: '',
+                hotelId: '',
+                restaurantId: ''
             });
             setShowCreate(false);
             loadEvents();
@@ -89,6 +118,32 @@ export default function EventsListPage() {
                                 value={formData.date}
                                 onChange={e => setFormData({...formData, date: e.target.value})}
                             />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Hotel Vinculado (Opcional)</label>
+                            <select
+                                className="border p-2 rounded w-full dark:bg-zinc-900 focus:ring-2 focus:ring-blue-500 outline-none"
+                                value={formData.hotelId}
+                                onChange={e => setFormData({...formData, hotelId: e.target.value})}
+                            >
+                                <option value="">Ninguno</option>
+                                {hotels.map(h => (
+                                    <option key={h.id} value={h.id}>{h.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Restaurante Vinculado (Opcional)</label>
+                            <select
+                                className="border p-2 rounded w-full dark:bg-zinc-900 focus:ring-2 focus:ring-blue-500 outline-none"
+                                value={formData.restaurantId}
+                                onChange={e => setFormData({...formData, restaurantId: e.target.value})}
+                            >
+                                <option value="">Ninguno</option>
+                                {restaurants.map(r => (
+                                    <option key={r.id} value={r.id}>{r.name}</option>
+                                ))}
+                            </select>
                         </div>
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Capacidad (Pax)</label>
@@ -150,10 +205,22 @@ export default function EventsListPage() {
                                 </div>
                                 <div>
                                     <h3 className="text-lg font-bold group-hover:text-purple-600 transition-colors">{event.name}</h3>
-                                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                        <Calendar className="w-3 h-3" />
-                                        {format(new Date(event.date), "PPP p", { locale: es })}
-                                    </p>
+                                    <div className="flex flex-col gap-1 mt-1">
+                                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                            <Calendar className="w-3 h-3" />
+                                            {format(new Date(event.date), "PPP p", { locale: es })}
+                                        </p>
+                                        {event.hotel && (
+                                            <p className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded w-fit font-medium">
+                                                Hotel: {event.hotel.name}
+                                            </p>
+                                        )}
+                                        {event.restaurant && (
+                                            <p className="text-[10px] bg-orange-50 text-orange-600 px-2 py-0.5 rounded w-fit font-medium">
+                                                Restaurante: {event.restaurant.name}
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                             

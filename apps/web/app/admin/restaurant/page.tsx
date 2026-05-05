@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { fetchAPI } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { Plus, Utensils, Settings, LayoutDashboard, Share2 } from 'lucide-react';
+import { Plus, Utensils, Settings, LayoutDashboard, Share2, Users, RefreshCw } from 'lucide-react';
 
 export default function RestaurantListPage() {
     const [restaurants, setRestaurants] = useState<any[]>([]);
@@ -28,16 +28,21 @@ export default function RestaurantListPage() {
     }
 
     async function handleCreate() {
-        if (!newName) return;
+        if (!newName) {
+            alert('Por favor, introduce un nombre para el restaurante antes de crearlo.');
+            return;
+        }
         try {
             await fetchAPI('/restaurant', {
                 method: 'POST',
-                body: JSON.stringify({ name: newName, settings: {} })
+                body: JSON.stringify({ name: newName, currency: 'EUR' })
             });
+            alert('Restaurante creado con éxito');
             setNewName('');
             loadRestaurants();
         } catch (e) {
-            alert('Error creando restaurante');
+            console.error('Error creating restaurant:', e);
+            alert('Error creando restaurante. Por favor, asegúrese de que el servidor está funcionando.');
         }
     }
 
@@ -103,17 +108,25 @@ export default function RestaurantListPage() {
                                     variant="outline" 
                                     size="sm"
                                     className="gap-2 text-xs" 
-                                    onClick={() => window.location.href = `/admin/restaurant/${rest.id}/config`}
+                                    onClick={() => window.location.href = `/admin/restaurant/${rest.id}/config?tab=general`}
                                 >
-                                    <Settings className="w-3 h-3" /> Configurar
+                                    <Settings className="w-3 h-3" /> Ajustes
                                 </Button>
                                 <Button 
                                     variant="outline" 
                                     size="sm"
-                                    className="gap-2 text-xs col-span-2" 
+                                    className="gap-2 text-xs" 
                                     onClick={() => window.location.href = `/admin/restaurant/${rest.id}/connections`}
                                 >
-                                    <Share2 className="w-3 h-3" /> Gestionar Conexiones
+                                    <Share2 className="w-3 h-3" /> Conexiones
+                                </Button>
+                                <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    className="gap-2 text-xs" 
+                                    onClick={() => window.location.href = `/admin/restaurant/${rest.id}/config?tab=access`}
+                                >
+                                    <Users className="w-3 h-3" /> Accesos
                                 </Button>
                             </div>
                         </div>
