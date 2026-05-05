@@ -297,8 +297,8 @@ function HotelConnectionsContent() {
                             <Database className="w-6 h-6" />
                         </div>
                         <div className="flex-1">
-                            <CardTitle>Conexión CRM</CardTitle>
-                            <CardDescription>Sincronización de reservas vía API.</CardDescription>
+                            <CardTitle>API Key y Conexión Externa</CardTitle>
+                            <CardDescription>Usa esta clave para integrar el motor con CRMs u otros servicios externos.</CardDescription>
                         </div>
                         <Switch 
                             checked={integrations.crm.enabled}
