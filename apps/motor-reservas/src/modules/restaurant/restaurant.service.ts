@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
+import { WaitlistService } from './waitlist.service';
 
 @Injectable()
 export class RestaurantService {
@@ -10,6 +11,7 @@ export class RestaurantService {
     constructor(
         private prisma: PrismaService,
         private mailService: MailService,
+        private waitlistService: WaitlistService,
     ) { }
 
     // ... (existing code) ...
@@ -363,10 +365,20 @@ export class RestaurantService {
         const updateData: any = { status };
         if (tableId) updateData.tableId = tableId;
         
-        return this.prisma.resBooking.update({
+        const booking = await this.prisma.resBooking.update({
             where: { id: bookingId },
             data: updateData
         });
+
+        // Trigger waitlist check if cancelled
+        if (status === 'CANCELLED') {
+            this.waitlistService.checkWaitlistForAvailability(
+                booking.restaurantId,
+                booking.date
+            );
+        }
+
+        return booking;
     }
 
 

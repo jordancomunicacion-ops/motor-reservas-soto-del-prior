@@ -1,26 +1,26 @@
 (function () {
-    const CONTAINER_ID = 'soto-widget-container';
+    const CONTAINER_ID = 'soto-hotel-widget-container';
     const BASE_URL = 'https://reservas.sotodelprior.com';
 
     function init() {
         // Prevent multiple initializations
         if (document.getElementById(CONTAINER_ID)) return;
 
-        // Find the data-restaurant attribute from the embed div
-        const embedDiv = document.getElementById('soto-booking-widget');
-        const restaurantId = embedDiv ? embedDiv.getAttribute('data-restaurant') : null;
+        // Find the data-hotel attribute from the embed div
+        const embedDiv = document.getElementById('soto-hotel-booking-widget');
+        const hotelId = embedDiv ? embedDiv.getAttribute('data-hotel') : null;
 
-        if (!restaurantId) {
-            console.error('[SotoWidget] No se encontró data-restaurant en #soto-booking-widget');
+        if (!hotelId) {
+            console.error('[SotoHotelWidget] No se encontró data-hotel en #soto-hotel-booking-widget');
             return;
         }
 
-        const IFRAME_URL = `${BASE_URL}/widget/restaurant?id=${restaurantId}`;
+        const IFRAME_URL = `${BASE_URL}/widget?hotelId=${hotelId}`;
 
         // 1. Inject CSS
         const style = document.createElement('style');
         style.innerHTML = `
-            #soto-widget-overlay {
+            #soto-hotel-widget-overlay {
                 position: fixed;
                 top: 0;
                 left: 0;
@@ -35,27 +35,27 @@
                 opacity: 0;
                 transition: opacity 0.3s ease;
             }
-            #soto-widget-overlay.open {
+            #soto-hotel-widget-overlay.open {
                 display: flex;
                 opacity: 1;
             }
-            #soto-widget-modal {
+            #soto-hotel-widget-modal {
                 background: white;
-                width: 900px;
+                width: 600px;
                 max-width: 95vw;
                 height: auto;
                 max-height: 90vh;
-                border-radius: 8px;
+                border-radius: 12px;
                 box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
                 position: relative;
                 overflow: hidden;
                 transform: scale(0.95);
                 transition: transform 0.3s ease;
             }
-            #soto-widget-overlay.open #soto-widget-modal {
+            #soto-hotel-widget-overlay.open #soto-hotel-widget-modal {
                 transform: scale(1);
             }
-            #soto-widget-close {
+            #soto-hotel-widget-close {
                 position: absolute;
                 top: 15px;
                 right: 15px;
@@ -73,10 +73,10 @@
                 z-index: 10;
                 padding-bottom: 4px;
             }
-            #soto-widget-close:hover {
+            #soto-hotel-widget-close:hover {
                 background: #e0e0e0;
             }
-            #soto-widget-launcher {
+            #soto-hotel-widget-launcher {
                 position: fixed;
                 bottom: 20px;
                 right: 20px;
@@ -93,13 +93,13 @@
                 box-shadow: 0 4px 14px rgba(0,0,0,0.2);
                 transition: all 0.3s ease;
             }
-            #soto-widget-launcher:hover {
+            #soto-hotel-widget-launcher:hover {
                 transform: translateY(-2px);
                 box-shadow: 0 6px 20px rgba(0,0,0,0.3);
             }
-            #soto-widget-iframe {
+            #soto-hotel-widget-iframe {
                 width: 100%;
-                height: 650px;
+                height: 700px;
                 border: none;
             }
         `;
@@ -107,18 +107,18 @@
 
         // 2. Create Elements
         const overlay = document.createElement('div');
-        overlay.id = 'soto-widget-overlay';
+        overlay.id = 'soto-hotel-widget-overlay';
 
         const modal = document.createElement('div');
-        modal.id = 'soto-widget-modal';
+        modal.id = 'soto-hotel-widget-modal';
 
         const closeBtn = document.createElement('button');
-        closeBtn.id = 'soto-widget-close';
+        closeBtn.id = 'soto-hotel-widget-close';
         closeBtn.innerHTML = '&times;';
         closeBtn.onclick = closeModal;
 
         const iframe = document.createElement('iframe');
-        iframe.id = 'soto-widget-iframe';
+        iframe.id = 'soto-hotel-widget-iframe';
         iframe.src = IFRAME_URL;
 
         modal.appendChild(closeBtn);
@@ -151,17 +151,17 @@
         };
 
         // 4. Expose API and Bind Triggers
-        window.SotoWidget = {
+        window.SotoHotelWidget = {
             open: openModal,
             close: closeModal
         };
 
-        // Bind to any element with class 'soto-widget-trigger'
-        document.querySelectorAll('.soto-widget-trigger').forEach(btn => {
+        // Bind to any element with class 'soto-hotel-widget-trigger'
+        document.querySelectorAll('.soto-hotel-widget-trigger').forEach(btn => {
             btn.addEventListener('click', openModal);
         });
 
-        console.log('[SotoWidget] Restaurant widget initialized for ID: ' + restaurantId);
+        console.log('[SotoHotelWidget] Hotel widget initialized for ID: ' + hotelId);
     }
 
     // Initialize when DOM is ready

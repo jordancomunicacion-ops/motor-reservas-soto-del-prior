@@ -489,14 +489,19 @@ model RestaurantWaitlist {
   restaurantId String
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
   
-  name         String
-  phone        String?
+  date         DateTime
+  shiftId      String?
   pax          Int
+  
+  name         String
+  email        String
+  phone        String?
   notes        String?
   
-  status       String   @default("WAITING") // WAITING, NOTIFIED, SEATED, CANCELLED
+  status       String   @default("WAITING") // WAITING, NOTIFIED, CONFIRMED, EXPIRED, CANCELLED
   
   createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
   notifiedAt   DateTime?
 }
 

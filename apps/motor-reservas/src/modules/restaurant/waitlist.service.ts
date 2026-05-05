@@ -1,0 +1,121 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import { MailService } from '../mail/mail.service';
+
+@Injectable()
+export class WaitlistService {
+    private readonly logger = new Logger(WaitlistService.name);
+
+    constructor(
+        private prisma: PrismaService,
+        private mailService: MailService
+    ) {}
+
+    /**
+     * Triggered when a reservation is cancelled or a table becomes free.
+     * Searches for suitable waitlist entries and notifies the first one.
+     */
+    async checkWaitlistForAvailability(restaurantId: string, date: Date, shiftId?: string) {
+        this.logger.log(`Checking waitlist for restaurant ${restaurantId} on date ${date.toISOString()}`);
+
+        const startOfDay = new Date(date);
+        startOfDay.setHours(0,0,0,0);
+        const endOfDay = new Date(date);
+        endOfDay.setHours(23,59,59,999);
+
+        // 1. Find all WAITING entries for this day
+        const waitlistEntries = await this.prisma.restaurantWaitlist.findMany({
+            where: {
+                restaurantId,
+                date: { gte: startOfDay, lte: endOfDay },
+                status: 'WAITING',
+                ...(shiftId ? { shiftId } : {})
+            },
+            orderBy: { createdAt: 'asc' }
+        });
+
+        if (waitlistEntries.length === 0) return;
+
+        // 2. For each entry, check if there's enough room now
+        // This is a simplified check. In a full implementation, we'd call the availability logic.
+        // For now, if someone cancelled, we notify the first person in line as a 'potential' opening.
+        
+        for (const entry of waitlistEntries) {
+            // Send notification email
+            await this.notifyGuest(entry);
+            
+            // We only notify the first one to avoid over-booking the same freed slot
+            // They have priority. If they don't confirm in X time, it goes to next (impl later)
+            break; 
+        }
+    }
+
+    private async notifyGuest(entry: any) {
+        try {
+            await this.prisma.restaurantWaitlist.update({
+                where: { id: entry.id },
+                data: { 
+                    status: 'NOTIFIED',
+                    notifiedAt: new Date()
+                }
+            });
+
+            const restaurant = await this.prisma.restaurant.findUnique({
+                where: { id: entry.restaurantId }
+            });
+
+            // Send email using waitlist_available template
+            // We pass a dummy booking object for the template to work
+            await this.mailService.sendRestaurantEmail(
+                entry.restaurantId,
+                {
+                    id: 'waitlist-' + entry.id,
+                    guestName: entry.name,
+                    guestEmail: entry.email,
+                    pax: entry.pax,
+                    date: entry.date
+                },
+                'waitlist_available',
+                {
+                    confirm_link: `https://reservas.sotodelprior.com/confirmar-espera?id=${entry.id}`
+                }
+            );
+
+            this.logger.log(`Guest ${entry.email} notified for waitlist ${entry.id}`);
+        } catch (e) {
+            this.logger.error(`Error notifying waitlist guest: ${e.message}`);
+        }
+    }
+
+    async confirmWaitlistEntry(waitlistId: string) {
+        const entry = await this.prisma.restaurantWaitlist.findUnique({
+            where: { id: waitlistId }
+        });
+
+        if (!entry || entry.status !== 'NOTIFIED') {
+            throw new Error('Entrada de lista de espera no válida o ya procesada.');
+        }
+
+        // Convert to real booking
+        const booking = await this.prisma.resBooking.create({
+            data: {
+                restaurantId: entry.restaurantId,
+                date: entry.date,
+                pax: entry.pax,
+                guestName: entry.name,
+                guestEmail: entry.email,
+                guestPhone: entry.phone,
+                status: 'CONFIRMED',
+                origin: 'WAITLIST'
+            }
+        });
+
+        // Update waitlist status
+        await this.prisma.restaurantWaitlist.update({
+            where: { id: waitlistId },
+            data: { status: 'CONFIRMED' }
+        });
+
+        return booking;
+    }
+}

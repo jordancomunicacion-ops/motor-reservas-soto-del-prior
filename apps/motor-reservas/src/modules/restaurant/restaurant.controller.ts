@@ -1,9 +1,13 @@
 import { Controller, Get, Post, Body, Param, Query, Patch, Delete } from '@nestjs/common';
 import { RestaurantService } from './restaurant.service';
+import { WaitlistService } from './waitlist.service';
 
 @Controller('restaurant')
 export class RestaurantController {
-    constructor(private readonly service: RestaurantService) { }
+    constructor(
+        private readonly service: RestaurantService,
+        private readonly waitlistService: WaitlistService
+    ) { }
 
     @Post()
     createRestaurant(@Body() body: any) {
@@ -149,6 +153,11 @@ export class RestaurantController {
     @Delete(':id/closures/:closureId')
     deleteClosure(@Param('closureId') closureId: string) {
         return this.service.deleteClosure(closureId);
+    }
+
+    @Post('waitlist/:id/confirm')
+    confirmWaitlist(@Param('id') id: string) {
+        return this.waitlistService.confirmWaitlistEntry(id);
     }
 }
 
