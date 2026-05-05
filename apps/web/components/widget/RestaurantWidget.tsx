@@ -1,14 +1,12 @@
 "use client";
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, isBefore, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Play, Check, Calendar, Users, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-
-// ... (existing code) ...
-
-
+import { fetchAPI } from '@/lib/api';
 
 // Types
 type Step = {
@@ -24,12 +22,27 @@ const STEPS: Step[] = [
 ];
 
 export function RestaurantWidget() {
+    const searchParams = useSearchParams();
+    const restaurantId = searchParams.get('id') || '';
+
     const [currentStep, setCurrentStep] = useState(1);
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [timeSlots, setTimeSlots] = useState<{ lunch: string[], dinner: string[] } | null>(null);
     const [selectedTime, setSelectedTime] = useState<string | null>(null);
     const [formData, setFormData] = useState({ name: '', surname: '', email: '', phone: '', prefix: '+34' });
+    const [pax, setPax] = useState(2);
+    const [comment, setComment] = useState('');
+    const [bonusCode, setBonusCode] = useState('');
+    const [hasAllergy, setHasAllergy] = useState<boolean | null>(null);
+    const [acceptTerms, setAcceptTerms] = useState(false);
+    const [acceptData, setAcceptData] = useState(false);
+    const [acceptMarketing, setAcceptMarketing] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const [loadingSlots, setLoadingSlots] = useState(false);
+    const [closures, setClosures] = useState<string[]>([]);
+    const [restaurantName, setRestaurantName] = useState('');
+    const [createdBooking, setCreatedBooking] = useState<any>(null);
 
     // Inject Fonts
     useEffect(() => {
@@ -40,32 +53,93 @@ export function RestaurantWidget() {
         return () => { document.head.removeChild(link); }
     }, []);
 
-    // Mock availability data for demo
-    // 0: Closed, 1: Available, 2: Full
+    // Load restaurant info and closures
+    useEffect(() => {
+        if (!restaurantId) return;
+        fetchAPI(`/restaurant/${restaurantId}`)
+            .then(data => { if (data?.name) setRestaurantName(data.name); })
+            .catch(() => {});
+        fetchAPI(`/restaurant/${restaurantId}/closures`)
+            .then(data => {
+                if (Array.isArray(data)) {
+                    setClosures(data.map((c: any) => format(new Date(c.date), 'yyyy-MM-dd')));
+                }
+            })
+            .catch(() => {});
+    }, [restaurantId]);
+
     const getDayStatus = (date: Date) => {
-        const day = date.getDate();
-        if (day % 7 === 0) return 'closed'; // Sundays closed
-        if (day === 8) return 'full'; // Mock full day
+        const dateStr = format(date, 'yyyy-MM-dd');
+        if (closures.includes(dateStr)) return 'closed';
+        if (isBefore(date, startOfDay(new Date()))) return 'closed';
         return 'available';
     };
 
-    const handleDateSelect = (date: Date) => {
+    const handleDateSelect = async (date: Date) => {
         const status = getDayStatus(date);
         if (status !== 'available') return;
         setSelectedDate(date);
-
-        // Mock Time Slots Logic
-        // In real app, fetch from API based on date
-        setTimeSlots({
-            lunch: ['13:30', '13:45', '14:00', '14:15', '14:30', '15:00'],
-            dinner: [] // Mock closed for dinner as per example
-        });
         setSelectedTime(null);
+        setLoadingSlots(true);
+
+        try {
+            const dateStr = format(date, 'yyyy-MM-dd');
+            // Fetch lunch slots
+            const lunchSlots = await fetchAPI(`/restaurant/${restaurantId}/slots?date=${dateStr}&pax=${pax}&type=LUNCH`);
+            // Fetch dinner slots
+            const dinnerSlots = await fetchAPI(`/restaurant/${restaurantId}/slots?date=${dateStr}&pax=${pax}&type=DINNER`);
+
+            setTimeSlots({
+                lunch: Array.isArray(lunchSlots) ? lunchSlots : [],
+                dinner: Array.isArray(dinnerSlots) ? dinnerSlots : []
+            });
+        } catch (e) {
+            console.error('Error fetching slots:', e);
+            setTimeSlots({ lunch: [], dinner: [] });
+        } finally {
+            setLoadingSlots(false);
+        }
     };
 
     const handleTimeSelect = (time: string) => {
         setSelectedTime(time);
         setCurrentStep(2);
+    };
+
+    const handleSubmitReservation = async () => {
+        if (!selectedDate || !selectedTime || !formData.name || !formData.email) {
+            alert('Por favor, complete todos los campos obligatorios.');
+            return;
+        }
+        if (!acceptTerms || !acceptData) {
+            alert('Debe aceptar las condiciones de uso y el tratamiento de datos.');
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            const dateStr = format(selectedDate, 'yyyy-MM-dd');
+            const result = await fetchAPI('/restaurant/public/reservation', {
+                method: 'POST',
+                body: JSON.stringify({
+                    restaurantId,
+                    date: dateStr,
+                    time: selectedTime,
+                    pax,
+                    name: `${formData.name} ${formData.surname}`.trim(),
+                    email: formData.email,
+                    phone: formData.prefix + formData.phone,
+                    notes: [comment, bonusCode ? `Bono: ${bonusCode}` : '', hasAllergy ? 'Tiene alergias/intolerancias' : ''].filter(Boolean).join(' | ') || undefined
+                })
+            });
+            setCreatedBooking(result);
+            setCurrentStep(4);
+        } catch (e) {
+            console.error('Error creating reservation:', e);
+            alert('Error al crear la reserva. Inténtelo de nuevo.');
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     // Calendar Generation
@@ -102,7 +176,7 @@ export function RestaurantWidget() {
                     >
                         {'<'} VOLVER
                     </button>
-                    <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400">SOTO DEL PRIOR</h2>
+                    <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400">{restaurantName || 'RESERVAS'}</h2>
                 </div>
             )}
 
@@ -301,11 +375,11 @@ export function RestaurantWidget() {
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <div className="font-bold text-gray-500 w-16 uppercase text-xs">Pax</div>
-                                        <div>2 personas</div>
+                                        <div>{pax} personas</div>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <div className="font-bold text-gray-500 w-16 uppercase text-xs">Lugar</div>
-                                        <div>SOTO del PRIOR</div>
+                                        <div>{restaurantName || 'Restaurante'}</div>
                                     </div>
                                 </div>
                             </div>
@@ -369,6 +443,8 @@ export function RestaurantWidget() {
                                     <textarea
                                         className="border p-3 text-sm rounded-none focus:outline-none focus:border-[#C59D5F] transition-colors bg-white resize-none"
                                         rows={2}
+                                        value={comment}
+                                        onChange={e => setComment(e.target.value)}
                                     ></textarea>
                                 </div>
 
@@ -377,11 +453,11 @@ export function RestaurantWidget() {
                                     <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">¿Tiene algún comensal alguna intolerancia/alergia?</label>
                                     <div className="flex gap-4">
                                         <label className="flex items-center gap-2 cursor-pointer">
-                                            <input type="checkbox" className="accent-[#C59D5F] w-4 h-4 cursor-pointer" />
+                                            <input type="checkbox" className="accent-[#C59D5F] w-4 h-4 cursor-pointer" checked={hasAllergy === true} onChange={() => setHasAllergy(true)} />
                                             <span className="text-sm">Sí</span>
                                         </label>
                                         <label className="flex items-center gap-2 cursor-pointer">
-                                            <input type="checkbox" className="accent-[#C59D5F] w-4 h-4 cursor-pointer" />
+                                            <input type="checkbox" className="accent-[#C59D5F] w-4 h-4 cursor-pointer" checked={hasAllergy === false} onChange={() => setHasAllergy(false)} />
                                             <span className="text-sm">No</span>
                                         </label>
                                     </div>
@@ -390,15 +466,15 @@ export function RestaurantWidget() {
                                 {/* Legal Checks */}
                                 <div className="grid gap-2 mt-2">
                                     <label className="flex items-start gap-2 cursor-pointer">
-                                        <input type="checkbox" className="accent-[#C59D5F] w-4 h-4 mt-0.5 cursor-pointer" />
+                                        <input type="checkbox" className="accent-[#C59D5F] w-4 h-4 mt-0.5 cursor-pointer" checked={acceptTerms} onChange={e => setAcceptTerms(e.target.checked)} />
                                         <span className="text-xs text-gray-600">Acepto las condiciones de uso, política de privacidad y aviso legal</span>
                                     </label>
                                     <label className="flex items-start gap-2 cursor-pointer">
-                                        <input type="checkbox" className="accent-[#C59D5F] w-4 h-4 mt-0.5 cursor-pointer" />
+                                        <input type="checkbox" className="accent-[#C59D5F] w-4 h-4 mt-0.5 cursor-pointer" checked={acceptData} onChange={e => setAcceptData(e.target.checked)} />
                                         <span className="text-xs text-gray-600">Consiento el tratamiento de datos personales</span>
                                     </label>
                                     <label className="flex items-start gap-2 cursor-pointer">
-                                        <input type="checkbox" className="accent-[#C59D5F] w-4 h-4 mt-0.5 cursor-pointer" />
+                                        <input type="checkbox" className="accent-[#C59D5F] w-4 h-4 mt-0.5 cursor-pointer" checked={acceptMarketing} onChange={e => setAcceptMarketing(e.target.checked)} />
                                         <span className="text-xs text-gray-600">Consiento la recepción de comunicaciones del restaurante por e-mail y/o SMS con fines comerciales</span>
                                     </label>
                                 </div>
@@ -447,6 +523,8 @@ export function RestaurantWidget() {
                                     className="w-full border p-4 text-sm rounded-none focus:outline-none focus:border-[#C59D5F] transition-colors bg-white resize-none"
                                     rows={4}
                                     placeholder="Ej: BONO-REGALO-2024..."
+                                    value={bonusCode}
+                                    onChange={e => setBonusCode(e.target.value)}
                                 ></textarea>
                             </div>
 
@@ -454,9 +532,10 @@ export function RestaurantWidget() {
                                 <Button
                                     className="w-full py-4 text-base font-bold uppercase tracking-widest text-white hover:bg-black transition-colors shadow-lg"
                                     style={{ backgroundColor: colors.accent, fontFamily: "'Oswald', sans-serif" }}
-                                    onClick={() => setCurrentStep(4)}
+                                    onClick={handleSubmitReservation}
+                                    disabled={submitting}
                                 >
-                                    RESERVAR
+                                    {submitting ? 'ENVIANDO...' : 'RESERVAR'}
                                 </Button>
                             </div>
                         </div>
@@ -489,13 +568,13 @@ export function RestaurantWidget() {
                                 <div className="flex items-center gap-3 text-gray-700">
                                     <Users className="w-5 h-5 text-[#C59D5F]" />
                                     <span className="text-lg font-bold" style={{ fontFamily: "'Oswald', sans-serif" }}>
-                                        2 personas.
+                                        {pax} personas.
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-3 text-gray-700">
                                     <MapPin className="w-5 h-5 text-[#C59D5F]" />
                                     <span className="text-md">
-                                        Finca Soto del Prior, Navarra. <a href="#" className="text-[#C59D5F] underline ml-1">¿Cómo llegar?</a>
+                                        {restaurantName || 'Restaurante'}
                                     </span>
                                 </div>
                             </div>
@@ -507,7 +586,7 @@ export function RestaurantWidget() {
                                 </h3>
 
                                 <div className="text-gray-500 text-sm space-y-1">
-                                    <p>Gracias por reservar en SOTO DEL PRIOR.</p>
+                                    <p>Gracias por reservar en {restaurantName || 'nuestro restaurante'}.</p>
                                     <p>Recibirá en breve un email de confirmación.</p>
                                 </div>
 
@@ -515,7 +594,7 @@ export function RestaurantWidget() {
                                     <Button
                                         className="text-white px-8 py-3 font-bold uppercase tracking-wider text-xs"
                                         style={{ backgroundColor: '#0A0A0A' }}
-                                        onClick={() => { setCurrentStep(1); setSelectedDate(null); setTimeSlots(null); setFormData({ name: '', surname: '', email: '', phone: '', prefix: '+34' }); }}
+                                        onClick={() => { setCurrentStep(1); setSelectedDate(null); setTimeSlots(null); setFormData({ name: '', surname: '', email: '', phone: '', prefix: '+34' }); setComment(''); setBonusCode(''); setHasAllergy(null); setAcceptTerms(false); setAcceptData(false); setAcceptMarketing(false); setCreatedBooking(null); }}
                                     >
                                         Volver al Inicio
                                     </Button>

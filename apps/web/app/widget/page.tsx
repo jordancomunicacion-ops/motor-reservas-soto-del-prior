@@ -34,16 +34,19 @@ function WidgetContent() {
     }, [styles.css]);
 
     // Search State
-    const [dates, setDates] = useState({ from: '2024-06-01', to: '2024-06-05' });
+    const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+    const checkout = new Date(); checkout.setDate(checkout.getDate() + 3);
+    const [dates, setDates] = useState({ from: tomorrow.toISOString().split('T')[0], to: checkout.toISOString().split('T')[0] });
     const [pax, setPax] = useState(2);
 
     // Results
     const [results, setResults] = useState<any[]>([]);
 
-    // Booking State
     const [selectedRoom, setSelectedRoom] = useState<any>(null);
-    const [guest, setGuest] = useState({ name: '', email: '' });
+    const [guest, setGuest] = useState({ name: '', email: '', phone: '' });
     const [config, setConfig] = useState<any>(null);
+    const [submitting, setSubmitting] = useState(false);
+    const [bookingResult, setBookingResult] = useState<any>(null);
 
     // Synergy State
     const [meals, setMeals] = useState({ breakfast: false, lunch: false, dinner: false });
@@ -103,7 +106,7 @@ function WidgetContent() {
                     <CardHeader className="bg-primary text-white py-4" style={{ backgroundColor: styles.primary }}>
                         <CardTitle className="text-lg flex justify-between items-center">
                             <span>Reserva tu estancia</span>
-                            <span className="text-xs opacity-70">Paso {step} de 4</span>
+                            <span className="text-xs opacity-70">Paso {Math.min(step, 4)} de 4</span>
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="p-6">
@@ -284,11 +287,79 @@ function WidgetContent() {
                                         <label className="text-xs font-bold uppercase opacity-60">Email</label>
                                         <input type="email" className="w-full border-2 border-gray-100 p-3 rounded-xl focus:border-primary outline-none" value={guest.email} onChange={e => setGuest({ ...guest, email: e.target.value })} />
                                     </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold uppercase opacity-60">Teléfono</label>
+                                        <input type="tel" className="w-full border-2 border-gray-100 p-3 rounded-xl focus:border-primary outline-none" value={guest.phone} onChange={e => setGuest({ ...guest, phone: e.target.value })} placeholder="+34 600 000 000" />
+                                    </div>
                                 </div>
-                                <Button className="w-full py-6 rounded-xl font-bold text-lg shadow-lg" style={{ backgroundColor: styles.primary }} onClick={() => alert('¡Reserva confirmada con éxito!')}>
-                                    Confirmar y Pagar €{selectedRoom?.totalPrice + (meals.breakfast ? 12 * 4 : 0)}
+                                <Button 
+                                    className="w-full py-6 rounded-xl font-bold text-lg shadow-lg" 
+                                    style={{ backgroundColor: styles.primary }} 
+                                    disabled={submitting || !guest.name || !guest.email}
+                                    onClick={async () => {
+                                        if (!guest.name || !guest.email) { alert('Nombre y email son obligatorios'); return; }
+                                        setSubmitting(true);
+                                        try {
+                                            const booking = await fetchAPI('/bookings', {
+                                                method: 'POST',
+                                                body: JSON.stringify({
+                                                    hotelId,
+                                                    guestName: guest.name,
+                                                    guestEmail: guest.email,
+                                                    guestPhone: guest.phone,
+                                                    checkInDate: dates.from,
+                                                    checkOutDate: dates.to,
+                                                    roomTypeId: selectedRoom.id,
+                                                    pax
+                                                })
+                                            });
+                                            setBookingResult(booking);
+                                            // Create synergy reservations if selected
+                                            if (config?.restaurantId && booking?.id) {
+                                                if (meals.lunch && lunchTime) {
+                                                    await fetchAPI('/restaurant/linked-reservation', {
+                                                        method: 'POST',
+                                                        body: JSON.stringify({ bookingId: booking.id, restaurantId: config.restaurantId, date: dates.from, time: lunchTime, pax, name: guest.name, email: guest.email })
+                                                    }).catch(e => console.error('Synergy lunch error:', e));
+                                                }
+                                                if (meals.dinner && dinnerTime) {
+                                                    await fetchAPI('/restaurant/linked-reservation', {
+                                                        method: 'POST',
+                                                        body: JSON.stringify({ bookingId: booking.id, restaurantId: config.restaurantId, date: dates.from, time: dinnerTime, pax, name: guest.name, email: guest.email })
+                                                    }).catch(e => console.error('Synergy dinner error:', e));
+                                                }
+                                            }
+                                            setStep(5);
+                                        } catch (e) {
+                                            console.error('Error creating booking:', e);
+                                            alert('Error al crear la reserva. Inténtelo de nuevo.');
+                                        } finally {
+                                            setSubmitting(false);
+                                        }
+                                    }}
+                                >
+                                    {submitting ? 'Procesando...' : `Confirmar y Reservar €${selectedRoom?.totalPrice + (meals.breakfast ? 12 * 4 : 0)}`}
                                 </Button>
                                 <button onClick={() => setStep(3)} className="w-full text-center text-xs text-muted-foreground mt-2">Revisar extras</button>
+                            </div>
+                        )}
+
+                        {/* STEP 5: SUCCESS */}
+                        {step === 5 && (
+                            <div className="space-y-6 text-center py-8">
+                                <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto">
+                                    <svg className="w-10 h-10 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                </div>
+                                <h3 className="font-bold text-2xl">¡Reserva Confirmada!</h3>
+                                <p className="text-muted-foreground">Ref: {bookingResult?.referenceCode || 'N/A'}</p>
+                                <div className="bg-gray-50 rounded-xl p-4 text-sm text-left space-y-1">
+                                    <p><strong>Huésped:</strong> {guest.name}</p>
+                                    <p><strong>Check-in:</strong> {dates.from}</p>
+                                    <p><strong>Check-out:</strong> {dates.to}</p>
+                                    <p><strong>Habitación:</strong> {selectedRoom?.name}</p>
+                                    <p><strong>Total:</strong> €{bookingResult?.totalPrice || selectedRoom?.totalPrice}</p>
+                                </div>
+                                <p className="text-xs text-muted-foreground">Recibirás un email de confirmación en breve.</p>
                             </div>
                         )}
                     </CardContent>

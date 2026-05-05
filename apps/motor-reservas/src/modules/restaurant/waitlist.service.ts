@@ -52,6 +52,10 @@ export class WaitlistService {
 
     private async notifyGuest(entry: any) {
         try {
+            const restaurant = await this.prisma.restaurant.findUnique({
+                where: { id: entry.restaurantId }
+            });
+
             await this.prisma.restaurantWaitlist.update({
                 where: { id: entry.id },
                 data: { 
@@ -60,12 +64,11 @@ export class WaitlistService {
                 }
             });
 
-            const restaurant = await this.prisma.restaurant.findUnique({
-                where: { id: entry.restaurantId }
-            });
+            const now = new Date();
+            const hoursUntilService = (new Date(entry.date).getTime() - now.getTime()) / (1000 * 60 * 60);
+            const isUrgent = hoursUntilService < 48;
 
-            // Send email using waitlist_available template
-            // We pass a dummy booking object for the template to work
+            // 1. Notify GUEST
             await this.mailService.sendRestaurantEmail(
                 entry.restaurantId,
                 {
@@ -77,11 +80,47 @@ export class WaitlistService {
                 },
                 'waitlist_available',
                 {
-                    confirm_link: `https://reservas.sotodelprior.com/confirmar-espera?id=${entry.id}`
+                    confirm_link: `https://reservas.sotodelprior.com/confirmar-espera?id=${entry.id}`,
+                    urgent_note: isUrgent ? 'Debido a la proximidad de la reserva, te recomendamos confirmar lo antes posible.' : ''
                 }
             );
 
-            this.logger.log(`Guest ${entry.email} notified for waitlist ${entry.id}`);
+            // 2. Notify ADMIN
+            if (restaurant?.contactEmail) {
+                const subject = isUrgent 
+                    ? `🚨 URGENTE: Hueco en Lista de Espera - ${restaurant.name}` 
+                    : `Aviso: Hueco en Lista de Espera - ${restaurant.name}`;
+                
+                const html = `
+                    <h3>¡Se ha liberado un hueco!</h3>
+                    <p>Una reserva ha sido cancelada para el <strong>${new Date(entry.date).toLocaleDateString()}</strong>.</p>
+                    <p>El sistema ha notificado automáticamente al primer cliente en lista de espera:</p>
+                    <ul>
+                        <li><strong>Cliente:</strong> ${entry.name}</li>
+                        <li><strong>Pax:</strong> ${entry.pax}</li>
+                        <li><strong>Email:</strong> ${entry.email}</li>
+                        <li><strong>Teléfono:</strong> ${entry.phone || 'No proporcionado'}</li>
+                    </ul>
+                    ${isUrgent ? `
+                    <div style="background: #fff5f5; border: 1px solid #feb2b2; padding: 15px; border-radius: 8px; color: #c53030;">
+                        <strong>⚠️ AVISO URGENTE:</strong> Faltan menos de 48h para el servicio. 
+                        Te recomendamos llamar directamente al cliente para asegurar la mesa.
+                    </div>
+                    ` : '<p>El cliente tiene un enlace para confirmar online.</p>'}
+                    <p><a href="https://reservas.sotodelprior.com/admin/restaurant/${restaurant.id}">Ir al Panel de Control</a></p>
+                `;
+
+                await this.mailService.sendEmail(
+                    restaurant.contactEmail,
+                    subject,
+                    html,
+                    'SOTOdelPRIOR Sistema',
+                    undefined,
+                    restaurant.mailConfig
+                );
+            }
+
+            this.logger.log(`Guest ${entry.email} notified for waitlist ${entry.id}. Urgent: ${isUrgent}`);
         } catch (e) {
             this.logger.error(`Error notifying waitlist guest: ${e.message}`);
         }
