@@ -41,6 +41,7 @@ model Hotel {
   // Notifications
   contactEmail   String?
   emailTemplates Json? @default("{\"created\": \"\", \"confirmed\": \"\", \"cancelled\": \"\", \"modified\": \"\", \"reminder\": \"\", \"waitlist_join\": \"\", \"waitlist_available\": \"\"}")
+  mailConfig     Json?
 
   events      Event[]
 }
@@ -350,6 +351,7 @@ model Restaurant {
   // Notifications
   contactEmail   String?
   emailTemplates Json? @default("{\"created\": \"\", \"confirmed\": \"\", \"cancelled\": \"\", \"modified\": \"\", \"reminder\": \"\", \"waitlist_join\": \"\", \"waitlist_available\": \"\"}")
+  mailConfig     Json?
 
   events    Event[]
 }

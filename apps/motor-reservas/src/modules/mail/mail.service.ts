@@ -4,12 +4,12 @@ import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class MailService {
-    private transporter: nodemailer.Transporter;
+    private defaultTransporter: nodemailer.Transporter;
     private readonly logger = new Logger(MailService.name);
 
     constructor(private prisma: PrismaService) {
-        // Initialize Transporter with Outlook/Office365 defaults
-        this.transporter = nodemailer.createTransport({
+        // Initialize Default Transporter from .env
+        this.defaultTransporter = nodemailer.createTransport({
             host: process.env.SMTP_HOST || 'smtp-mail.outlook.com',
             port: parseInt(process.env.SMTP_PORT || '587'),
             secure: false, // TLS
@@ -19,6 +19,25 @@ export class MailService {
             },
             tls: {
                 ciphers: 'SSLv3',
+                rejectUnauthorized: false
+            }
+        });
+    }
+
+    private getTransporter(customConfig?: any): nodemailer.Transporter {
+        if (!customConfig || !customConfig.host || !customConfig.user || !customConfig.pass) {
+            return this.defaultTransporter;
+        }
+
+        return nodemailer.createTransport({
+            host: customConfig.host,
+            port: parseInt(customConfig.port || '587'),
+            secure: customConfig.secure || false,
+            auth: {
+                user: customConfig.user,
+                pass: customConfig.pass,
+            },
+            tls: {
                 rejectUnauthorized: false
             }
         });
@@ -34,10 +53,12 @@ export class MailService {
         return processed;
     }
 
-    async sendEmail(to: string, subject: string, html: string, fromName?: string, replyTo?: string) {
+    async sendEmail(to: string, subject: string, html: string, fromName?: string, replyTo?: string, customConfig?: any) {
         try {
-            const fromEmail = process.env.SMTP_FROM || process.env.SMTP_USER;
-            const info = await this.transporter.sendMail({
+            const transporter = this.getTransporter(customConfig);
+            const fromEmail = customConfig?.from || process.env.SMTP_FROM || process.env.SMTP_USER;
+            
+            const info = await transporter.sendMail({
                 from: `"${fromName || 'SOTO DEL PRIOR'}" <${fromEmail}>`,
                 to,
                 replyTo: replyTo || fromEmail,
@@ -63,6 +84,7 @@ export class MailService {
 
         const templates: any = restaurant.emailTemplates || {};
         const customHtml = templates[type];
+        const mailConfig = restaurant.mailConfig;
         
         let html = '';
         let subject = '';
@@ -86,7 +108,6 @@ export class MailService {
                       type === 'waitlist_available' ? `Mesa disponible - ${restaurant.name}` :
                       `Reserva modificada - ${restaurant.name}`;
         } else {
-            // Fallback to basic internal templates if no custom HTML
             const statusText = type === 'created' ? 'recibida' : type === 'confirmed' ? 'confirmada' : type === 'cancelled' ? 'cancelada' : type === 'reminder' ? 'recordada' : 'procesada';
             html = `<h1>${restaurant.name}</h1><p>Hola ${booking.guestName}, tu solicitud para el ${data.date} ha sido ${statusText}.</p>`;
             subject = `${restaurant.name} - Notificación de Reserva`;
@@ -97,7 +118,8 @@ export class MailService {
             subject, 
             html, 
             restaurant.name, 
-            restaurant.contactEmail || undefined
+            restaurant.contactEmail || undefined,
+            mailConfig
         );
     }
 
@@ -111,6 +133,7 @@ export class MailService {
 
         const templates: any = hotel.emailTemplates || {};
         const customHtml = templates[type];
+        const mailConfig = hotel.mailConfig;
         
         let html = '';
         let subject = '';
@@ -145,7 +168,8 @@ export class MailService {
             subject, 
             html, 
             hotel.name, 
-            hotel.contactEmail || undefined
+            hotel.contactEmail || undefined,
+            mailConfig
         );
     }
 

@@ -49,6 +49,13 @@ function RestaurantConfigContent() {
         stripeEnabled: false,
         noShowFee: 0,
         cancelHours: 24,
+        mailConfig: {
+            host: '',
+            port: '587',
+            user: '',
+            pass: '',
+            from: ''
+        }
     });
 
     useEffect(() => {
@@ -70,6 +77,13 @@ function RestaurantConfigContent() {
                 stripeEnabled: data.integrations?.stripeEnabled || false,
                 noShowFee: data.integrations?.noShowFee || 0,
                 cancelHours: data.integrations?.cancelHours || 24,
+                mailConfig: data.mailConfig || {
+                    host: '',
+                    port: '587',
+                    user: '',
+                    pass: '',
+                    from: ''
+                }
             });
         } catch (e) {
             console.error(e);
@@ -109,7 +123,8 @@ function RestaurantConfigContent() {
                         stripeEnabled: formData.stripeEnabled,
                         noShowFee: formData.noShowFee,
                         cancelHours: formData.cancelHours,
-                    }
+                    },
+                    mailConfig: formData.mailConfig
                 })
             });
 
@@ -315,37 +330,67 @@ function RestaurantConfigContent() {
                     </CardContent>
                 </Card>
 
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-slate-600">
-                                <Key className="w-5 h-5" />
-                            </div>
-                            <div>
-                                <CardTitle>Integración CRM</CardTitle>
-                                <CardDescription>Claves para tu CRM externo.</CardDescription>
-                            </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-lg border">
-                            <Label className="text-xs text-muted-foreground uppercase mb-2 block">API Key (ID del Restaurante)</Label>
-                            <div className="flex items-center gap-2">
-                                <code className="bg-white dark:bg-black px-2 py-1 rounded border flex-1 text-xs">
-                                    {restaurantId}
-                                </code>
-                                <Button size="sm" variant="outline" onClick={() => {
-                                    navigator.clipboard.writeText(restaurantId);
-                                    alert('Copiado al portapapeles');
-                                }}>Copiar</Button>
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-2">
-                                Usa esta clave en la configuración de tu CRM para que pueda sincronizar los datos de clientes e integrarse automáticamente.
-                            </p>
-                        </div>
-                    </CardContent>
-                </Card>
             </div>
+
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-slate-600">
+                            <Mail className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <CardTitle>Configuración del Servidor de Envío</CardTitle>
+                            <CardDescription>Define la cuenta de correo desde la que se enviarán las notificaciones de este restaurante.</CardDescription>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label>Servidor SMTP (ej: smtp.office365.com)</Label>
+                            <Input 
+                                value={formData.mailConfig.host}
+                                onChange={(e) => setFormData({...formData, mailConfig: {...formData.mailConfig, host: e.target.value}})}
+                                placeholder="smtp.ejemplo.com"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Puerto (ej: 587)</Label>
+                            <Input 
+                                value={formData.mailConfig.port}
+                                onChange={(e) => setFormData({...formData, mailConfig: {...formData.mailConfig, port: e.target.value}})}
+                                placeholder="587"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Usuario / Email</Label>
+                            <Input 
+                                value={formData.mailConfig.user}
+                                onChange={(e) => setFormData({...formData, mailConfig: {...formData.mailConfig, user: e.target.value}})}
+                                placeholder="usuario@ejemplo.com"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Contraseña (o Contraseña de Aplicación)</Label>
+                            <Input 
+                                type="password"
+                                value={formData.mailConfig.pass}
+                                onChange={(e) => setFormData({...formData, mailConfig: {...formData.mailConfig, pass: e.target.value}})}
+                                placeholder="••••••••••••"
+                            />
+                        </div>
+                        <div className="md:col-span-2 space-y-2">
+                            <Label>Email remitente (Aparecerá como el 'De:')</Label>
+                            <Input 
+                                value={formData.mailConfig.from}
+                                onChange={(e) => setFormData({...formData, mailConfig: {...formData.mailConfig, from: e.target.value}})}
+                                placeholder="reservas@tudominio.com"
+                            />
+                            <p className="text-[10px] text-muted-foreground">Si se deja vacío, se usará el usuario/email de arriba.</p>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
 
             <Card>
                 <CardHeader>

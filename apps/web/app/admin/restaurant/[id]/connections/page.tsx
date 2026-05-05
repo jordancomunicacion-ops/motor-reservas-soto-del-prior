@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Share2, Utensils, Database, ArrowLeft, Save, Globe, Sparkles } from 'lucide-react';
+import { Share2, Utensils, Database, ArrowLeft, Save, Globe, Sparkles, CreditCard, Key } from 'lucide-react';
 import Link from 'next/link';
 import { WidgetConfigSection } from '@/components/admin/WidgetConfigSection';
 
@@ -19,7 +19,8 @@ function RestaurantConnectionsContent() {
     const [saving, setSaving] = useState(false);
     
     const [integrations, setIntegrations] = useState({
-        crm: { enabled: false, url: 'http://localhost:3004/api/integrations/restaurant', token: '', syncBookings: true }
+        crm: { enabled: false, url: 'http://localhost:3004/api/integrations/restaurant', token: '', syncBookings: true },
+        stripe: { enabled: false, publicKey: '', secretKey: '' }
     });
 
     useEffect(() => {
@@ -120,6 +121,21 @@ function RestaurantConnectionsContent() {
                         />
                     </CardHeader>
                     <CardContent className="space-y-4">
+                        <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-lg border mb-4">
+                            <Label className="text-xs text-muted-foreground uppercase mb-2 block">API Key de este Restaurante (SOTOdelPRIOR ID)</Label>
+                            <div className="flex items-center gap-2">
+                                <code className="bg-white dark:bg-black px-2 py-1 rounded border flex-1 text-xs font-mono text-purple-600 dark:text-purple-400">
+                                    {restaurantId}
+                                </code>
+                                <Button size="sm" variant="outline" onClick={() => {
+                                    navigator.clipboard.writeText(restaurantId);
+                                    alert('ID Copiado al portapapeles');
+                                }}>Copiar ID</Button>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground mt-2">
+                                Este es el identificador único del restaurante que debes usar en tu CRM para referenciar este establecimiento.
+                            </p>
+                        </div>
                         <div className="space-y-2">
                             <Label>URL del Endpoint CRM</Label>
                             <Input 
@@ -159,6 +175,47 @@ function RestaurantConnectionsContent() {
                                 Probar Conexión
                             </Button>
                         </div>
+                    </CardContent>
+                </Card>
+
+                {/* Stripe Connection */}
+                <Card>
+                    <CardHeader className="flex flex-row items-center gap-4">
+                        <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg text-emerald-600">
+                            <CreditCard className="w-6 h-6" />
+                        </div>
+                        <div className="flex-1">
+                            <CardTitle>Conexión Stripe</CardTitle>
+                            <CardDescription>Pasarela de pago y garantía por tarjetas.</CardDescription>
+                        </div>
+                        <Switch 
+                            checked={integrations.stripe?.enabled || false}
+                            onCheckedChange={(val) => setIntegrations(prev => ({ ...prev, stripe: { ...(prev.stripe || {}), enabled: val } }))}
+                        />
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                            <Label>Clave Pública (Publishable Key)</Label>
+                            <Input 
+                                placeholder="pk_live_..." 
+                                value={integrations.stripe?.publicKey || ''}
+                                onChange={e => setIntegrations(prev => ({ ...prev, stripe: { ...prev.stripe, publicKey: e.target.value } }))}
+                                disabled={!integrations.stripe?.enabled}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Clave Secreta (Secret Key)</Label>
+                            <Input 
+                                type="password"
+                                placeholder="sk_live_..." 
+                                value={integrations.stripe?.secretKey || ''}
+                                onChange={e => setIntegrations(prev => ({ ...prev, stripe: { ...prev.stripe, secretKey: e.target.value } }))}
+                                disabled={!integrations.stripe?.enabled}
+                            />
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            Una vez configurada la cuenta bancaria de este restaurante, puedes ir a la pestaña "Ajustes" para definir la penalización por No-Show.
+                        </p>
                     </CardContent>
                 </Card>
 
