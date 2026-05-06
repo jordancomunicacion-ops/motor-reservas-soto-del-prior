@@ -248,6 +248,8 @@ export default function TablePlanEditor({ restaurantId }: { restaurantId: string
                     <TablePlan 
                         zones={zones} 
                         tables={zones.flatMap(z => z.tables.map(t => ({ ...t, zoneId: z.id })))} 
+                        activeZoneId={activeZoneId}
+                        onActiveZoneChange={setActiveZoneId}
                         onTableUpdate={handleUpdateTable}
                         onBookingMove={() => {}} 
                         onTableSelect={setSelectedTableId}

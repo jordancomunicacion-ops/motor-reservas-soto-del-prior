@@ -262,18 +262,31 @@ export default function TablePlan({
     restaurantId?: string,
     hideToolbar?: boolean,
     mode?: 'VIEW' | 'EDIT' | 'SERVICE',
+    activeZoneId?: string,
+    onActiveZoneChange?: (id: string) => void,
     className?: string
 }) {
     const router = useRouter();
-    const [activeZone, setActiveZone] = useState(zones[0]?.id || "");
+    const [activeZone, setActiveZone] = useState(activeZoneId || zones[0]?.id || "");
     const [editMode, setEditMode] = useState(false);
     const [scale, setScale] = useState(1);
+
+    useEffect(() => {
+        if (activeZoneId && activeZoneId !== activeZone) {
+            setActiveZone(activeZoneId);
+        }
+    }, [activeZoneId]);
 
     useEffect(() => {
         if (zones.length > 0 && !activeZone) {
             setActiveZone(zones[0].id);
         }
     }, [zones, activeZone]);
+
+    const handleZoneChange = (id: string) => {
+        setActiveZone(id);
+        onActiveZoneChange?.(id);
+    };
 
     // Filter tables by active zone
     const activeTables = tables.filter(t => t.zoneId === activeZone);
@@ -325,7 +338,7 @@ export default function TablePlan({
                                 key={z.id}
                                 variant={activeZone === z.id ? "default" : "outline"}
                                 size="sm"
-                                onClick={() => setActiveZone(z.id)}
+                                onClick={() => handleZoneChange(z.id)}
                                 className={cn(activeZone === z.id ? "bg-stone-900 text-white" : "")}
                             >
                                 {z.name}
