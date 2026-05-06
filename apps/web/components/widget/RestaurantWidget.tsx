@@ -445,14 +445,20 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
                                                 <h4 className="font-bold text-base mb-1">{selectedEvent.name}</h4>
                                                 <p className="text-xs text-gray-600 mb-3 line-clamp-2 italic">{selectedEvent.description}</p>
                                                 <div className="flex justify-between items-center">
-                                                    <span className="text-lg font-black text-indigo-600 tracking-tighter">{selectedEvent.price}€</span>
-                                                    <Button 
-                                                        size="sm" 
-                                                        className="bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold uppercase h-8 px-4"
-                                                        onClick={() => handleTimeSelect(format(new Date(selectedEvent.date), 'HH:mm'))}
-                                                    >
-                                                        Reservar Evento
-                                                    </Button>
+                                                    {selectedEvent._count.bookings >= selectedEvent.capacity ? (
+                                                        <span className="text-sm font-bold text-rose-600 uppercase italic tracking-tighter">Evento Completo</span>
+                                                    ) : (
+                                                        <>
+                                                            <span className="text-lg font-black text-indigo-600 tracking-tighter">{selectedEvent.price}€</span>
+                                                            <Button 
+                                                                size="sm" 
+                                                                className="bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold uppercase h-8 px-4"
+                                                                onClick={() => handleTimeSelect(format(new Date(selectedEvent.date), 'HH:mm'))}
+                                                            >
+                                                                Reservar Evento
+                                                            </Button>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </div>
                                         )}

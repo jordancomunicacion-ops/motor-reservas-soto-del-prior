@@ -541,6 +541,11 @@ export class RestaurantService {
                 restaurantId,
                 date: { gte: startOfDay, lte: endOfDay },
                 isActive: true
+            },
+            include: {
+                _count: {
+                    select: { bookings: true }
+                }
             }
         });
 
