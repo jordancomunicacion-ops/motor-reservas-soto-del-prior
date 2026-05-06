@@ -398,6 +398,7 @@ model Zone {
   index        Int      @default(0) // Sorting order
   isActive     Boolean  @default(true)
   tables       Table[]
+  events       Event[]
 }
 
 model Table {
@@ -644,6 +645,7 @@ model Event {
   integrations Json? @default("{}")
   
   bookings    EventBooking[]
+  zones       Zone[]
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

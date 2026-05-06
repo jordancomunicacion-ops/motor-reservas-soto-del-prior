@@ -19,11 +19,23 @@ export default function EventsListPage() {
         price: 0,
         description: '',
         hotelId: '',
-        restaurantId: ''
+        restaurantId: '',
+        zoneIds: [] as string[]
     });
 
     const [hotels, setHotels] = useState<any[]>([]);
     const [restaurants, setRestaurants] = useState<any[]>([]);
+    const [availableZones, setAvailableZones] = useState<any[]>([]);
+
+    useEffect(() => {
+        if (formData.restaurantId) {
+            fetchAPI(`/restaurant/${formData.restaurantId}/zones`)
+                .then(setAvailableZones)
+                .catch(() => setAvailableZones([]));
+        } else {
+            setAvailableZones([]);
+        }
+    }, [formData.restaurantId]);
 
     useEffect(() => {
         loadEvents();
@@ -98,7 +110,8 @@ export default function EventsListPage() {
                 price: 0,
                 description: '',
                 hotelId: '',
-                restaurantId: ''
+                restaurantId: '',
+                zoneIds: []
             });
             setShowCreate(false);
             loadEvents();
@@ -185,7 +198,9 @@ export default function EventsListPage() {
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Capacidad Total (Pax)</label>
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1">
+                                <Users className="w-3 h-3" /> Capacidad Total (Pax)
+                            </label>
                             <input
                                 type="number"
                                 className="border-2 p-3 rounded-xl w-full dark:bg-zinc-900 focus:border-indigo-500 outline-none transition-all"
@@ -201,6 +216,37 @@ export default function EventsListPage() {
                                 value={formData.price}
                                 onChange={e => setFormData({...formData, price: Number(e.target.value)})}
                             />
+                        </div>
+                        <div className="md:col-span-2 space-y-4">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1">
+                                <Utensils className="w-3 h-3" /> Salas / Áreas Reservadas
+                            </label>
+                            {formData.restaurantId ? (
+                                availableZones.length > 0 ? (
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                        {availableZones.map(zone => (
+                                            <label key={zone.id} className="flex items-center gap-2 p-2 rounded-lg border border-zinc-100 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 cursor-pointer transition-colors">
+                                                <input 
+                                                    type="checkbox"
+                                                    className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                                    checked={formData.zoneIds.includes(zone.id)}
+                                                    onChange={(e) => {
+                                                        const newIds = e.target.checked 
+                                                            ? [...formData.zoneIds, zone.id]
+                                                            : formData.zoneIds.filter(id => id !== zone.id);
+                                                        setFormData({...formData, zoneIds: newIds});
+                                                    }}
+                                                />
+                                                <span className="text-xs font-medium">{zone.name}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-[10px] text-muted-foreground italic">Este restaurante no tiene salas configuradas.</p>
+                                )
+                            ) : (
+                                <p className="text-[10px] text-muted-foreground italic">Selecciona un restaurante para ver sus salas.</p>
+                            )}
                         </div>
                         <div className="md:col-span-2 space-y-2">
                             <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Descripción del Evento</label>

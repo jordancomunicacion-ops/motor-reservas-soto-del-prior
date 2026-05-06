@@ -15,6 +15,7 @@ export class EventService {
         _count: {
           select: { bookings: true },
         },
+        zones: true
       },
       orderBy: { date: 'asc' },
     });
@@ -29,6 +30,7 @@ export class EventService {
         bookings: {
           orderBy: { createdAt: 'desc' },
         },
+        zones: true
       },
     });
 
@@ -39,19 +41,29 @@ export class EventService {
     return event;
   }
 
-  async create(data: { name: string; date: Date; capacity: number; price: number; description?: string }) {
+  async create(data: any) {
+    const { zoneIds, ...rest } = data;
     return this.prisma.event.create({
       data: {
-        ...data,
+        ...rest,
         integrations: {},
+        zones: {
+            connect: zoneIds?.map((id: string) => ({ id })) || []
+        }
       },
     });
   }
 
   async update(id: string, data: any) {
+    const { zoneIds, ...rest } = data;
     return this.prisma.event.update({
       where: { id },
-      data,
+      data: {
+          ...rest,
+          zones: {
+              set: zoneIds?.map((id: string) => ({ id })) || []
+          }
+      },
     });
   }
 

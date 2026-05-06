@@ -21,11 +21,23 @@ export default function EventConfigPage() {
         description: '',
         isActive: true,
         hotelId: '',
-        restaurantId: ''
+        restaurantId: '',
+        zoneIds: [] as string[]
     });
 
     const [hotels, setHotels] = useState<any[]>([]);
     const [restaurants, setRestaurants] = useState<any[]>([]);
+    const [availableZones, setAvailableZones] = useState<any[]>([]);
+
+    useEffect(() => {
+        if (formData.restaurantId) {
+            fetchAPI(`/restaurant/${formData.restaurantId}/zones`)
+                .then(setAvailableZones)
+                .catch(() => setAvailableZones([]));
+        } else {
+            setAvailableZones([]);
+        }
+    }, [formData.restaurantId]);
 
     useEffect(() => {
         if (params.id) {
@@ -63,7 +75,8 @@ export default function EventConfigPage() {
                         description: eventObj.description || '',
                         isActive: eventObj.isActive,
                         hotelId: eventObj.hotelId || '',
-                        restaurantId: eventObj.restaurantId || ''
+                        restaurantId: eventObj.restaurantId || '',
+                        zoneIds: eventObj.zones?.map((z: any) => z.id) || []
                     });
                 }
             }
@@ -216,9 +229,43 @@ export default function EventConfigPage() {
                                 </select>
                             </div>
                         </div>
-                        <p className="mt-4 text-xs text-muted-foreground italic">
-                            * Vincular un evento a un establecimiento permite filtrar reservas y estadísticas por propiedad.
-                        </p>
+                    </div>
+
+                    <div className="bg-white dark:bg-zinc-800 p-6 rounded-xl border border-gray-100 dark:border-zinc-700 shadow-sm">
+                        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                            <Utensils className="w-5 h-5 text-orange-500" /> Salas / Áreas Reservadas
+                        </h2>
+                        {formData.restaurantId ? (
+                            availableZones.length > 0 ? (
+                                <div className="space-y-3">
+                                    <p className="text-xs text-muted-foreground mb-4">
+                                        Selecciona las salas que ocupará este evento. Las mesas en estas áreas quedarán bloqueadas para reservas normales.
+                                    </p>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {availableZones.map(zone => (
+                                            <label key={zone.id} className="flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors">
+                                                <input 
+                                                    type="checkbox"
+                                                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                    checked={formData.zoneIds.includes(zone.id)}
+                                                    onChange={(e) => {
+                                                        const newIds = e.target.checked 
+                                                            ? [...formData.zoneIds, zone.id]
+                                                            : formData.zoneIds.filter(id => id !== zone.id);
+                                                        setFormData({...formData, zoneIds: newIds});
+                                                    }}
+                                                />
+                                                <span className="text-sm font-medium">{zone.name}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="text-sm text-muted-foreground italic bg-gray-50 p-4 rounded-lg">Este restaurante no tiene salas configuradas.</p>
+                            )
+                        ) : (
+                            <p className="text-sm text-muted-foreground italic bg-gray-50 p-4 rounded-lg">Selecciona un restaurante primero para ver sus salas.</p>
+                        )}
                     </div>
                 </div>
 

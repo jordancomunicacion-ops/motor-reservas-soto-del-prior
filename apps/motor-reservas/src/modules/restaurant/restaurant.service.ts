@@ -498,14 +498,32 @@ export class RestaurantService {
             }
         });
 
-        const tables = await this.prisma.table.findMany({
-            where: { zone: { restaurantId }, isActive: true }
-        });
-
         const startOfDay = new Date(date);
         startOfDay.setHours(0, 0, 0, 0);
         const endOfDay = new Date(date);
         endOfDay.setHours(23, 59, 59, 999);
+
+        // Check for events on this date and their blocked zones
+        const dayEvents = await this.prisma.event.findMany({
+            where: {
+                restaurantId,
+                date: { gte: startOfDay, lte: endOfDay },
+                isActive: true
+            },
+            include: { zones: true }
+        });
+
+        const blockedZoneIds = dayEvents.flatMap(e => e.zones.map(z => z.id));
+
+        const tables = await this.prisma.table.findMany({
+            where: { 
+                zone: { 
+                    restaurantId,
+                    id: blockedZoneIds.length > 0 ? { notIn: blockedZoneIds } : undefined
+                }, 
+                isActive: true 
+            }
+        });
 
         const bookings = await this.prisma.resBooking.findMany({
             where: {
@@ -535,23 +553,9 @@ export class RestaurantService {
             }
         }
 
-        // Check if there's an event on this date
-        const hasEvent = await this.prisma.event.findFirst({
-            where: {
-                restaurantId,
-                date: { gte: startOfDay, lte: endOfDay },
-                isActive: true
-            },
-            include: {
-                _count: {
-                    select: { bookings: true }
-                }
-            }
-        });
-
         return {
             slots: availableSlots,
-            event: hasEvent
+            event: dayEvents[0] || null
         };
     }
 
