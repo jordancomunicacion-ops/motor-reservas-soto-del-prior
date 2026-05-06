@@ -124,11 +124,11 @@ export default function EventsListPage() {
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg text-indigo-600">
+                    <div className="p-2 bg-primary/10 dark:bg-primary/20 rounded-lg text-primary">
                         <PartyPopper className="w-6 h-6" />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-bold italic tracking-tighter uppercase">Gestión de Eventos</h1>
+                        <h1 className="text-2xl font-bold tracking-tight">Gestión de Eventos</h1>
                         <p className="text-xs text-muted-foreground">Crea y gestiona eventos puntuales para tus establecimientos.</p>
                     </div>
                 </div>
@@ -138,10 +138,10 @@ export default function EventsListPage() {
             </div>
 
             {showCreate && (
-                <div className="bg-white dark:bg-zinc-800 p-8 rounded-2xl shadow-xl border border-indigo-50 dark:border-zinc-700 animate-in fade-in slide-in-from-top-4 duration-300">
-                    <div className="flex items-center gap-2 mb-6 text-indigo-600">
+                <div className="bg-white dark:bg-zinc-800 p-8 rounded-3xl shadow-2xl border border-primary/5 dark:border-zinc-700 animate-in fade-in slide-in-from-top-4 duration-500">
+                    <div className="flex items-center gap-2 mb-6 text-primary">
                         <Calendar className="w-5 h-5" />
-                        <h2 className="text-lg font-bold uppercase tracking-widest italic">Configurar Nuevo Evento</h2>
+                        <h2 className="text-lg font-bold uppercase tracking-widest">Configurar Nuevo Evento</h2>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -260,7 +260,7 @@ export default function EventsListPage() {
                     </div>
                     <div className="mt-8 flex justify-end gap-3">
                         <Button variant="ghost" onClick={() => setShowCreate(false)}>Cancelar</Button>
-                        <Button onClick={handleCreate} className="gap-2 bg-indigo-600 hover:bg-indigo-700 px-8 rounded-xl font-bold uppercase tracking-widest italic shadow-lg shadow-indigo-200">
+                        <Button onClick={handleCreate} className="gap-2 bg-primary hover:opacity-90 text-white px-8 rounded-xl font-bold uppercase tracking-widest shadow-lg shadow-primary/20">
                             Crear Evento
                         </Button>
                     </div>
@@ -316,33 +316,33 @@ export default function EventsListPage() {
                                 )}
                             </div>
                             
-                            <div className="space-y-4 mb-6 bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-xl">
+                             <div className="space-y-4 mb-6 bg-secondary/50 dark:bg-zinc-900/50 p-4 rounded-2xl border border-primary/5">
                                 <div className="flex justify-between text-xs font-bold uppercase tracking-wider">
                                     <span className="text-muted-foreground flex items-center gap-1.5"><Users className="w-4 h-4" /> Ocupación</span>
-                                    <span className="text-indigo-600">{event._count.bookings} / {event.capacity} pax</span>
+                                    <span className="text-primary">{event._count.bookings} / {event.capacity} pax</span>
                                 </div>
                                 <div className="w-full bg-zinc-200 dark:bg-zinc-800 rounded-full h-2 overflow-hidden">
                                     <div 
-                                        className="bg-indigo-600 h-full rounded-full transition-all duration-700" 
+                                        className="bg-primary h-full rounded-full transition-all duration-700" 
                                         style={{ width: `${Math.min(100, (event._count.bookings / event.capacity) * 100)}%` }}
                                     />
                                 </div>
                                 <div className="flex justify-between items-center">
                                     <span className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5"><Euro className="w-4 h-4" /> Precio</span>
-                                    <span className="text-2xl font-black text-indigo-600 italic tracking-tighter">{event.price}€</span>
+                                    <span className="text-2xl font-black text-primary tracking-tighter">{event.price}€</span>
                                 </div>
                             </div>
                             
                             <div className="grid grid-cols-2 gap-3">
                                 <Button 
                                     variant="outline" 
-                                    className="rounded-xl text-xs font-bold uppercase tracking-widest transition-colors hover:bg-zinc-50" 
+                                    className="rounded-xl text-xs font-bold uppercase tracking-widest transition-colors hover:bg-secondary" 
                                     onClick={() => window.location.href = `/admin/events/${event.id}`}
                                 >
                                     Detalles
                                 </Button>
                                 <Button 
-                                    className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-widest shadow-md shadow-indigo-100" 
+                                    className="bg-primary hover:opacity-90 text-white rounded-xl text-xs font-bold uppercase tracking-widest shadow-md shadow-primary/10" 
                                     onClick={() => window.location.href = `/admin/events/${event.id}/config`}
                                 >
                                     Gestionar

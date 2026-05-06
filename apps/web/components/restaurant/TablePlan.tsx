@@ -19,7 +19,21 @@ interface TableProps {
 
 function TableNode({ data, onUpdate, onDropReservation, onSelect, onSelectProfile, mode, isSelected }: TableProps) {
     const [isDragging, setIsDragging] = useState(false);
+    const [dropdownPos, setDropdownPos] = useState<'bottom' | 'top'>('bottom');
     const tableRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (isSelected && tableRef.current) {
+            const rect = tableRef.current.getBoundingClientRect();
+            // Check if there is enough space below (approx 60px for the dropdown)
+            const parent = tableRef.current.offsetParent?.getBoundingClientRect();
+            if (parent && (rect.bottom - parent.top) + 60 > parent.height) {
+                setDropdownPos('top');
+            } else {
+                setDropdownPos('bottom');
+            }
+        }
+    }, [isSelected]);
 
     // Status Colors mapping based on the provided legend
     const getStatusStyle = () => {
@@ -102,7 +116,7 @@ function TableNode({ data, onUpdate, onDropReservation, onSelect, onSelectProfil
                 getStatusStyle(),
                 isDragging && "opacity-50",
                 data.shape === 'ROUND' ? 'rounded-full' : 'rounded-md',
-                isSelected && "ring-2 ring-blue-600 ring-offset-2 z-20",
+                isSelected && "ring-4 ring-primary ring-offset-4 z-[100] shadow-2xl",
                 mode === 'EDIT' ? "border-double border-4 cursor-move" : "cursor-pointer hover:brightness-95 hover:shadow-md active:scale-95"
             )}
             style={{
@@ -180,9 +194,12 @@ function TableNode({ data, onUpdate, onDropReservation, onSelect, onSelectProfil
                 </div>
             )}
 
-            {/* Manual Status Actions (Simplified Dropdown simulation for now) */}
+            {/* Manual Status Actions */}
             {mode === 'SERVICE' && isSelected && activeBooking && (
-                <div className="absolute -bottom-12 flex bg-white dark:bg-zinc-800 border rounded shadow-lg p-1.5 gap-1.5 z-[100] animate-in fade-in slide-in-from-top-1">
+                <div className={cn(
+                    "absolute flex bg-white dark:bg-zinc-800 border rounded-2xl shadow-2xl p-2 gap-2 z-[110] animate-in fade-in zoom-in duration-200",
+                    dropdownPos === 'bottom' ? "-bottom-16" : "-top-16"
+                )}>
                     <Button size="icon" variant="outline" className="h-7 w-7 text-purple-600 border-purple-100" onClick={(e) => { e.stopPropagation(); onUpdate?.(data.id, { bookingStatus: 'BAR_ARRIVAL' }); }} title="En Barra">
                          <GlassWater className="w-3.5 h-3.5" />
                     </Button>
