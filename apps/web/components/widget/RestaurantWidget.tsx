@@ -132,6 +132,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
     const [restaurantName, setRestaurantName] = useState('');
     const [createdBooking, setCreatedBooking] = useState<any>(null);
     const [selectedEvent, setSelectedEvent] = useState<any>(null);
+    const [eventDates, setEventDates] = useState<string[]>([]);
 
     // CRM Additional Fields (Step 3)
     const [additionalData, setAdditionalData] = useState({
@@ -170,12 +171,22 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
                 }
             })
             .catch(() => {});
+        
+        // Load events for this restaurant
+        fetchAPI(`/event?restaurantId=${restaurantId}`)
+            .then(data => {
+                if (Array.isArray(data)) {
+                    setEventDates(data.map((e: any) => format(new Date(e.date), 'yyyy-MM-dd')));
+                }
+            })
+            .catch(() => {});
     }, [restaurantId]);
 
     const getDayStatus = (date: Date) => {
         const dateStr = format(date, 'yyyy-MM-dd');
         if (closures.includes(dateStr)) return 'closed';
         if (isBefore(date, startOfDay(new Date()))) return 'closed';
+        if (eventDates.includes(dateStr)) return 'event';
         return 'available';
     };
 
@@ -384,11 +395,16 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
                                             const isPast = isBefore(date, startOfDay(new Date()));
                                             let style = {};
                                             let className = "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 mx-auto ";
+                                            
                                             if (isSelected) {
                                                 style = { backgroundColor: colors.accent, color: 'white', boxShadow: '0 2px 6px rgba(197, 157, 95, 0.4)' };
                                                 className += "cursor-pointer transform scale-105";
                                             } else if (status === 'closed' || isPast) {
-                                                className += "bg-gray-100 text-gray-300 cursor-not-allowed";
+                                                style = { backgroundColor: '#FEE2E2', color: '#EF4444' };
+                                                className += "cursor-not-allowed";
+                                            } else if (status === 'event') {
+                                                style = { backgroundColor: '#EEF2FF', color: '#4F46E5', border: '1px solid #C7D2FE' };
+                                                className += "cursor-pointer hover:bg-[#E0E7FF]";
                                             } else {
                                                 className += "bg-white text-gray-700 hover:bg-[#F9F9F9] hover:text-[#C59D5F] cursor-pointer border border-transparent hover:border-[#C59D5F]";
                                             }
@@ -404,7 +420,8 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
                             <div className="flex flex-col border-l pl-0 md:pl-8 border-gray-100">
                                 <div className="flex flex-wrap gap-x-4 gap-y-2 mb-4 text-[10px] uppercase font-bold tracking-wider text-gray-500">
                                     <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded" style={{ backgroundColor: colors.white, border: '1px solid #CCC' }}></div> Disponible</div>
-                                    <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-gray-200"></div> Cerrado</div>
+                                    <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-red-100 border border-red-200"></div> Completo</div>
+                                    <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-indigo-50 border border-indigo-100"></div> Evento</div>
                                     <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded flex justify-center items-center text-white" style={{ backgroundColor: colors.accent }}></div> Seleccionado</div>
                                 </div>
                                 {!selectedDate && (
