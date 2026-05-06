@@ -250,6 +250,8 @@ export default function TablePlan({
     hideToolbar = false,
     mode = 'SERVICE',
     onSelectProfile,
+    activeZoneId,
+    onActiveZoneChange,
     className
 }: {
     zones: any[],
