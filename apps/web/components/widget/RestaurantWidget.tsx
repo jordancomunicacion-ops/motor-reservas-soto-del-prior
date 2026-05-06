@@ -266,6 +266,33 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
         }
     };
 
+    const handleJoinWaitlist = async () => {
+        if (!formData.name || !formData.email) {
+            alert('Nombre y email son obligatorios');
+            return;
+        }
+        setSubmitting(true);
+        try {
+            await fetchAPI(`/restaurant/${restaurantId}/waitlist`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    date: format(selectedDate!, 'yyyy-MM-dd'),
+                    pax,
+                    name: formData.name,
+                    email: formData.email,
+                    phone: formData.prefix + formData.phone,
+                    notes: comment
+                })
+            });
+            setCreatedBooking({ isWaitlist: true });
+            setCurrentStep(4);
+        } catch (e) {
+            alert('Error al apuntarse a la lista de espera');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
     // --- Granular No-Show Logic ---
     const shouldRequireStripe = () => {
         if (!widgetConfig?.stripeEnabled) return false;
@@ -476,7 +503,6 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
                                             )}
                                         </div>
                                         <div>
-                                            <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3 border-b pb-1">Cena</h4>
                                             {timeSlots.dinner.length > 0 ? (
                                                 <div className="grid grid-cols-3 gap-2">
                                                     {timeSlots.dinner.map(t => (
@@ -487,6 +513,20 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
                                                 <p className="text-[10px] text-gray-400 italic">No hay disponibilidad para cenar.</p>
                                             )}
                                         </div>
+
+                                        {timeSlots.lunch.length === 0 && timeSlots.dinner.length === 0 && (
+                                            <div className="mt-8 p-6 bg-amber-50 border-2 border-amber-100 rounded-2xl text-center">
+                                                <Info className="w-8 h-8 text-amber-500 mx-auto mb-3" />
+                                                <h4 className="font-bold text-gray-800 mb-1">¡Vaya! No queda sitio</h4>
+                                                <p className="text-xs text-gray-600 mb-4">Pero no te preocupes, puedes apuntarte a nuestra lista de espera y te avisaremos si se libera una mesa.</p>
+                                                <Button 
+                                                    className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold uppercase tracking-widest text-xs h-12 rounded-xl shadow-lg shadow-amber-200"
+                                                    onClick={() => setCurrentStep(5)}
+                                                >
+                                                    Apuntarse a la Lista de Espera
+                                                </Button>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -623,16 +663,91 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
                     {currentStep === 4 && (
                         <div className="animate-in fade-in zoom-in duration-500 h-full pt-4 text-center">
                             <div className="flex flex-col items-center justify-center pb-8 border-b border-gray-100 mb-8">
-                                <div className="w-20 h-20 rounded-full bg-[#C59D5F] flex items-center justify-center shadow-lg mb-6">
-                                    <Check className="w-10 h-10 text-white" strokeWidth={4} />
+                                <div className={`w-20 h-20 rounded-full flex items-center justify-center shadow-lg mb-6 ${createdBooking?.isWaitlist ? 'bg-amber-500' : 'bg-[#C59D5F]'}`}>
+                                    {createdBooking?.isWaitlist ? <Clock className="w-10 h-10 text-white" /> : <Check className="w-10 h-10 text-white" strokeWidth={4} />}
                                 </div>
-                                <h2 className="text-3xl font-bold uppercase tracking-wide" style={{ fontFamily: "'Oswald', sans-serif" }}>Reserva Confirmada</h2>
+                                <h2 className="text-3xl font-bold uppercase tracking-wide" style={{ fontFamily: "'Oswald', sans-serif" }}>
+                                    {createdBooking?.isWaitlist ? 'Lista de Espera' : 'Reserva Confirmada'}
+                                </h2>
                             </div>
                             <div className="max-w-md mx-auto space-y-3 mb-8">
-                                <p className="text-lg font-bold" style={{ fontFamily: "'Oswald', sans-serif" }}>{selectedDate ? format(selectedDate, 'dd-MM-yyyy') : ''}, {selectedTime}h.</p>
-                                <p>{pax} personas en {restaurantName}.</p>
+                                <p className="text-lg font-bold" style={{ fontFamily: "'Oswald', sans-serif" }}>
+                                    {selectedDate ? format(selectedDate, 'dd-MM-yyyy') : ''}
+                                    {!createdBooking?.isWaitlist && `, ${selectedTime}h`}
+                                </p>
+                                <p>
+                                    {createdBooking?.isWaitlist 
+                                        ? `Te avisaremos si se libera una mesa para ${pax} personas.`
+                                        : `${pax} personas en ${restaurantName}.`
+                                    }
+                                </p>
                             </div>
                             <Button className="px-8 py-3 bg-black text-white font-bold uppercase tracking-wider text-xs rounded-none" onClick={() => window.location.reload()}>Volver al Inicio</Button>
+                        </div>
+                    )}
+
+                    {/* STEP 5: WAITLIST FORM */}
+                    {currentStep === 5 && selectedDate && (
+                        <div className="animate-in fade-in zoom-in duration-500 max-w-xl mx-auto py-4">
+                            <div className="text-center mb-8">
+                                <h3 className="text-2xl font-bold uppercase tracking-wide mb-2" style={{ fontFamily: "'Oswald', sans-serif" }}>Lista de Espera</h3>
+                                <p className="text-sm text-gray-500">Para el {format(selectedDate, "d 'de' MMMM", { locale: es })} · {pax} personas</p>
+                            </div>
+
+                            <div className="space-y-4 mb-8">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold uppercase text-gray-400">Nombre</label>
+                                        <input 
+                                            className="w-full border p-3 rounded focus:ring-1 focus:ring-amber-500 outline-none"
+                                            value={formData.name}
+                                            onChange={e => setFormData({...formData, name: e.target.value})}
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold uppercase text-gray-400">Email</label>
+                                        <input 
+                                            className="w-full border p-3 rounded focus:ring-1 focus:ring-amber-500 outline-none"
+                                            value={formData.email}
+                                            onChange={e => setFormData({...formData, email: e.target.value})}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold uppercase text-gray-400">Teléfono</label>
+                                    <input 
+                                        className="w-full border p-3 rounded focus:ring-1 focus:ring-amber-500 outline-none"
+                                        placeholder="+34 000 000 000"
+                                        value={formData.prefix + formData.phone}
+                                        onChange={e => setFormData({...formData, phone: e.target.value.replace(formData.prefix, '')})}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold uppercase text-gray-400">Notas / Alergias</label>
+                                    <textarea 
+                                        className="w-full border p-3 rounded focus:ring-1 focus:ring-amber-500 outline-none h-24 resize-none"
+                                        value={comment}
+                                        onChange={e => setComment(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-3">
+                                <Button 
+                                    className="w-full h-14 bg-amber-500 hover:bg-amber-600 text-white font-bold uppercase tracking-widest text-sm rounded shadow-lg"
+                                    onClick={handleJoinWaitlist}
+                                    disabled={submitting}
+                                >
+                                    {submitting ? 'APUNTANDO...' : 'CONFIRMAR DISPONIBILIDAD'}
+                                </Button>
+                                <Button 
+                                    variant="ghost"
+                                    className="w-full text-gray-400 hover:text-gray-600 font-bold uppercase text-[10px] tracking-widest"
+                                    onClick={() => setCurrentStep(1)}
+                                >
+                                    Volver al calendario
+                                </Button>
+                            </div>
                         </div>
                     )}
 

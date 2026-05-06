@@ -205,7 +205,13 @@ export class RestaurantService {
 
     async deleteRestaurant(id: string) {
         return this.prisma.$transaction(async (tx) => {
-            // 1. Delete dependent entities
+            // 1. Clear any hotel links to this restaurant to avoid FK errors
+            await tx.hotel.updateMany({
+                where: { restaurantId: id },
+                data: { restaurantId: null }
+            });
+
+            // 2. Delete dependent entities
             await tx.resBooking.deleteMany({ where: { restaurantId: id } });
             await tx.restaurantWaitlist.deleteMany({ where: { restaurantId: id } });
             await tx.restaurantClosure.deleteMany({ where: { restaurantId: id } });
@@ -213,16 +219,26 @@ export class RestaurantService {
             await tx.widgetConfig.deleteMany({ where: { restaurantId: id } });
             await tx.event.deleteMany({ where: { restaurantId: id } });
             
-            const zones = await tx.zone.findMany({ where: { restaurantId: id }, select: { id: true } });
+            // 3. Delete tables and zones (order is critical: tables first)
+            const zones = await tx.zone.findMany({ 
+                where: { restaurantId: id },
+                select: { id: true } 
+            });
             const zoneIds = zones.map(z => z.id);
+            
             if (zoneIds.length > 0) {
-                await tx.tableHold.deleteMany({ where: { table: { zoneId: { in: zoneIds } } } });
-                await tx.table.deleteMany({ where: { zoneId: { in: zoneIds } } });
-                await tx.zone.deleteMany({ where: { restaurantId: id } });
+                await tx.table.deleteMany({ 
+                    where: { zoneId: { in: zoneIds } } 
+                });
+                await tx.zone.deleteMany({ 
+                    where: { restaurantId: id } 
+                });
             }
 
             // 4. Finally delete the restaurant
-            return tx.restaurant.delete({ where: { id } });
+            return tx.restaurant.delete({
+                where: { id }
+            });
         });
     }
 
@@ -693,6 +709,27 @@ export class RestaurantService {
     async deleteClosure(id: string) {
         return this.prisma.restaurantClosure.delete({
             where: { id }
+        });
+    }
+
+    async addToWaitlist(restaurantId: string, data: any) {
+        return this.prisma.restaurantWaitlist.create({
+            data: {
+                restaurantId,
+                date: new Date(data.date),
+                pax: data.pax,
+                name: data.name,
+                email: data.email,
+                phone: data.phone,
+                notes: data.notes
+            }
+        });
+    }
+
+    async getWaitlist(restaurantId: string) {
+        return this.prisma.restaurantWaitlist.findMany({
+            where: { restaurantId },
+            orderBy: { createdAt: 'desc' }
         });
     }
 }
