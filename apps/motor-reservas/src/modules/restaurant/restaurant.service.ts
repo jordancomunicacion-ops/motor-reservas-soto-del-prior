@@ -721,5 +721,47 @@ export class RestaurantService {
         });
     }
 
+    async getAuthorizedUsers(restaurantId: string) {
+        return this.prisma.user.findMany({
+            where: { restaurantId },
+            select: { id: true, email: true, name: true, role: true, permissions: true }
+        });
+    }
+
+    async authorizeUser(restaurantId: string, data: { email: string, permissions: string[] }) {
+        const { email, permissions } = data;
+        
+        const user = await this.prisma.user.findUnique({ where: { email } });
+        
+        if (user) {
+            return this.prisma.user.update({
+                where: { email },
+                data: {
+                    restaurantId,
+                    permissions: permissions.join(',')
+                }
+            });
+        } else {
+            return this.prisma.user.create({
+                data: {
+                    email,
+                    restaurantId,
+                    password: 'INVITED',
+                    permissions: permissions.join(','),
+                    role: 'STAFF'
+                }
+            });
+        }
+    }
+
+    async deauthorizeUser(restaurantId: string, userId: string) {
+        return this.prisma.user.update({
+            where: { id: userId },
+            data: {
+                restaurantId: null,
+                permissions: null
+            }
+        });
+    }
 }
 

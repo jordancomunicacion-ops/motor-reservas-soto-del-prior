@@ -6,6 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Users, Mail, ShieldCheck, Trash2, Settings2, CheckCircle2, ChevronRight, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { fetchAPI } from '@/lib/api';
+import { useEffect } from 'react';
 
 // Definición de permisos disponibles sincronizados con el Menú Principal
 const AVAILABLE_PERMISSIONS = [
@@ -28,6 +30,26 @@ export default function AccessManager({ contextId, contextType }: { contextId: s
     const [selectedProfile, setSelectedProfile] = useState('STAFF');
     const [customPermissions, setCustomPermissions] = useState<string[]>(DEFAULT_PROFILES[0].permissions);
     const [isManagingProfiles, setIsManagingProfiles] = useState(false);
+    
+    const [users, setUsers] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        loadUsers();
+    }, [contextId]);
+
+    async function loadUsers() {
+        setLoading(true);
+        try {
+            const data = await fetchAPI(`/restaurant/${contextId}/users`);
+            setUsers(data);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    }
 
     const handleProfileChange = (profileId: string) => {
         setSelectedProfile(profileId);
@@ -43,6 +65,38 @@ export default function AccessManager({ contextId, contextType }: { contextId: s
                 ? prev.filter(p => p !== permId) 
                 : [...prev, permId]
         );
+    };
+
+    const handleGrantAccess = async () => {
+        if (!email) return;
+        setSaving(true);
+        try {
+            await fetchAPI(`/restaurant/${contextId}/users`, {
+                method: 'POST',
+                body: JSON.stringify({ email, permissions: customPermissions })
+            });
+            setEmail('');
+            alert('Empleado autorizado con éxito');
+            loadUsers();
+        } catch (e) {
+            console.error(e);
+            alert('Error al autorizar empleado');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleRemoveAccess = async (userId: string) => {
+        if (!window.confirm('¿Eliminar acceso de este empleado?')) return;
+        try {
+            await fetchAPI(`/restaurant/${contextId}/users/${userId}`, {
+                method: 'DELETE'
+            });
+            loadUsers();
+        } catch (e) {
+            console.error(e);
+            alert('Error al eliminar acceso');
+        }
     };
 
     return (
@@ -160,11 +214,11 @@ export default function AccessManager({ contextId, contextType }: { contextId: s
                                 </div>
 
                                 <Button 
-                                    onClick={() => alert("Empleado autorizado con éxito")} 
+                                    onClick={handleGrantAccess} 
                                     className="w-full h-12 gap-2 text-sm font-bold bg-indigo-600 hover:bg-indigo-700"
-                                    disabled={!email}
+                                    disabled={!email || saving}
                                 >
-                                    <ShieldCheck className="w-5 h-5" /> Conceder Acceso al Personal
+                                    <ShieldCheck className="w-5 h-5" /> {saving ? 'Procesando...' : 'Conceder Acceso al Personal'}
                                 </Button>
                             </CardContent>
                         </Card>
@@ -176,15 +230,39 @@ export default function AccessManager({ contextId, contextType }: { contextId: s
                             <Users className="w-4 h-4 text-zinc-500" /> Personal Autorizado
                         </h4>
                         <div className="bg-white dark:bg-zinc-900 border rounded-2xl overflow-hidden shadow-sm">
-                            <div className="divide-y dark:border-zinc-700">
-                                <div className="p-8 text-center space-y-2">
-                                    <div className="w-12 h-12 bg-gray-100 dark:bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                                        <Users className="w-6 h-6 text-gray-400" />
+                                {loading ? (
+                                    <div className="p-8 text-center text-sm text-muted-foreground italic">Cargando personal...</div>
+                                ) : users.length === 0 ? (
+                                    <div className="p-8 text-center space-y-2">
+                                        <div className="w-12 h-12 bg-gray-100 dark:bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                                            <Users className="w-6 h-6 text-gray-400" />
+                                        </div>
+                                        <p className="text-sm font-medium text-zinc-500">Sin empleados activos</p>
+                                        <p className="text-[11px] text-muted-foreground italic">Aún no has autorizado a nadie para este centro.</p>
                                     </div>
-                                    <p className="text-sm font-medium text-zinc-500">Sin empleados activos</p>
-                                    <p className="text-[11px] text-muted-foreground italic">Aún no has autorizado a nadie para este centro.</p>
-                                </div>
-                            </div>
+                                ) : (
+                                    users.map(user => (
+                                        <div key={user.id} className="p-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-zinc-800/30 transition-colors">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center text-indigo-600 text-xs font-bold">
+                                                    {user.email[0].toUpperCase()}
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs font-bold">{user.email}</p>
+                                                    <p className="text-[10px] text-muted-foreground">{user.role}</p>
+                                                </div>
+                                            </div>
+                                            <Button 
+                                                variant="ghost" 
+                                                size="icon" 
+                                                className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                onClick={() => handleRemoveAccess(user.id)}
+                                            >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            </Button>
+                                        </div>
+                                    ))
+                                )}
                         </div>
                         
                         <Card className="bg-amber-50/50 dark:bg-amber-900/10 border-amber-100 dark:border-amber-900/30">

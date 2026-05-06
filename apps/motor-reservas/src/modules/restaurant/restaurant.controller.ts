@@ -159,5 +159,20 @@ export class RestaurantController {
     confirmWaitlist(@Param('id') id: string) {
         return this.waitlistService.confirmWaitlistEntry(id);
     }
+
+    @Get(':id/users')
+    getAuthorizedUsers(@Param('id') id: string) {
+        return this.service.getAuthorizedUsers(id);
+    }
+
+    @Post(':id/users')
+    authorizeUser(@Param('id') id: string, @Body() body: any) {
+        return this.service.authorizeUser(id, body);
+    }
+
+    @Delete(':id/users/:userId')
+    deauthorizeUser(@Param('id') id: string, @Param('userId') userId: string) {
+        return this.service.deauthorizeUser(id, userId);
+    }
 }
 
