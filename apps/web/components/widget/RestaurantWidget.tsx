@@ -131,7 +131,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
     const [closures, setClosures] = useState<string[]>([]);
     const [restaurantName, setRestaurantName] = useState('');
     const [createdBooking, setCreatedBooking] = useState<any>(null);
-    const [hasEventOnSelectedDate, setHasEventOnSelectedDate] = useState(false);
+    const [selectedEvent, setSelectedEvent] = useState<any>(null);
 
     // CRM Additional Fields (Step 3)
     const [additionalData, setAdditionalData] = useState({
@@ -195,7 +195,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
                 lunch: lunchData?.slots || [],
                 dinner: dinnerData?.slots || []
             });
-            setHasEventOnSelectedDate(lunchData?.hasEvent || dinnerData?.hasEvent || false);
+            setSelectedEvent(lunchData?.event || dinnerData?.event || null);
         } catch (e) {
             console.error('Error fetching slots:', e);
             setTimeSlots({ lunch: [], dinner: [] });
@@ -266,7 +266,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
         if (widgetConfig.noShowFeeGroups && pax >= widgetConfig.noShowGroupMinPax) return true;
         
         // 3. Events
-        if (widgetConfig.noShowFeeEvents && hasEventOnSelectedDate) return true;
+        if (widgetConfig.noShowFeeEvents && selectedEvent) return true;
         
         return false;
     };
@@ -415,16 +415,42 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
                                 )}
                                 {selectedDate && timeSlots && (
                                     <div className="animate-in fade-in slide-in-from-right-4 duration-500">
-                                        <h3 className="font-bold text-lg mb-6 flex items-center gap-2" style={{ fontFamily: "'Oswald', sans-serif" }}>
+                                        <h3 className="font-bold text-lg mb-4 flex items-center gap-2" style={{ fontFamily: "'Oswald', sans-serif" }}>
                                             <span className="text-[#C59D5F]">Disponibilidad:</span> {format(selectedDate, "d 'de' MMMM", { locale: es })}
                                         </h3>
+
+                                        {selectedEvent && (
+                                            <div className="mb-6 p-4 bg-indigo-50 border-2 border-indigo-100 rounded-xl animate-in zoom-in duration-300">
+                                                <div className="flex items-center gap-2 text-indigo-600 mb-1">
+                                                    <PartyPopper className="w-4 h-4" />
+                                                    <span className="text-[10px] font-bold uppercase tracking-widest">Evento Especial</span>
+                                                </div>
+                                                <h4 className="font-bold text-base mb-1">{selectedEvent.name}</h4>
+                                                <p className="text-xs text-gray-600 mb-3 line-clamp-2 italic">{selectedEvent.description}</p>
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-lg font-black text-indigo-600 tracking-tighter">{selectedEvent.price}€</span>
+                                                    <Button 
+                                                        size="sm" 
+                                                        className="bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold uppercase h-8 px-4"
+                                                        onClick={() => handleTimeSelect(format(new Date(selectedEvent.date), 'HH:mm'))}
+                                                    >
+                                                        Reservar Evento
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        )}
+
                                         <div className="mb-6">
                                             <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3 border-b pb-1">Comida</h4>
-                                            <div className="grid grid-cols-3 gap-2">
-                                                {timeSlots.lunch.map(t => (
-                                                    <Button key={t} className="text-white text-sm py-2 h-auto font-bold tracking-wider hover:translate-y-[-2px] transition-transform shadow-sm" style={{ backgroundColor: colors.accent }} onClick={() => handleTimeSelect(t)}>{t}</Button>
-                                                ))}
-                                            </div>
+                                            {timeSlots.lunch.length > 0 ? (
+                                                <div className="grid grid-cols-3 gap-2">
+                                                    {timeSlots.lunch.map(t => (
+                                                        <Button key={t} className="text-white text-sm py-2 h-auto font-bold tracking-wider hover:translate-y-[-2px] transition-transform shadow-sm" style={{ backgroundColor: colors.accent }} onClick={() => handleTimeSelect(t)}>{t}</Button>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="text-[10px] text-gray-400 italic">No hay disponibilidad para comer.</p>
+                                            )}
                                         </div>
                                         <div>
                                             <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3 border-b pb-1">Cena</h4>
@@ -435,7 +461,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
                                                     ))}
                                                 </div>
                                             ) : (
-                                                <p className="text-sm text-gray-400 italic font-light bg-gray-50 p-2 text-center rounded">Restaurante cerrado para cenas.</p>
+                                                <p className="text-[10px] text-gray-400 italic">No hay disponibilidad para cenar.</p>
                                             )}
                                         </div>
                                     </div>

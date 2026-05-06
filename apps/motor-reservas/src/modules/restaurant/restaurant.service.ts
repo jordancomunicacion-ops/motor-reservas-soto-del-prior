@@ -551,7 +551,7 @@ export class RestaurantService {
 
         return {
             slots: availableSlots,
-            hasEvent: !!hasEvent
+            event: hasEvent
         };
     }
 
