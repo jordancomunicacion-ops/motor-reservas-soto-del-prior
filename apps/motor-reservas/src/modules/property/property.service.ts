@@ -11,7 +11,7 @@ export class PropertyService {
     }
 
     async getHotels() {
-        return this.prisma.hotel.findMany();
+        return this.prisma.hotel.findMany({ include: { restaurant: true } });
     }
 
     async getHotel(id: string) {

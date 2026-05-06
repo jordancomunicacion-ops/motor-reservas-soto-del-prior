@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { fetchAPI } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { Plus, PartyPopper, Settings, Calendar, Users, Euro, Info } from 'lucide-react';
+import { Plus, PartyPopper, Settings, Calendar, Users, Euro, Info, Building2, Utensils } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -35,15 +35,10 @@ export default function EventsListPage() {
             const hotelsData = await fetchAPI('/property/hotels');
             const restaurantsData = await fetchAPI('/restaurant');
             
-            console.log('Hotels loaded:', hotelsData);
-            console.log('Restaurants loaded:', restaurantsData);
-            
             setHotels(Array.isArray(hotelsData) ? hotelsData : []);
             setRestaurants(Array.isArray(restaurantsData) ? restaurantsData : []);
         } catch (e) {
             console.error('Error loading establishments', e);
-            setHotels([]);
-            setRestaurants([]);
         }
     }
 
@@ -61,8 +56,32 @@ export default function EventsListPage() {
         }
     }
 
+    // Handle Synergy Logic
+    const handleHotelChange = (hotelId: string) => {
+        const selectedHotel = hotels.find(h => h.id === hotelId);
+        setFormData({
+            ...formData,
+            hotelId,
+            // If hotel has a linked restaurant, auto-select it
+            restaurantId: selectedHotel?.restaurantId || formData.restaurantId
+        });
+    };
+
+    const handleRestaurantChange = (restaurantId: string) => {
+        // Find if any hotel is linked to this restaurant
+        const linkedHotel = hotels.find(h => h.restaurantId === restaurantId);
+        setFormData({
+            ...formData,
+            restaurantId,
+            hotelId: linkedHotel?.id || formData.hotelId
+        });
+    };
+
     async function handleCreate() {
-        if (!formData.name || !formData.date) return;
+        if (!formData.name || !formData.date) {
+            alert('Nombre y fecha son obligatorios');
+            return;
+        }
         try {
             await fetchAPI('/event', {
                 method: 'POST',
@@ -91,40 +110,56 @@ export default function EventsListPage() {
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold">Gestión de Eventos</h1>
-                <Button onClick={() => setShowCreate(!showCreate)} className="gap-2">
-                    <Plus className="w-4 h-4" /> {showCreate ? 'Cancelar' : 'Nuevo Evento'}
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg text-indigo-600">
+                        <PartyPopper className="w-6 h-6" />
+                    </div>
+                    <div>
+                        <h1 className="text-2xl font-bold italic tracking-tighter uppercase">Gestión de Eventos</h1>
+                        <p className="text-xs text-muted-foreground">Crea y gestiona eventos puntuales para tus establecimientos.</p>
+                    </div>
+                </div>
+                <Button onClick={() => setShowCreate(!showCreate)} className={`gap-2 ${showCreate ? 'bg-zinc-100 text-zinc-900 hover:bg-zinc-200' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>
+                    {showCreate ? 'Cerrar' : <><Plus className="w-4 h-4" /> Nuevo Evento</>}
                 </Button>
             </div>
 
             {showCreate && (
-                <div className="bg-white dark:bg-zinc-800 p-6 rounded-lg shadow border border-gray-100 dark:border-zinc-700 animate-in fade-in slide-in-from-top-4 duration-300">
-                    <h2 className="text-lg font-semibold mb-4">Crear Nuevo Evento Puntual</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-white dark:bg-zinc-800 p-8 rounded-2xl shadow-xl border border-indigo-50 dark:border-zinc-700 animate-in fade-in slide-in-from-top-4 duration-300">
+                    <div className="flex items-center gap-2 mb-6 text-indigo-600">
+                        <Calendar className="w-5 h-5" />
+                        <h2 className="text-lg font-bold uppercase tracking-widest italic">Configurar Nuevo Evento</h2>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Nombre del Evento</label>
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Nombre del Evento</label>
                             <input
-                                className="border p-2 rounded w-full dark:bg-zinc-900 focus:ring-2 focus:ring-blue-500 outline-none"
+                                className="border-2 p-3 rounded-xl w-full dark:bg-zinc-900 focus:border-indigo-500 outline-none transition-all"
                                 placeholder="Ej: Cena de Gala San Juan"
                                 value={formData.name}
                                 onChange={e => setFormData({...formData, name: e.target.value})}
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Fecha</label>
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Fecha y Hora</label>
                             <input
                                 type="datetime-local"
-                                className="border p-2 rounded w-full dark:bg-zinc-900 focus:ring-2 focus:ring-blue-500 outline-none"
+                                className="border-2 p-3 rounded-xl w-full dark:bg-zinc-900 focus:border-indigo-500 outline-none transition-all"
                                 value={formData.date}
                                 onChange={e => setFormData({...formData, date: e.target.value})}
                             />
                         </div>
+
+                        {/* Establishments linkage with Synergy Logic */}
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Hotel Vinculado (Opcional)</label>
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1">
+                                <Building2 className="w-3 h-3" /> Hotel Vinculado
+                            </label>
                             <select
-                                className="border p-2 rounded w-full dark:bg-zinc-900 focus:ring-2 focus:ring-blue-500 outline-none"
+                                className="border-2 p-3 rounded-xl w-full dark:bg-zinc-900 focus:border-indigo-500 outline-none transition-all"
                                 value={formData.hotelId}
-                                onChange={e => setFormData({...formData, hotelId: e.target.value})}
+                                onChange={e => handleHotelChange(e.target.value)}
                             >
                                 <option value="">Ninguno</option>
                                 {hotels.map(h => (
@@ -133,49 +168,54 @@ export default function EventsListPage() {
                             </select>
                         </div>
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Restaurante Vinculado (Opcional)</label>
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1">
+                                <Utensils className="w-3 h-3" /> Restaurante Vinculado
+                            </label>
                             <select
-                                className="border p-2 rounded w-full dark:bg-zinc-900 focus:ring-2 focus:ring-blue-500 outline-none"
+                                className="border-2 p-3 rounded-xl w-full dark:bg-zinc-900 focus:border-indigo-500 outline-none transition-all"
                                 value={formData.restaurantId}
-                                onChange={e => setFormData({...formData, restaurantId: e.target.value})}
+                                onChange={e => handleRestaurantChange(e.target.value)}
                             >
                                 <option value="">Ninguno</option>
                                 {restaurants.map(r => (
                                     <option key={r.id} value={r.id}>{r.name}</option>
                                 ))}
                             </select>
+                            <p className="text-[10px] text-muted-foreground italic">Al vincular un restaurante, se aplicarán sus políticas de Stripe/No-Show.</p>
                         </div>
+
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Capacidad (Pax)</label>
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Capacidad Total (Pax)</label>
                             <input
                                 type="number"
-                                className="border p-2 rounded w-full dark:bg-zinc-900 focus:ring-2 focus:ring-blue-500 outline-none"
+                                className="border-2 p-3 rounded-xl w-full dark:bg-zinc-900 focus:border-indigo-500 outline-none transition-all"
                                 value={formData.capacity}
                                 onChange={e => setFormData({...formData, capacity: Number(e.target.value)})}
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Precio por Persona (€)</label>
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Precio por Persona (€)</label>
                             <input
                                 type="number"
-                                className="border p-2 rounded w-full dark:bg-zinc-900 focus:ring-2 focus:ring-blue-500 outline-none"
+                                className="border-2 p-3 rounded-xl w-full dark:bg-zinc-900 focus:border-indigo-500 outline-none transition-all"
                                 value={formData.price}
                                 onChange={e => setFormData({...formData, price: Number(e.target.value)})}
                             />
                         </div>
                         <div className="md:col-span-2 space-y-2">
-                            <label className="text-sm font-medium">Descripción</label>
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Descripción del Evento</label>
                             <textarea
-                                className="border p-2 rounded w-full dark:bg-zinc-900 focus:ring-2 focus:ring-blue-500 outline-none h-24"
-                                placeholder="Detalles del evento..."
+                                className="border-2 p-3 rounded-xl w-full dark:bg-zinc-900 focus:border-indigo-500 outline-none transition-all h-24 resize-none"
+                                placeholder="Detalles, menú, condiciones..."
                                 value={formData.description}
                                 onChange={e => setFormData({...formData, description: e.target.value})}
                             />
                         </div>
                     </div>
-                    <div className="mt-4 flex justify-end">
-                        <Button onClick={handleCreate} className="gap-2 bg-blue-600 hover:bg-blue-700">
-                            <Plus className="w-4 h-4" /> Crear Evento
+                    <div className="mt-8 flex justify-end gap-3">
+                        <Button variant="ghost" onClick={() => setShowCreate(false)}>Cancelar</Button>
+                        <Button onClick={handleCreate} className="gap-2 bg-indigo-600 hover:bg-indigo-700 px-8 rounded-xl font-bold uppercase tracking-widest italic shadow-lg shadow-indigo-200">
+                            Crear Evento
                         </Button>
                     </div>
                 </div>
@@ -183,80 +223,83 @@ export default function EventsListPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {loading ? (
-                    <p>Cargando eventos...</p>
+                    <div className="col-span-full py-12 text-center">
+                        <div className="animate-spin w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+                        <p className="text-muted-foreground">Cargando eventos...</p>
+                    </div>
                 ) : events.length === 0 ? (
-                    <div className="col-span-full py-12 text-center bg-gray-50 dark:bg-zinc-900/50 rounded-xl border-2 border-dashed border-gray-200 dark:border-zinc-800">
-                        <PartyPopper className="w-12 h-12 mx-auto text-gray-300 mb-4" />
-                        <p className="text-muted-foreground font-medium">No hay eventos programados.</p>
-                        <p className="text-sm text-muted-foreground">Comienza creando tu primer evento puntual.</p>
+                    <div className="col-span-full py-20 text-center bg-zinc-50 dark:bg-zinc-900/50 rounded-3xl border-2 border-dashed border-zinc-200 dark:border-zinc-800">
+                        <PartyPopper className="w-16 h-16 mx-auto text-zinc-300 mb-6" />
+                        <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">No hay eventos activos</h3>
+                        <p className="text-muted-foreground max-w-xs mx-auto">Comienza creando un evento puntual para tus restaurantes u hoteles.</p>
                     </div>
                 ) : (
                     events.map(event => (
-                        <div key={event.id} className="bg-white dark:bg-zinc-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-zinc-700 hover:shadow-md transition-all group overflow-hidden relative">
+                        <div key={event.id} className="bg-white dark:bg-zinc-800 p-6 rounded-2xl shadow-sm border border-zinc-100 dark:border-zinc-700 hover:shadow-xl hover:translate-y-[-4px] transition-all group overflow-hidden relative">
                             <div className="absolute top-0 right-0 p-4">
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${event.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                <span className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase ${event.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
                                     {event.isActive ? 'Activo' : 'Inactivo'}
                                 </span>
                             </div>
                             
                             <div className="flex items-center gap-4 mb-6">
-                                <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-xl text-purple-600">
+                                <div className="p-4 bg-indigo-50 dark:bg-indigo-900/30 rounded-2xl text-indigo-600 group-hover:scale-110 transition-transform">
                                     <PartyPopper className="w-6 h-6" />
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-bold group-hover:text-purple-600 transition-colors">{event.name}</h3>
+                                    <h3 className="text-lg font-bold tracking-tight leading-tight">{event.name}</h3>
                                     <div className="flex flex-col gap-1 mt-1">
-                                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                            <Calendar className="w-3 h-3" />
-                                            {format(new Date(event.date), "PPP p", { locale: es })}
+                                        <p className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+                                            <Calendar className="w-3.5 h-3.5" />
+                                            {format(new Date(event.date), "d 'de' MMMM, yyyy 'a las' HH:mm", { locale: es })}
                                         </p>
-                                        {event.hotel && (
-                                            <p className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded w-fit font-medium">
-                                                Hotel: {event.hotel.name}
-                                            </p>
-                                        )}
-                                        {event.restaurant && (
-                                            <p className="text-[10px] bg-orange-50 text-orange-600 px-2 py-0.5 rounded w-fit font-medium">
-                                                Restaurante: {event.restaurant.name}
-                                            </p>
-                                        )}
                                     </div>
                                 </div>
                             </div>
+
+                            <div className="flex flex-wrap gap-2 mb-6">
+                                {event.hotel && (
+                                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-600 text-[10px] font-bold uppercase rounded-lg border border-blue-100">
+                                        <Building2 className="w-3 h-3" /> {event.hotel.name}
+                                    </div>
+                                )}
+                                {event.restaurant && (
+                                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-orange-50 text-orange-600 text-[10px] font-bold uppercase rounded-lg border border-orange-100">
+                                        <Utensils className="w-3 h-3" /> {event.restaurant.name}
+                                    </div>
+                                )}
+                            </div>
                             
-                            <div className="space-y-3 mb-6">
-                                <div className="flex justify-between text-sm">
+                            <div className="space-y-4 mb-6 bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-xl">
+                                <div className="flex justify-between text-xs font-bold uppercase tracking-wider">
                                     <span className="text-muted-foreground flex items-center gap-1.5"><Users className="w-4 h-4" /> Ocupación</span>
-                                    <span className="font-semibold">{event._count.bookings} reservas / {event.capacity} pax</span>
+                                    <span className="text-indigo-600">{event._count.bookings} / {event.capacity} pax</span>
                                 </div>
-                                <div className="w-full bg-gray-100 dark:bg-zinc-900 rounded-full h-1.5 overflow-hidden">
+                                <div className="w-full bg-zinc-200 dark:bg-zinc-800 rounded-full h-2 overflow-hidden">
                                     <div 
-                                        className="bg-purple-500 h-full rounded-full transition-all duration-500" 
+                                        className="bg-indigo-600 h-full rounded-full transition-all duration-700" 
                                         style={{ width: `${Math.min(100, (event._count.bookings / event.capacity) * 100)}%` }}
                                     />
                                 </div>
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground flex items-center gap-1.5"><Euro className="w-4 h-4" /> Precio</span>
-                                    <span className="font-bold text-lg">{event.price}€</span>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5"><Euro className="w-4 h-4" /> Precio</span>
+                                    <span className="text-2xl font-black text-indigo-600 italic tracking-tighter">{event.price}€</span>
                                 </div>
                             </div>
                             
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-2 gap-3">
                                 <Button 
                                     variant="outline" 
-                                    size="sm"
-                                    className="gap-2 text-xs" 
+                                    className="rounded-xl text-xs font-bold uppercase tracking-widest transition-colors hover:bg-zinc-50" 
                                     onClick={() => window.location.href = `/admin/events/${event.id}`}
                                 >
-                                    <Info className="w-3 h-3" /> Ver Detalles
+                                    Detalles
                                 </Button>
                                 <Button 
-                                    variant="outline" 
-                                    size="sm"
-                                    className="gap-2 text-xs" 
+                                    className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-widest shadow-md shadow-indigo-100" 
                                     onClick={() => window.location.href = `/admin/events/${event.id}/config`}
                                 >
-                                    <Settings className="w-3 h-3" /> Editar
+                                    Gestionar
                                 </Button>
                             </div>
                         </div>
