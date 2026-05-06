@@ -100,8 +100,28 @@ export class PropertyService {
     }
 
     async deleteHotel(id: string) {
-        return this.prisma.hotel.delete({
-            where: { id },
+        return this.prisma.$transaction(async (tx) => {
+            // 1. Clean up bookings and related
+            await tx.booking.deleteMany({ where: { hotelId: id } });
+            
+            // 2. Clean up inventory, pricing, seasons and restrictions
+            await tx.dailyPrice.deleteMany({ where: { roomType: { hotelId: id } } });
+            await tx.restriction.deleteMany({ where: { hotelId: id } });
+            await tx.season.deleteMany({ where: { hotelId: id } });
+            await tx.ratePlan.deleteMany({ where: { hotelId: id } });
+            await tx.widgetConfig.deleteMany({ where: { hotelId: id } });
+            await tx.event.deleteMany({ where: { hotelId: id } });
+
+            // 3. Clean up rooms and room types
+            const roomTypes = await tx.roomType.findMany({ where: { hotelId: id }, select: { id: true } });
+            const roomTypeIds = roomTypes.map(rt => rt.id);
+            if (roomTypeIds.length > 0) {
+                await tx.room.deleteMany({ where: { roomTypeId: { in: roomTypeIds } } });
+                await tx.roomType.deleteMany({ where: { hotelId: id } });
+            }
+
+            // 4. Finally delete the hotel
+            return tx.hotel.delete({ where: { id } });
         });
     }
 

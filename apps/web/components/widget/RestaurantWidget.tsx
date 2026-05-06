@@ -80,7 +80,7 @@ function CardForm({ onSuccess, submitting, colors, amount }: { onSuccess: (pmId:
 
 export function RestaurantWidget() {
     const [stripePromise, setStripePromise] = useState<any>(null);
-    const [stripeConfig, setStripeConfig] = useState<any>(null);
+    const [widgetConfig, setWidgetConfig] = useState<any>(null);
     const searchParams = useSearchParams();
     const restaurantId = searchParams.get('id') || '';
 
@@ -88,26 +88,28 @@ export function RestaurantWidget() {
         if (!restaurantId) return;
         fetchAPI(`/restaurant/${restaurantId}`)
             .then(data => { 
+                if (data?.widgetConfig) {
+                    setWidgetConfig(data.widgetConfig);
+                }
                 if (data?.integrations?.stripe?.enabled && data?.integrations?.stripe?.publicKey) {
-                    setStripeConfig(data.integrations.stripe);
                     setStripePromise(loadStripe(data.integrations.stripe.publicKey));
                 }
             })
             .catch(() => {});
     }, [restaurantId]);
 
-    if (stripePromise) {
+    if (stripePromise && widgetConfig) {
         return (
             <Elements stripe={stripePromise}>
-                <RestaurantWidgetContent stripeEnabled={true} />
+                <RestaurantWidgetContent widgetConfig={widgetConfig} />
             </Elements>
         );
     }
 
-    return <RestaurantWidgetContent stripeEnabled={false} />;
+    return <RestaurantWidgetContent widgetConfig={widgetConfig} />;
 }
 
-function RestaurantWidgetContent({ stripeEnabled }: { stripeEnabled: boolean }) {
+function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
     const searchParams = useSearchParams();
     const restaurantId = searchParams.get('id') || '';
 
@@ -129,6 +131,7 @@ function RestaurantWidgetContent({ stripeEnabled }: { stripeEnabled: boolean }) 
     const [closures, setClosures] = useState<string[]>([]);
     const [restaurantName, setRestaurantName] = useState('');
     const [createdBooking, setCreatedBooking] = useState<any>(null);
+    const [hasEventOnSelectedDate, setHasEventOnSelectedDate] = useState(false);
 
     // CRM Additional Fields (Step 3)
     const [additionalData, setAdditionalData] = useState({
@@ -185,13 +188,14 @@ function RestaurantWidgetContent({ stripeEnabled }: { stripeEnabled: boolean }) 
 
         try {
             const dateStr = format(date, 'yyyy-MM-dd');
-            const lunchSlots = await fetchAPI(`/restaurant/${restaurantId}/slots?date=${dateStr}&pax=${pax}&type=LUNCH`);
-            const dinnerSlots = await fetchAPI(`/restaurant/${restaurantId}/slots?date=${dateStr}&pax=${pax}&type=DINNER`);
+            const lunchData = await fetchAPI(`/restaurant/${restaurantId}/slots?date=${dateStr}&pax=${pax}&type=LUNCH`);
+            const dinnerData = await fetchAPI(`/restaurant/${restaurantId}/slots?date=${dateStr}&pax=${pax}&type=DINNER`);
 
             setTimeSlots({
-                lunch: Array.isArray(lunchSlots) ? lunchSlots : [],
-                dinner: Array.isArray(dinnerSlots) ? dinnerSlots : []
+                lunch: lunchData?.slots || [],
+                dinner: dinnerData?.slots || []
             });
+            setHasEventOnSelectedDate(lunchData?.hasEvent || dinnerData?.hasEvent || false);
         } catch (e) {
             console.error('Error fetching slots:', e);
             setTimeSlots({ lunch: [], dinner: [] });
@@ -251,8 +255,24 @@ function RestaurantWidgetContent({ stripeEnabled }: { stripeEnabled: boolean }) 
         }
     };
 
+    // --- Granular No-Show Logic ---
+    const shouldRequireStripe = () => {
+        if (!widgetConfig?.stripeEnabled) return false;
+        
+        // 1. All reservations
+        if (widgetConfig.noShowFeeAll) return true;
+        
+        // 2. Groups
+        if (widgetConfig.noShowFeeGroups && pax >= widgetConfig.noShowGroupMinPax) return true;
+        
+        // 3. Events
+        if (widgetConfig.noShowFeeEvents && hasEventOnSelectedDate) return true;
+        
+        return false;
+    };
+
     const handleMainSubmit = () => {
-        if (stripeEnabled) {
+        if (shouldRequireStripe()) {
             document.getElementById('stripe-submit-btn')?.click();
         } else {
             handleSubmitReservation();
@@ -269,7 +289,7 @@ function RestaurantWidgetContent({ stripeEnabled }: { stripeEnabled: boolean }) 
     const weekDays = ['L', 'M', 'Mi', 'J', 'V', 'S', 'D'];
 
     const colors = {
-        accent: '#C59D5F',
+        accent: widgetConfig?.primaryColor || '#C59D5F',
         bg: '#F4F4F4',
         text: '#0A0A0A',
         white: '#FFFFFF'
@@ -284,7 +304,7 @@ function RestaurantWidgetContent({ stripeEnabled }: { stripeEnabled: boolean }) 
                     <button
                         onClick={() => setCurrentStep(currentStep - 1)}
                         className="text-xs font-bold uppercase tracking-wider flex items-center gap-1 hover:text-[#C59D5F] transition-colors"
-                        style={{ fontFamily: "'Oswald', sans-serif" }}
+                        style={{ backgroundColor: 'transparent', color: colors.text, fontFamily: "'Oswald', sans-serif" }}
                     >
                         {'<'} VOLVER
                     </button>
@@ -522,12 +542,12 @@ function RestaurantWidgetContent({ stripeEnabled }: { stripeEnabled: boolean }) 
 
                                 {/* Stripe Form */}
                                 <div className="mt-6">
-                                    {stripeEnabled ? (
+                                    {shouldRequireStripe() ? (
                                         <CardForm 
                                             onSuccess={(pmId) => handleSubmitReservation(pmId)} 
                                             submitting={submitting} 
                                             colors={colors}
-                                            amount={20}
+                                            amount={widgetConfig?.noShowFeeAmount || 20}
                                         />
                                     ) : (
                                         <div className="p-4 bg-gray-50 text-center italic text-sm text-gray-500">

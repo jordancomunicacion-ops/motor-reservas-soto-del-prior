@@ -205,9 +205,21 @@ export class RestaurantService {
 
     async deleteRestaurant(id: string) {
         return this.prisma.$transaction(async (tx) => {
+            // 1. Clean up everything related to the restaurant
             await tx.restaurantWaitlist.deleteMany({ where: { restaurantId: id } });
             await tx.resBooking.deleteMany({ where: { restaurantId: id } });
+            await tx.shift.deleteMany({ where: { restaurantId: id } });
+            await tx.restaurantClosure.deleteMany({ where: { restaurantId: id } });
+            await tx.widgetConfig.deleteMany({ where: { restaurantId: id } });
+            await tx.event.deleteMany({ where: { restaurantId: id } });
             
+            // 2. Clear any hotel links to this restaurant
+            await tx.hotel.updateMany({
+                where: { restaurantId: id },
+                data: { restaurantId: null }
+            });
+
+            // 3. Clean up zones and tables
             const zones = await tx.zone.findMany({ where: { restaurantId: id }, select: { id: true } });
             const zoneIds = zones.map(z => z.id);
             if (zoneIds.length > 0) {
@@ -216,6 +228,7 @@ export class RestaurantService {
                 await tx.zone.deleteMany({ where: { restaurantId: id } });
             }
 
+            // 4. Finally delete the restaurant
             return tx.restaurant.delete({ where: { id } });
         });
     }
@@ -522,7 +535,24 @@ export class RestaurantService {
             }
         }
 
-        return availableSlots;
+        // Check if there's an event on this date
+        const startOfDay = new Date(date);
+        startOfDay.setHours(0,0,0,0);
+        const endOfDay = new Date(date);
+        endOfDay.setHours(23,59,59,999);
+
+        const hasEvent = await this.prisma.event.findFirst({
+            where: {
+                restaurantId,
+                date: { gte: startOfDay, lte: endOfDay },
+                isActive: true
+            }
+        });
+
+        return {
+            slots: availableSlots,
+            hasEvent: !!hasEvent
+        };
     }
 
     private isSlotAvailable(slotTime: Date, pax: number, tables: any[], bookings: any[], defaultDuration: number = 90): boolean {

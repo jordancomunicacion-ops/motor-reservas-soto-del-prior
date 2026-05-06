@@ -61,6 +61,14 @@ model WidgetConfig {
   
   showLogo       Boolean @default(true)
   title          String? // Override default title
+
+  // Stripe & No-Show Fee Strategy
+  stripeEnabled      Boolean @default(false)
+  noShowFeeAmount    Decimal @default(0)
+  noShowFeeAll       Boolean @default(false)
+  noShowFeeGroups    Boolean @default(false)
+  noShowGroupMinPax  Int     @default(8)
+  noShowFeeEvents    Boolean @default(false)
 }
 
 model RoomType {

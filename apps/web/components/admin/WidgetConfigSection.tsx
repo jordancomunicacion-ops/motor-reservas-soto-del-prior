@@ -6,8 +6,9 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { fetchAPI } from '@/lib/api';
-import { Sparkles, Copy, Check, ExternalLink } from 'lucide-react';
+import { Sparkles, Copy, Check, ExternalLink, CreditCard, Users, Calendar } from 'lucide-react';
 
 interface WidgetConfigSectionProps {
     entityId: string;
@@ -16,9 +17,15 @@ interface WidgetConfigSectionProps {
 
 export function WidgetConfigSection({ entityId, type }: WidgetConfigSectionProps) {
     const [config, setConfig] = useState({
-        primaryColor: '#3b82f6',
+        primaryColor: '#C59D5F',
         customCss: '',
-        showLogo: true
+        showLogo: true,
+        stripeEnabled: false,
+        noShowFeeAmount: 0,
+        noShowFeeAll: false,
+        noShowFeeGroups: false,
+        noShowGroupMinPax: 8,
+        noShowFeeEvents: false
     });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -33,9 +40,15 @@ export function WidgetConfigSection({ entityId, type }: WidgetConfigSectionProps
             const data = await fetchAPI(`/config/${entityId}`);
             if (data) {
                 setConfig({
-                    primaryColor: data.primaryColor || '#3b82f6',
+                    primaryColor: data.primaryColor || '#C59D5F',
                     customCss: data.customCss || '',
-                    showLogo: data.showLogo !== undefined ? data.showLogo : true
+                    showLogo: data.showLogo !== undefined ? data.showLogo : true,
+                    stripeEnabled: data.stripeEnabled || false,
+                    noShowFeeAmount: data.noShowFeeAmount || 0,
+                    noShowFeeAll: data.noShowFeeAll || false,
+                    noShowFeeGroups: data.noShowFeeGroups || false,
+                    noShowGroupMinPax: data.noShowGroupMinPax || 8,
+                    noShowFeeEvents: data.noShowFeeEvents || false
                 });
             }
         } catch (e) {
@@ -52,7 +65,7 @@ export function WidgetConfigSection({ entityId, type }: WidgetConfigSectionProps
                 method: 'POST',
                 body: JSON.stringify(config)
             });
-            alert('Configuración del widget guardada');
+            alert('Configuración guardada correctamente');
         } catch (e) {
             console.error('Error saving widget config:', e);
             alert('Error al guardar la configuración');
@@ -71,66 +84,168 @@ export function WidgetConfigSection({ entityId, type }: WidgetConfigSectionProps
         setTimeout(() => setCopied(false), 2000);
     };
 
-    if (loading) return <div className="py-4 text-sm text-muted-foreground italic">Cargando configuración del widget...</div>;
+    if (loading) return <div className="py-4 text-sm text-muted-foreground italic">Cargando configuración...</div>;
 
     return (
         <div className="space-y-6">
-            <Card className="border-blue-100 dark:border-blue-900/30 bg-blue-50/5 dark:bg-blue-950/10">
-                <CardHeader>
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg text-blue-600">
-                            <Sparkles className="w-5 h-5" />
+            <div className="grid md:grid-cols-2 gap-6">
+                {/* Visual Config */}
+                <Card className="border-blue-100 dark:border-blue-900/30 bg-blue-50/5 dark:bg-blue-950/10">
+                    <CardHeader>
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg text-blue-600">
+                                <Sparkles className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <CardTitle>Diseño del Widget</CardTitle>
+                                <CardDescription>Personaliza la apariencia visual.</CardDescription>
+                            </div>
                         </div>
-                        <div>
-                            <CardTitle>Personalización del Widget</CardTitle>
-                            <CardDescription>Ajusta el diseño del motor de reservas para tu web.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                            <Label>Color de Acento</Label>
+                            <div className="flex gap-2">
+                                <div 
+                                    className="w-10 h-10 rounded-md border shadow-sm" 
+                                    style={{ backgroundColor: config.primaryColor }}
+                                />
+                                <Input 
+                                    type="text" 
+                                    value={config.primaryColor} 
+                                    onChange={e => setConfig({ ...config, primaryColor: e.target.value })}
+                                    className="font-mono uppercase"
+                                />
+                                <input 
+                                    type="color" 
+                                    value={config.primaryColor} 
+                                    onChange={e => setConfig({ ...config, primaryColor: e.target.value })}
+                                    className="w-12 h-10 p-0 border-0 cursor-pointer bg-transparent"
+                                />
+                            </div>
                         </div>
-                    </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                        <Label>Color Principal</Label>
-                        <div className="flex gap-2">
-                            <div 
-                                className="w-10 h-10 rounded-md border shadow-sm" 
-                                style={{ backgroundColor: config.primaryColor }}
-                            />
-                            <Input 
-                                type="text" 
-                                value={config.primaryColor} 
-                                onChange={e => setConfig({ ...config, primaryColor: e.target.value })}
-                                className="font-mono uppercase"
-                                placeholder="#3B82F6"
-                            />
-                            <input 
-                                type="color" 
-                                value={config.primaryColor} 
-                                onChange={e => setConfig({ ...config, primaryColor: e.target.value })}
-                                className="w-12 h-10 p-0 border-0 cursor-pointer bg-transparent"
-                            />
-                        </div>
-                    </div>
 
-                    <div className="space-y-2">
-                        <Label>CSS Personalizado</Label>
-                        <Textarea
-                            className="font-mono text-xs h-32"
-                            value={config.customCss}
-                            onChange={e => setConfig({ ...config, customCss: e.target.value })}
-                            placeholder=".widget-container { background: transparent; }"
-                        />
-                        <p className="text-[10px] text-muted-foreground">
-                            Añade estilos CSS adicionales para integrar mejor el widget en tu sitio web.
-                        </p>
+                        <div className="space-y-2">
+                            <Label>CSS Personalizado</Label>
+                            <Textarea
+                                className="font-mono text-xs h-24"
+                                value={config.customCss}
+                                onChange={e => setConfig({ ...config, customCss: e.target.value })}
+                                placeholder=".widget-container { ... }"
+                            />
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* No-Show Fee Strategy */}
+                <Card className="border-amber-100 dark:border-amber-900/30 bg-amber-50/5 dark:bg-amber-950/10">
+                    <CardHeader>
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg text-amber-600">
+                                <CreditCard className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <CardTitle>Estrategia de No-Show</CardTitle>
+                                <CardDescription>Configura cuándo pedir tarjeta de crédito.</CardDescription>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="flex items-center justify-between p-3 bg-white dark:bg-zinc-900 rounded-lg border">
+                            <div className="space-y-0.5">
+                                <Label className="text-base">Activar Stripe</Label>
+                                <p className="text-xs text-muted-foreground">Requiere tarjeta como garantía.</p>
+                            </div>
+                            <Checkbox 
+                                checked={config.stripeEnabled} 
+                                onCheckedChange={(checked) => setConfig({ ...config, stripeEnabled: checked === true })}
+                            />
+                        </div>
+
+                        {config.stripeEnabled && (
+                            <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                                <div className="space-y-2">
+                                    <Label>Importe Penalización (€ por persona)</Label>
+                                    <Input 
+                                        type="number" 
+                                        value={config.noShowFeeAmount} 
+                                        onChange={e => setConfig({ ...config, noShowFeeAmount: Number(e.target.value) })}
+                                    />
+                                </div>
+
+                                <div className="space-y-3 pt-2">
+                                    <Label className="text-xs font-bold uppercase text-muted-foreground">Aplicar a:</Label>
+                                    
+                                    <div className="flex items-start gap-3">
+                                        <Checkbox 
+                                            id="all" 
+                                            checked={config.noShowFeeAll} 
+                                            onCheckedChange={(checked) => setConfig({ ...config, noShowFeeAll: checked === true })}
+                                        />
+                                        <div className="grid gap-1.5 leading-none">
+                                            <label htmlFor="all" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                                Todas las reservas
+                                            </label>
+                                            <p className="text-xs text-muted-foreground">Cualquier persona que reserve deberá poner tarjeta.</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-start gap-3">
+                                        <Checkbox 
+                                            id="groups" 
+                                            checked={config.noShowFeeGroups} 
+                                            onCheckedChange={(checked) => setConfig({ ...config, noShowFeeGroups: checked === true })}
+                                        />
+                                        <div className="grid gap-1.5 leading-none w-full">
+                                            <label htmlFor="groups" className="text-sm font-medium leading-none flex items-center gap-2">
+                                                Reservas de Grupos
+                                            </label>
+                                            {config.noShowFeeGroups && (
+                                                <div className="flex items-center gap-2 mt-2">
+                                                    <span className="text-xs">Mínimo de pax:</span>
+                                                    <Input 
+                                                        type="number" 
+                                                        className="w-20 h-8 text-xs" 
+                                                        value={config.noShowGroupMinPax} 
+                                                        onChange={e => setConfig({ ...config, noShowGroupMinPax: Number(e.target.value) })}
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-start gap-3">
+                                        <Checkbox 
+                                            id="events" 
+                                            checked={config.noShowFeeEvents} 
+                                            onCheckedChange={(checked) => setConfig({ ...config, noShowFeeEvents: checked === true })}
+                                        />
+                                        <div className="grid gap-1.5 leading-none">
+                                            <label htmlFor="events" className="text-sm font-medium leading-none">
+                                                Eventos Especiales
+                                            </label>
+                                            <p className="text-xs text-muted-foreground">Reservas vinculadas a eventos creados en el panel.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+
+            <Card className="border-none shadow-none bg-transparent">
+                <CardFooter className="flex justify-between items-center p-0">
+                    <div className="text-xs text-muted-foreground">
+                        Última sincronización: {new Date().toLocaleDateString()}
                     </div>
-                </CardContent>
-                <CardFooter className="flex justify-end border-t pt-4">
-                    <Button onClick={saveConfig} disabled={saving} size="sm">
-                        {saving ? 'Guardando...' : 'Guardar Diseño'}
+                    <Button onClick={saveConfig} disabled={saving} className="gap-2 px-8">
+                        {saving ? 'Guardando...' : 'Guardar Toda la Configuración'}
                     </Button>
                 </CardFooter>
             </Card>
 
+            {/* Integration Link */}
             <Card>
                 <CardHeader>
                     <CardTitle className="text-sm">Código de Integración</CardTitle>
@@ -154,10 +269,6 @@ export function WidgetConfigSection({ entityId, type }: WidgetConfigSectionProps
                         >
                             <ExternalLink className="w-3 h-3" /> Previsualizar Widget
                         </a>
-                    </div>
-
-                    <div className="p-3 bg-yellow-50 dark:bg-yellow-900/10 text-yellow-800 dark:text-yellow-400 text-[11px] rounded border border-yellow-100 dark:border-yellow-900/30">
-                        <strong>Tip:</strong> Puedes insertar este enlace usando un <code>&lt;iframe&gt;</code> en cualquier parte de tu web principal.
                     </div>
                 </CardContent>
             </Card>

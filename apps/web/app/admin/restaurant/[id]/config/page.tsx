@@ -46,9 +46,6 @@ function RestaurantConfigContent() {
             waitlist_join: '<h1>Estás en lista de espera</h1><p>Hola {{name}}, te hemos añadido a la lista de espera para el {{date}}.</p>',
             waitlist_available: '<h1>¡Hay un hueco libre!</h1><p>Hola {{name}}, se ha liberado una mesa para tu solicitud del {{date}}. Por favor, confirma para reservarla.</p>'
         },
-        stripeEnabled: false,
-        noShowFee: 0,
-        cancelHours: 24,
         mailConfig: {
             host: '',
             port: '587',
@@ -74,9 +71,6 @@ function RestaurantConfigContent() {
                 defaultDuration: data.defaultDuration || 90,
                 contactEmail: data.contactEmail || '',
                 emailTemplates: data.emailTemplates || formData.emailTemplates,
-                stripeEnabled: data.integrations?.stripeEnabled || false,
-                noShowFee: data.integrations?.noShowFee || 0,
-                cancelHours: data.integrations?.cancelHours || 24,
                 mailConfig: data.mailConfig || {
                     host: '',
                     port: '587',
@@ -119,11 +113,6 @@ function RestaurantConfigContent() {
                     defaultDuration: Number(formData.defaultDuration),
                     contactEmail: formData.contactEmail,
                     emailTemplates: formData.emailTemplates,
-                    integrations: {
-                        stripeEnabled: formData.stripeEnabled,
-                        noShowFee: formData.noShowFee,
-                        cancelHours: formData.cancelHours,
-                    },
                     mailConfig: formData.mailConfig
                 })
             });
@@ -284,51 +273,7 @@ function RestaurantConfigContent() {
             </Card>
 
             <div className="grid md:grid-cols-2 gap-6">
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg text-emerald-600">
-                                <CreditCard className="w-5 h-5" />
-                            </div>
-                            <div>
-                                <CardTitle>Políticas y Garantía</CardTitle>
-                                <CardDescription>Stripe y cancelaciones.</CardDescription>
-                            </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <Label htmlFor="stripe-enabled">Requerir Tarjeta (Stripe)</Label>
-                            <input 
-                                type="checkbox" 
-                                id="stripe-enabled" 
-                                className="w-4 h-4"
-                                checked={formData.stripeEnabled}
-                                onChange={(e) => setFormData({...formData, stripeEnabled: e.target.checked})}
-                            />
-                        </div>
-                        {formData.stripeEnabled && (
-                            <>
-                                <div className="space-y-2">
-                                    <Label>Penalización por No-Show (€)</Label>
-                                    <Input 
-                                        type="number" 
-                                        value={formData.noShowFee}
-                                        onChange={(e) => setFormData({...formData, noShowFee: Number(e.target.value)})}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Horas límite de cancelación gratuita</Label>
-                                    <Input 
-                                        type="number" 
-                                        value={formData.cancelHours}
-                                        onChange={(e) => setFormData({...formData, cancelHours: Number(e.target.value)})}
-                                    />
-                                </div>
-                            </>
-                        )}
-                    </CardContent>
-                </Card>
+
 
             </div>
 

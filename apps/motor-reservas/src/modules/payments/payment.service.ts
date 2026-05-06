@@ -1,18 +1,18 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { Stripe } from 'stripe';
+import Stripe from 'stripe';
 
 @Injectable()
 export class PaymentService {
     private readonly logger = new Logger(PaymentService.name);
-    private stripeClients: Map<string, Stripe> = new Map();
+    private stripeClients: Map<string, any> = new Map();
 
     constructor(private prisma: PrismaService) { }
 
     /**
      * Gets or creates a Stripe client for a specific restaurant/hotel
      */
-    private async getStripeClient(entityId: string, entityType: 'hotel' | 'restaurant'): Promise<Stripe> {
+    private async getStripeClient(entityId: string, entityType: 'hotel' | 'restaurant'): Promise<any> {
         // Check cache
         if (this.stripeClients.has(entityId)) {
             return this.stripeClients.get(entityId)!;
