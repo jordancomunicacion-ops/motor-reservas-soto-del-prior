@@ -170,7 +170,7 @@ function RestaurantConfigContent() {
     if (loading) return <div className="p-8">Cargando configuración...</div>;
 
     return (
-        <div className="space-y-6 max-w-3xl mx-auto">
+        <div className="space-y-10 max-w-5xl mx-auto pb-20">
             <div className="flex items-center gap-4">
                 <Link href={`/admin/restaurant/${restaurantId}`} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors">
                     <ArrowLeft className="w-5 h-5" />
@@ -357,8 +357,8 @@ function RestaurantConfigContent() {
                         </p>
                     </div>
 
-                    <div className="space-y-4">
-                        <div className="flex gap-2">
+                    <div className="space-y-8">
+                        <div className="flex flex-wrap gap-2">
                                 {['created', 'confirmed', 'cancelled', 'modified', 'reminder', 'waitlist_join', 'waitlist_available'].map((t) => (
                                     <Button 
                                         key={t}

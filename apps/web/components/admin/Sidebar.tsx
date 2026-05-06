@@ -78,7 +78,7 @@ export function Sidebar({ userRole }: { userRole?: string }) {
     const effectiveRole = userRole || 'ADMIN'; 
 
     return (
-        <aside className="hidden w-64 flex-col border-r bg-sidebar h-screen fixed left-0 top-0 z-30 shadow-sm md:flex">
+        <aside className="hidden w-72 flex-col border-r bg-sidebar h-screen fixed left-0 top-0 z-30 shadow-sm md:flex">
             <div className="p-4 flex justify-center border-b border-gray-100 h-16 items-center">
                 <img src="/logo-text.png" alt="SOTO DEL PRIOR" className="h-10 w-auto" />
             </div>
@@ -87,18 +87,10 @@ export function Sidebar({ userRole }: { userRole?: string }) {
                 <SidebarNav userRole={effectiveRole} />
             </Suspense>
 
-            <div className="p-4 border-t border-gray-100 space-y-2 mt-auto">
-                {/* Debug info */}
-                <div className="px-4 py-2 bg-red-50 rounded text-[10px] text-red-600 font-mono mb-2">
-                    DEBUG: role="{userRole || 'undefined'}"
+            <div className="p-4 border-t border-gray-100 mt-auto">
+                <div className="px-4 py-2 text-[10px] text-muted-foreground opacity-50">
+                    &copy; 2026 SOTO del PRIOR
                 </div>
-                <Link
-                    href="/"
-                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted"
-                >
-                    <ArrowLeft className="w-5 h-5" />
-                    <span>Volver al Portal</span>
-                </Link>
             </div>
         </aside>
     );

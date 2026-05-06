@@ -1,4 +1,9 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+let API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
+// Enforce HTTPS if we are in a secure context and the API URL is HTTP but targetting the same domain
+if (typeof window !== 'undefined' && window.location.protocol === 'https:' && API_URL.startsWith('http:')) {
+    API_URL = API_URL.replace('http:', 'https:');
+}
 
 export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
     const method = options.method || 'GET';
@@ -43,10 +48,19 @@ function getMockData(endpoint: string) {
     ];
     if (endpoint.includes('bookings')) return [];
     if (endpoint.includes('channels')) return [];
-    if (endpoint.includes('event')) return [
-        { id: 'ev1', name: 'Cata de Vinos Ribera', date: new Date().toISOString(), capacity: 20, price: 35, _count: { bookings: 2 }, isActive: true },
-        { id: 'ev2', name: 'Cena de Gala Verano', date: new Date(Date.now() + 86400000 * 7).toISOString(), capacity: 100, price: 85, _count: { bookings: 45 }, isActive: true }
-    ];
+    if (endpoint.includes('event')) {
+        const events = [
+            { id: 'ev1', name: 'Cata de Vinos Ribera', date: new Date().toISOString(), capacity: 20, price: 35, _count: { bookings: 2 }, isActive: true, bookings: [] },
+            { id: 'ev2', name: 'Cena de Gala Verano', date: new Date(Date.now() + 86400000 * 7).toISOString(), capacity: 100, price: 85, _count: { bookings: 45 }, isActive: true, bookings: [] }
+        ];
+        // If it's a detail request (e.g. /event/ev1), return just the object
+        const parts = endpoint.split('/');
+        const lastPart = parts[parts.length - 1];
+        if (lastPart !== 'event' && lastPart !== '') {
+            return events.find(e => e.id === lastPart) || events[0];
+        }
+        return events;
+    }
 
     // Restaurant Utilities Recovery
     if (endpoint.includes('restaurant')) {

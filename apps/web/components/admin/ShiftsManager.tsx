@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Trash2, Clock, Coffee, Utensils, Moon } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CalendarOff } from 'lucide-react';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 interface Closure {
     id: string;
@@ -323,7 +325,15 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
                                     <CalendarOff className="w-4 h-4" />
                                 </div>
                                 <div>
-                                    <div className="font-medium">{new Date(closure.date).toLocaleDateString()}</div>
+                                    <div className="font-medium capitalize">
+                                        {(() => {
+                                            try {
+                                                return format(new Date(closure.date), "eeee d 'de' MMMM", { locale: es });
+                                            } catch (e) {
+                                                return 'Fecha no válida';
+                                            }
+                                        })()}
+                                    </div>
                                     {closure.reason && <div className="text-xs text-muted-foreground">{closure.reason}</div>}
                                 </div>
                             </div>

@@ -33,7 +33,8 @@ export default function EventDetailPage() {
     if (loading) return <div className="p-8">Cargando evento...</div>;
     if (!event) return <div className="p-8">Evento no encontrado</div>;
 
-    const totalPax = event.bookings.reduce((sum: number, b: any) => sum + b.pax, 0);
+    const bookings = event.bookings || [];
+    const totalPax = bookings.reduce((sum: number, b: any) => sum + b.pax, 0);
 
     return (
         <div className="space-y-6 pb-12">
@@ -74,14 +75,14 @@ export default function EventDetailPage() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 dark:divide-zinc-700">
-                                    {event.bookings.length === 0 ? (
+                                    {bookings.length === 0 ? (
                                         <tr>
                                             <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">
                                                 No hay reservas para este evento todavía.
                                             </td>
                                         </tr>
                                     ) : (
-                                        event.bookings.map((booking: any) => (
+                                        bookings.map((booking: any) => (
                                             <tr key={booking.id} className="hover:bg-gray-50 dark:hover:bg-zinc-900/50 transition-colors">
                                                 <td className="px-6 py-4">
                                                     <div className="font-bold">{booking.guestName}</div>
