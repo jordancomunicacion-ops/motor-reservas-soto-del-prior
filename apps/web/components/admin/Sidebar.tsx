@@ -41,7 +41,7 @@ function SidebarNav({ userRole }: SidebarNavProps) {
     const visibleItems = navItems.filter(item => hasPermission(userRole, item.permission));
 
     return (
-        <nav className="flex-1 overflow-y-auto p-4 space-y-1 mt-2">
+        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
             <div className="px-4 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider opacity-50 flex justify-between items-center">
                 <span>Menu Principal</span>
                 {userRole && (
@@ -58,7 +58,7 @@ function SidebarNav({ userRole }: SidebarNavProps) {
                         key={item.href}
                         href={href}
                         className={classNames(
-                            "flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-colors",
+                            "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200 group",
                             isActive
                                 ? "bg-sidebar-accent text-sidebar-primary shadow-sm"
                                 : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -78,7 +78,7 @@ export function Sidebar({ userRole }: { userRole?: string }) {
     const effectiveRole = userRole || 'ADMIN'; 
 
     return (
-        <aside className="hidden w-72 flex-col border-r bg-sidebar h-screen fixed left-0 top-0 z-30 shadow-sm md:flex">
+        <aside className="hidden w-64 flex-col border-r bg-sidebar h-screen fixed left-0 top-0 z-30 shadow-sm md:flex">
             <div className="p-4 flex justify-center border-b border-gray-100 h-16 items-center">
                 <img src="/logo-text.png" alt="SOTO DEL PRIOR" className="h-10 w-auto" />
             </div>
