@@ -131,7 +131,7 @@ export class WaitlistService {
             where: { id: waitlistId }
         });
 
-        if (!entry || entry.status !== 'NOTIFIED') {
+        if (!entry || (entry.status !== 'NOTIFIED' && entry.status !== 'WAITING')) {
             throw new Error('Entrada de lista de espera no válida o ya procesada.');
         }
 

@@ -100,6 +100,29 @@ function RestaurantDashboardContent() {
         }
     };
 
+    const handleAddWaitlist = async (data: any) => {
+        try {
+            await fetchAPI(`/restaurant/${restaurantId}/waitlist`, {
+                method: 'POST',
+                body: JSON.stringify({ ...data, date: format(date, 'yyyy-MM-dd') })
+            });
+            loadData();
+        } catch (e) {
+            alert("Error en lista de espera");
+        }
+    };
+
+    const handleSeatWaitlist = async (waitlistId: string) => {
+        try {
+            // First mark as notified if it isn't, so the confirm logic works
+            // In a real scenario, we might want a direct 'Seat' endpoint that bypasses 'NOTIFIED' check
+            await fetchAPI(`/restaurant/waitlist/${waitlistId}/confirm`, { method: 'POST' });
+            loadData();
+        } catch (e) {
+            alert("Error al sentar cliente");
+        }
+    };
+
     const handleAssignTable = async (bookingId: string, tableId: string) => {
         try {
             await fetchAPI(`/restaurant/reservation/${bookingId}/status`, { 
@@ -151,8 +174,8 @@ function RestaurantDashboardContent() {
                     <div className="flex-1 h-1/2">
                         <WaitlistPanel
                             entries={waitlist}
-                            onAdd={(d) => console.log("Add waitlist", d)}
-                            onSeat={(id) => console.log("Seat", id)}
+                            onAdd={handleAddWaitlist}
+                            onSeat={handleSeatWaitlist}
                         />
                     </div>
                     <Card className="h-1/2 overflow-hidden flex flex-col border-gray-100 dark:border-zinc-700 shadow-sm">

@@ -146,7 +146,11 @@ export class RestaurantService {
 
         await this.mailService.sendRestaurantNotification(updated, 'cancelled');
 
-        // Sync with CRM removed
+        // Trigger waitlist check
+        this.waitlistService.checkWaitlistForAvailability(
+            updated.restaurantId,
+            updated.date
+        );
         
         return updated;
     }
