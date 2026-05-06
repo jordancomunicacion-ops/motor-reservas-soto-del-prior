@@ -75,7 +75,7 @@ export class MailService {
 
     // --- RESTAURANT NOTIFICATIONS ---
 
-    async sendRestaurantNotification(booking: any, type: string) {
+    async sendRestaurantNotification(booking: any, type: string, extraData: any = {}) {
         const restaurant = await this.prisma.restaurant.findUnique({
             where: { id: booking.restaurantId }
         });
@@ -95,7 +95,8 @@ export class MailService {
             time: new Date(booking.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             pax: booking.pax,
             restaurant_name: restaurant.name,
-            modify_link: `https://motor.sotodelprior.com/restaurant/modify?id=${booking.id}`
+            modify_link: `https://motor.sotodelprior.com/restaurant/modify?id=${booking.id}`,
+            ...extraData
         };
 
         if (customHtml && customHtml.trim() !== '') {

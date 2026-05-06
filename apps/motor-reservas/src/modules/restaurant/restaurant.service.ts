@@ -67,6 +67,17 @@ export class RestaurantService {
         email: string;
         phone: string;
         notes?: string;
+        // CRM Additional Fields
+        surname2?: string;
+        age?: number;
+        gender?: string;
+        whatsapp?: string;
+        instagram?: string;
+        facebook?: string;
+        tiktok?: string;
+        linkedin?: string;
+        xTwitter?: string;
+        paymentMethodId?: string;
     }) {
         // 1. Combine Date + Time
         const [hours, minutes] = data.time.split(':').map(Number);
@@ -80,11 +91,21 @@ export class RestaurantService {
                 date: start,
                 pax: data.pax,
                 guestName: data.name,
+                guestSurname2: data.surname2,
                 guestEmail: data.email,
                 guestPhone: data.phone,
+                guestAge: data.age ? Number(data.age) : null,
+                guestGender: data.gender,
+                guestWhatsapp: data.whatsapp,
+                instagram: data.instagram,
+                facebook: data.facebook,
+                tiktok: data.tiktok,
+                linkedin: data.linkedin,
+                xTwitter: data.xTwitter,
                 notes: data.notes,
                 status: 'PENDING_CONFIRMATION',
-                origin: 'WIDGET'
+                origin: 'WIDGET',
+                stripePaymentMethodId: data.paymentMethodId
             }
         });
 
@@ -141,7 +162,7 @@ export class RestaurantService {
     async getRestaurant(id: string) {
         return this.prisma.restaurant.findUnique({ 
             where: { id },
-            include: { hotel: true }
+            include: { hotel: true, widgetConfig: true }
         });
     }
 

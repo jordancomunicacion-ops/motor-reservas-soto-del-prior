@@ -12,7 +12,7 @@ tar --exclude="node_modules" --exclude=".next" --exclude=".git" --exclude=".idea
 echo.
 echo [2/4] Limpiando despliegue anterior en el servidor...
 echo * Te va a pedir la contrasena del servidor *
-ssh root@164.92.167.42 "mkdir -p ~/SOTOdelPRIOR/apps/reservas && cd ~/SOTOdelPRIOR/apps/reservas && docker compose down --remove-orphans 2>/dev/null || true && rm -rf * && docker image prune -f && docker builder prune -f"
+ssh root@164.92.167.42 "mkdir -p ~/SOTOdelPRIOR/apps/reservas && cd ~/SOTOdelPRIOR/apps/reservas && docker compose down --remove-orphans 2>/dev/null || true && rm -rf * && docker system prune -a -f"
 
 echo.
 echo [3/4] Subiendo al servidor (~/SOTOdelPRIOR/apps/reservas)...

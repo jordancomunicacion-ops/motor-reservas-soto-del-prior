@@ -5,16 +5,31 @@ import { PaymentService } from './payment.service';
 export class PaymentController {
     constructor(private paymentService: PaymentService) { }
 
+    @Post('setup-intent/:bookingId')
+    async createSetupIntent(
+        @Param('bookingId') bookingId: string,
+        @Body('entityId') entityId: string,
+        @Body('entityType') entityType: 'hotel' | 'restaurant'
+    ) {
+        return this.paymentService.createSetupIntent(bookingId, entityId, entityType);
+    }
+
     @Post('attach/:bookingId')
     async attachCard(
         @Param('bookingId') bookingId: string,
-        @Body('paymentMethodId') paymentMethodId: string
+        @Body('paymentMethodId') paymentMethodId: string,
+        @Body('entityId') entityId: string,
+        @Body('entityType') entityType: 'hotel' | 'restaurant'
     ) {
-        return this.paymentService.savePaymentMethod(bookingId, paymentMethodId);
+        return this.paymentService.savePaymentMethod(bookingId, paymentMethodId, entityId, entityType);
     }
 
     @Post('charge-no-show/:bookingId')
-    async chargeNoShow(@Param('bookingId') bookingId: string) {
-        return this.paymentService.chargeNoShowFee(bookingId);
+    async chargeNoShow(
+        @Param('bookingId') bookingId: string,
+        @Body('entityId') entityId: string,
+        @Body('entityType') entityType: 'hotel' | 'restaurant'
+    ) {
+        return this.paymentService.chargeNoShowFee(bookingId, entityId, entityType);
     }
 }

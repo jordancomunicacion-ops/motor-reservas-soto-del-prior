@@ -69,14 +69,14 @@ export class WaitlistService {
             const isUrgent = hoursUntilService < 48;
 
             // 1. Notify GUEST
-            await this.mailService.sendRestaurantEmail(
-                entry.restaurantId,
+            await this.mailService.sendRestaurantNotification(
                 {
-                    id: 'waitlist-' + entry.id,
+                    restaurantId: entry.restaurantId,
                     guestName: entry.name,
                     guestEmail: entry.email,
                     pax: entry.pax,
-                    date: entry.date
+                    date: entry.date,
+                    id: 'waitlist-' + entry.id
                 },
                 'waitlist_available',
                 {

@@ -4,15 +4,15 @@ FROM node:20-bookworm-slim AS base
 FROM base AS deps
 WORKDIR /app
 
-# Install ca-certificates
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+# Install ca-certificates and openssl for Prisma
+RUN apt-get update && apt-get install -y ca-certificates openssl && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
 COPY package.json ./
 RUN npm install
 
 # Rebuild the source code only when needed
-FROM base AS builder
+FROM deps AS builder
 WORKDIR /app
 
 # Increase Node memory for build
@@ -26,7 +26,7 @@ ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 # Generate Prisma Client
-# RUN npx prisma generate
+RUN npx prisma generate
 
 # Build with verbose output
 RUN set -ex; npm run build

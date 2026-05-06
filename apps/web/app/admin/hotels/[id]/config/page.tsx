@@ -194,6 +194,7 @@ function HotelConfigContent() {
             </div>
 
             {tab === 'general' && (
+                <>
                 <Card>
                     <CardHeader>
                         <div className="flex items-center gap-3">
@@ -414,7 +415,9 @@ function HotelConfigContent() {
                                 Etiquetas disponibles: <strong>{"{{name}}"}</strong>, <strong>{"{{hotel_name}}"}</strong>, <strong>{"{{room_type}}"}</strong>, <strong>{"{{check_in}}"}</strong>, <strong>{"{{check_out}}"}</strong>, <strong>{"{{reference}}"}</strong>, <strong>{"{{total_price}}"}</strong>, <strong>{"{{nights}}"}</strong>, <strong>{"{{modify_link}}"}</strong>.
                             </p>
                         </div>
+                    </CardHeader>
 
+                    <CardContent>
                         <div className="space-y-4">
                             <div className="flex gap-2">
                                 {['created', 'confirmed', 'cancelled', 'modified', 'reminder'].map((t) => (

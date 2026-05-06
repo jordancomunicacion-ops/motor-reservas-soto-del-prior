@@ -1,6 +1,6 @@
 FROM node:20-alpine
 
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl libc6-compat
 
 WORKDIR /app
 
@@ -20,4 +20,4 @@ RUN npm run build
 EXPOSE 3000
 
 # Start
-CMD ["node", "dist/main"]
+CMD ["node", "dist/src/main"]

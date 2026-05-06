@@ -1,71 +1,175 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { Stripe } from 'stripe';
 
 @Injectable()
 export class PaymentService {
+    private readonly logger = new Logger(PaymentService.name);
+    private stripeClients: Map<string, Stripe> = new Map();
+
     constructor(private prisma: PrismaService) { }
 
-    // Mock Stripe Client
-    private stripe = {
-        customers: {
-            create: async (data: any) => ({ id: 'cus_mock_' + Date.now() }),
-            update: async (id: string, data: any) => ({ id }),
-        },
-        paymentMethods: {
-            attach: async (id: string, data: any) => ({ id }),
-        },
-        paymentIntents: {
-            create: async (data: any) => ({ id: 'pi_mock_' + Date.now(), client_secret: 'secret_mock' }),
+    /**
+     * Gets or creates a Stripe client for a specific restaurant/hotel
+     */
+    private async getStripeClient(entityId: string, entityType: 'hotel' | 'restaurant'): Promise<Stripe> {
+        // Check cache
+        if (this.stripeClients.has(entityId)) {
+            return this.stripeClients.get(entityId)!;
         }
-    };
 
-    async createCustomer(email: string, name: string) {
-        return this.stripe.customers.create({ email, name });
+        // Fetch entity to get keys
+        let integrations: any = null;
+        if (entityType === 'hotel') {
+            const hotel = await this.prisma.hotel.findUnique({ where: { id: entityId } });
+            integrations = hotel?.integrations;
+        } else {
+            const res = await this.prisma.restaurant.findUnique({ where: { id: entityId } });
+            integrations = res?.integrations;
+        }
+
+        const stripeConfig = integrations?.stripe;
+        if (!stripeConfig?.enabled || !stripeConfig?.secretKey) {
+            throw new BadRequestException(`Stripe no está configurado para este ${entityType}.`);
+        }
+
+        const stripe = new Stripe(stripeConfig.secretKey, {
+            apiVersion: '2025-01-27-preview' as any, // Use latest stable
+        });
+
+        this.stripeClients.set(entityId, stripe);
+        return stripe;
     }
 
-    async savePaymentMethod(bookingId: string, paymentMethodId: string) {
-        // 1. Get booking
-        const booking = await this.prisma.resBooking.findUnique({ where: { id: bookingId } });
-        if (!booking) throw new Error('Booking not found');
+    async createSetupIntent(bookingId: string, entityId: string, entityType: 'hotel' | 'restaurant') {
+        const stripe = await this.getStripeClient(entityId, entityType);
+        
+        // Find booking to get guest info
+        const booking = entityType === 'restaurant' 
+            ? await this.prisma.resBooking.findUnique({ where: { id: bookingId } })
+            : null; // TODO: Add hotel booking support
 
-        // 2. Create customer if needed (mock logic)
-        // In real world, we would check if this user already has a stripeId
-        const customer = await this.createCustomer(booking.guestEmail || 'unknown@example.com', booking.guestName);
+        if (!booking) throw new BadRequestException('Booking not found');
 
-        // 3. Attach method to customer
-        await this.stripe.paymentMethods.attach(paymentMethodId, { customer: customer.id });
+        // Create or get customer
+        let customerId = (booking as any).stripeCustomerId;
+        if (!customerId) {
+            const customer = await stripe.customers.create({
+                email: (booking as any).guestEmail,
+                name: (booking as any).guestName,
+                metadata: { bookingId, entityId }
+            });
+            customerId = customer.id;
 
-        // 4. Update booking with Stripe info
-        return this.prisma.resBooking.update({
-            where: { id: bookingId },
-            data: {
-                stripeCustomerId: customer.id,
-                stripePaymentMethodId: paymentMethodId
+            // Update booking
+            if (entityType === 'restaurant') {
+                await this.prisma.resBooking.update({
+                    where: { id: bookingId },
+                    data: { stripeCustomerId: customerId }
+                });
             }
+        }
+
+        const setupIntent = await stripe.setupIntents.create({
+            customer: customerId,
+            payment_method_types: ['card'],
+            metadata: { bookingId }
         });
+
+        return {
+            clientSecret: setupIntent.client_secret,
+            customerId
+        };
     }
 
-    async chargeNoShowFee(bookingId: string) {
-        const booking = await this.prisma.resBooking.findUnique({ where: { id: bookingId } });
-        if (!booking) throw new Error('Booking not found');
-        if (!booking.stripePaymentMethodId || !booking.stripeCustomerId) throw new Error('No payment method attached');
+    async savePaymentMethod(bookingId: string, paymentMethodId: string, entityId?: string, entityType?: 'hotel' | 'restaurant') {
+        let eId = entityId;
+        let eType = entityType;
 
-        // Fetch policy
-        // Assuming global policy for now or linked via restaurant
-        // const policy = await this.prisma.resPolicy.findFirst({ where: { isActive: true } });
+        if (!eId || !eType) {
+            const booking = await this.prisma.resBooking.findUnique({ where: { id: bookingId } });
+            if (!booking) throw new BadRequestException('Reserva no encontrada para autodetectar entidad.');
+            eId = booking.restaurantId;
+            eType = 'restaurant';
+        }
 
-        // Mock Charge
-        const amount = 2000; // 20.00 EUR
+        const stripe = await this.getStripeClient(eId, eType);
+        
+        const booking = eType === 'restaurant' 
+            ? await this.prisma.resBooking.findUnique({ where: { id: bookingId } })
+            : null;
 
-        const paymentIntent = await this.stripe.paymentIntents.create({
-            amount,
-            currency: 'eur',
-            customer: booking.stripeCustomerId,
-            payment_method: booking.stripePaymentMethodId,
-            off_session: true,
-            confirm: true
+        if (!booking || !(booking as any).stripeCustomerId) throw new BadRequestException('Booking or Customer not found');
+
+        // Attach payment method to customer
+        await stripe.paymentMethods.attach(paymentMethodId, {
+            customer: (booking as any).stripeCustomerId,
         });
 
-        return { success: true, paymentIntent };
+        // Set as default for customer
+        await stripe.customers.update((booking as any).stripeCustomerId, {
+            invoice_settings: { default_payment_method: paymentMethodId },
+        });
+
+        // Save in DB
+        if (eType === 'restaurant') {
+            return this.prisma.resBooking.update({
+                where: { id: bookingId },
+                data: { stripePaymentMethodId: paymentMethodId }
+            });
+        }
+    }
+
+    async chargeNoShowFee(bookingId: string, entityId?: string, entityType?: 'hotel' | 'restaurant') {
+        let eId = entityId;
+        let eType = entityType;
+
+        if (!eId || !eType) {
+            const booking = await this.prisma.resBooking.findUnique({ where: { id: bookingId } });
+            if (!booking) throw new BadRequestException('Reserva no encontrada.');
+            eId = booking.restaurantId;
+            eType = 'restaurant';
+        }
+
+        const stripe = await this.getStripeClient(eId, eType);
+
+        const booking = entityType === 'restaurant' 
+            ? await this.prisma.resBooking.findUnique({ where: { id: bookingId } })
+            : null;
+
+        if (!booking || !(booking as any).stripeCustomerId || !(booking as any).stripePaymentMethodId) {
+            throw new BadRequestException('No hay tarjeta guardada para esta reserva.');
+        }
+
+        // Get fee from config
+        let amount = 0;
+        let currency = 'eur';
+        
+        if (entityType === 'restaurant') {
+            const restaurant = await this.prisma.restaurant.findUnique({ 
+                where: { id: entityId },
+                include: { widgetConfig: true } 
+            });
+            // We store fee in EUR units (e.g. 20.00), Stripe wants cents
+            amount = (restaurant?.widgetConfig as any)?.noShowFee * 100 || 2000;
+        }
+
+        try {
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount,
+                currency,
+                customer: (booking as any).stripeCustomerId,
+                payment_method: (booking as any).stripePaymentMethodId,
+                off_session: true,
+                confirm: true,
+                description: `Penalización No-Show Reserva ${bookingId}`,
+                metadata: { bookingId }
+            });
+
+            return { success: true, paymentIntentId: paymentIntent.id };
+        } catch (e) {
+            this.logger.error(`Error charging no-show fee: ${e.message}`);
+            return { success: false, error: e.message };
+        }
     }
 }

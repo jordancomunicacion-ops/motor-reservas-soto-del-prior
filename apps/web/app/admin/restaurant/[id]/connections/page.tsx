@@ -19,7 +19,7 @@ function RestaurantConnectionsContent() {
     const [saving, setSaving] = useState(false);
     
     const [integrations, setIntegrations] = useState({
-        crm: { enabled: false, url: 'http://localhost:3004/api/integrations/restaurant', token: '', syncBookings: true },
+        crm: { enabled: false, url: 'https://crm.sotodelprior.com/api/integrations/restaurant', token: '', syncBookings: true },
         stripe: { enabled: false, publicKey: '', secretKey: '' }
     });
 
@@ -136,44 +136,64 @@ function RestaurantConnectionsContent() {
                                 Este es el identificador único del restaurante que debes usar en tu CRM para referenciar este establecimiento.
                             </p>
                         </div>
-                        <div className="space-y-2">
-                            <Label>URL del Endpoint CRM</Label>
-                            <Input 
-                                placeholder="https://tu-crm.com/api/webhooks" 
-                                value={integrations.crm.url}
-                                onChange={e => setIntegrations(prev => ({ ...prev, crm: { ...prev.crm, url: e.target.value } }))}
-                                disabled={!integrations.crm.enabled}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Token de Autorización (Opcional)</Label>
-                            <Input 
-                                type="password"
-                                placeholder="Bearer token o API Key" 
-                                value={(integrations.crm as any).token || ''}
-                                onChange={e => setIntegrations(prev => ({ ...prev, crm: { ...prev.crm, token: e.target.value } }))}
-                                disabled={!integrations.crm.enabled}
-                            />
-                            <p className="text-[10px] text-muted-foreground italic">Se enviará en la cabecera Authorization.</p>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">Sincronizar reservas automáticamente</span>
-                            <Switch 
-                                checked={integrations.crm.syncBookings}
-                                onCheckedChange={(val) => setIntegrations(prev => ({ ...prev, crm: { ...prev.crm, syncBookings: val } }))}
-                                disabled={!integrations.crm.enabled}
-                            />
-                        </div>
+                        <div className="space-y-4 pt-2">
+                            <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-100 dark:border-purple-900/30">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <div className={`w-2 h-2 rounded-full ${integrations.crm.enabled ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
+                                    <span className="text-xs font-bold uppercase tracking-wider">
+                                        {integrations.crm.enabled ? 'Sincronización Activa' : 'Sincronización Desactivada'}
+                                    </span>
+                                </div>
+                                <p className="text-[11px] text-muted-foreground">
+                                    {integrations.crm.enabled 
+                                        ? 'Tus reservas y perfiles de clientes se están enviando automáticamente al CRM central de SOTOdelPRIOR.' 
+                                        : 'Activa esta opción para unificar la base de datos de clientes y ver métricas avanzadas en el CRM.'}
+                                </p>
+                            </div>
 
-                        <div className="pt-2">
-                            <Button 
-                                variant="outline" 
-                                className="w-full gap-2 border-dashed" 
-                                onClick={handleTestConnection}
-                                disabled={!integrations.crm.enabled}
-                            >
-                                Probar Conexión
-                            </Button>
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground font-medium">Sincronización Automática</span>
+                                <Switch 
+                                    checked={integrations.crm.syncBookings}
+                                    onCheckedChange={(val) => setIntegrations(prev => ({ ...prev, crm: { ...prev.crm, syncBookings: val } }))}
+                                    disabled={!integrations.crm.enabled}
+                                />
+                            </div>
+
+                            <details className="group">
+                                <summary className="text-[10px] text-muted-foreground cursor-pointer hover:text-purple-600 transition-colors uppercase font-bold list-none flex items-center gap-1">
+                                    <span className="group-open:rotate-90 transition-transform">▶</span> Ajustes Avanzados de Endpoint
+                                </summary>
+                                <div className="space-y-3 mt-3 p-3 bg-slate-50 dark:bg-slate-900 rounded border border-dashed">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-[11px]">URL del CRM (Webhook)</Label>
+                                        <Input 
+                                            placeholder="https://crm.sotodelprior.com/api/integrations/restaurant" 
+                                            value={integrations.crm.url}
+                                            onChange={e => setIntegrations(prev => ({ ...prev, crm: { ...prev.crm, url: e.target.value } }))}
+                                            className="h-8 text-xs font-mono"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label className="text-[11px]">Token de Validación</Label>
+                                        <Input 
+                                            type="password"
+                                            placeholder="Token de seguridad" 
+                                            value={(integrations.crm as any).token || ''}
+                                            onChange={e => setIntegrations(prev => ({ ...prev, crm: { ...prev.crm, token: e.target.value } }))}
+                                            className="h-8 text-xs"
+                                        />
+                                    </div>
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm"
+                                        className="w-full h-8 text-[11px] gap-2 border-dashed" 
+                                        onClick={handleTestConnection}
+                                    >
+                                        Probar Conexión Manual
+                                    </Button>
+                                </div>
+                            </details>
                         </div>
                     </CardContent>
                 </Card>

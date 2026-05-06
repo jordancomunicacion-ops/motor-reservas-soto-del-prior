@@ -428,9 +428,20 @@ model ResBooking {
    
    // Guest Info
    guestName    String
+   guestSurname2 String?  // Segundo apellido
    guestPhone   String?
    guestEmail   String?
+   guestAge     Int?
+   guestGender  String?   // M, F, OTHER
+   guestWhatsapp String?
    pax          Int
+   
+   // Social Media (CRM)
+   instagram    String?
+   facebook     String?
+   tiktok       String?
+   linkedin     String?
+   xTwitter     String?
    
    date         DateTime // Date + Time
    duration     Int      @default(90) // Minutes

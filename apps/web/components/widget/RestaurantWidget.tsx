@@ -7,6 +7,8 @@ import { ChevronLeft, ChevronRight, Play, Check, Calendar, Users, MapPin } from 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { fetchAPI } from '@/lib/api';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
 // Types
 type Step = {
@@ -17,11 +19,95 @@ type Step = {
 const STEPS: Step[] = [
     { id: 1, label: 'Encontrar' },
     { id: 2, label: 'Información' },
-    { id: 3, label: 'Adicional' },
+    { id: 3, label: 'Garantía' },
     { id: 4, label: 'Confirmación' }
 ];
 
+function CardForm({ onSuccess, submitting, colors, amount }: { onSuccess: (pmId: string) => void, submitting: boolean, colors: any, amount: number }) {
+    const stripe = useStripe();
+    const elements = useElements();
+    const [error, setError] = useState<string | null>(null);
+
+    const handleSubmit = async (e: any) => {
+        if (e) e.preventDefault();
+        if (!stripe || !elements) return;
+
+        const cardElement = elements.getElement(CardElement);
+        if (!cardElement) return;
+
+        const { error, paymentMethod } = await stripe.createPaymentMethod({
+            type: 'card',
+            card: cardElement,
+        });
+
+        if (error) {
+            setError(error.message || 'Error al procesar la tarjeta');
+        } else {
+            onSuccess(paymentMethod.id);
+        }
+    };
+
+    return (
+        <div className="space-y-4">
+            <div className="p-4 bg-gray-50 border rounded-none">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-[#C59D5F] mb-4">Datos de la Tarjeta</p>
+                <CardElement options={{
+                    style: {
+                        base: {
+                            fontSize: '16px',
+                            color: '#424770',
+                            '::placeholder': { color: '#aab7c4' },
+                        },
+                        invalid: { color: '#9e2146' },
+                    },
+                }} />
+            </div>
+            {error && <p className="text-xs text-red-500 italic">{error}</p>}
+            <p className="text-[11px] text-gray-500 leading-relaxed italic">
+                * No se realizará ningún cargo ahora. Solo se solicita como garantía. Se aplicará una penalización de {amount}€ por persona en caso de no presentarse sin cancelar con 48h de antelación.
+            </p>
+            <Button
+                id="stripe-submit-btn"
+                className="hidden"
+                onClick={handleSubmit}
+                disabled={submitting}
+            >
+                Confirmar
+            </Button>
+        </div>
+    );
+}
+
 export function RestaurantWidget() {
+    const [stripePromise, setStripePromise] = useState<any>(null);
+    const [stripeConfig, setStripeConfig] = useState<any>(null);
+    const searchParams = useSearchParams();
+    const restaurantId = searchParams.get('id') || '';
+
+    useEffect(() => {
+        if (!restaurantId) return;
+        fetchAPI(`/restaurant/${restaurantId}`)
+            .then(data => { 
+                if (data?.integrations?.stripe?.enabled && data?.integrations?.stripe?.publicKey) {
+                    setStripeConfig(data.integrations.stripe);
+                    setStripePromise(loadStripe(data.integrations.stripe.publicKey));
+                }
+            })
+            .catch(() => {});
+    }, [restaurantId]);
+
+    if (stripePromise) {
+        return (
+            <Elements stripe={stripePromise}>
+                <RestaurantWidgetContent stripeEnabled={true} />
+            </Elements>
+        );
+    }
+
+    return <RestaurantWidgetContent stripeEnabled={false} />;
+}
+
+function RestaurantWidgetContent({ stripeEnabled }: { stripeEnabled: boolean }) {
     const searchParams = useSearchParams();
     const restaurantId = searchParams.get('id') || '';
 
@@ -44,20 +130,35 @@ export function RestaurantWidget() {
     const [restaurantName, setRestaurantName] = useState('');
     const [createdBooking, setCreatedBooking] = useState<any>(null);
 
+    // CRM Additional Fields (Step 3)
+    const [additionalData, setAdditionalData] = useState({
+        surname2: '',
+        age: '',
+        gender: '',
+        whatsapp: '',
+        instagram: '',
+        facebook: '',
+        tiktok: '',
+        linkedin: '',
+        xTwitter: ''
+    });
+
     // Inject Fonts
     useEffect(() => {
         const link = document.createElement('link');
         link.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&family=Oswald:wght@300;400;500;700&display=swap";
         link.rel = "stylesheet";
         document.head.appendChild(link);
-        return () => { document.head.removeChild(link); }
+        return () => { if (document.head.contains(link)) document.head.removeChild(link); }
     }, []);
 
     // Load restaurant info and closures
     useEffect(() => {
         if (!restaurantId) return;
         fetchAPI(`/restaurant/${restaurantId}`)
-            .then(data => { if (data?.name) setRestaurantName(data.name); })
+            .then(data => { 
+                if (data?.name) setRestaurantName(data.name); 
+            })
             .catch(() => {});
         fetchAPI(`/restaurant/${restaurantId}/closures`)
             .then(data => {
@@ -84,9 +185,7 @@ export function RestaurantWidget() {
 
         try {
             const dateStr = format(date, 'yyyy-MM-dd');
-            // Fetch lunch slots
             const lunchSlots = await fetchAPI(`/restaurant/${restaurantId}/slots?date=${dateStr}&pax=${pax}&type=LUNCH`);
-            // Fetch dinner slots
             const dinnerSlots = await fetchAPI(`/restaurant/${restaurantId}/slots?date=${dateStr}&pax=${pax}&type=DINNER`);
 
             setTimeSlots({
@@ -106,7 +205,7 @@ export function RestaurantWidget() {
         setCurrentStep(2);
     };
 
-    const handleSubmitReservation = async () => {
+    const handleSubmitReservation = async (paymentMethodId?: string) => {
         if (!selectedDate || !selectedTime || !formData.name || !formData.email) {
             alert('Por favor, complete todos los campos obligatorios.');
             return;
@@ -126,10 +225,20 @@ export function RestaurantWidget() {
                     date: dateStr,
                     time: selectedTime,
                     pax,
-                    name: `${formData.name} ${formData.surname}`.trim(),
+                    name: `${formData.name} ${formData.surname} ${additionalData.surname2}`.trim(),
                     email: formData.email,
                     phone: formData.prefix + formData.phone,
-                    notes: [comment, bonusCode ? `Bono: ${bonusCode}` : '', hasAllergy ? 'Tiene alergias/intolerancias' : ''].filter(Boolean).join(' | ') || undefined
+                    notes: [comment, bonusCode ? `Bono: ${bonusCode}` : '', hasAllergy ? 'Tiene alergias/intolerancias' : ''].filter(Boolean).join(' | ') || undefined,
+                    surname2: additionalData.surname2 || undefined,
+                    age: (additionalData.age && !isNaN(parseInt(additionalData.age))) ? parseInt(additionalData.age) : undefined,
+                    gender: additionalData.gender || undefined,
+                    whatsapp: additionalData.whatsapp || undefined,
+                    instagram: additionalData.instagram || undefined,
+                    facebook: additionalData.facebook || undefined,
+                    tiktok: additionalData.tiktok || undefined,
+                    linkedin: additionalData.linkedin || undefined,
+                    xTwitter: additionalData.xTwitter || undefined,
+                    paymentMethodId
                 })
             });
             setCreatedBooking(result);
@@ -142,22 +251,25 @@ export function RestaurantWidget() {
         }
     };
 
+    const handleMainSubmit = () => {
+        if (stripeEnabled) {
+            document.getElementById('stripe-submit-btn')?.click();
+        } else {
+            handleSubmitReservation();
+        }
+    };
+
     // Calendar Generation
     const monthStart = startOfMonth(currentMonth);
     const monthEnd = endOfMonth(monthStart);
     const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
-
-    // Add padding days for start of month
-    const startDay = monthStart.getDay(); // 0 (Sun) - 6 (Sat)
-    // Adjust for Monday start (Spain) -> Mon=0, Sun=6
+    const startDay = monthStart.getDay();
     const adjustedStartDay = startDay === 0 ? 6 : startDay - 1;
     const paddingDays = Array(adjustedStartDay).fill(null);
-
     const weekDays = ['L', 'M', 'Mi', 'J', 'V', 'S', 'D'];
 
-    // Design Tokens from WEB SOTOdelPRIOR
     const colors = {
-        accent: '#C59D5F', // Gold
+        accent: '#C59D5F',
         bg: '#F4F4F4',
         text: '#0A0A0A',
         white: '#FFFFFF'
@@ -168,7 +280,7 @@ export function RestaurantWidget() {
 
             {/* Header / Back Button */}
             {currentStep > 1 && (
-                <div className="flex justify-between items-center mb-4 px-1">
+                <div className="flex justify-between items-center mb-4 px-1 pt-4">
                     <button
                         onClick={() => setCurrentStep(currentStep - 1)}
                         className="text-xs font-bold uppercase tracking-wider flex items-center gap-1 hover:text-[#C59D5F] transition-colors"
@@ -181,8 +293,7 @@ export function RestaurantWidget() {
             )}
 
             {/* Stepper */}
-            <div className="flex relative justify-between items-center mb-0 px-8 max-w-2xl mx-auto">
-                {/* Connector Line */}
+            <div className={`flex relative justify-between items-center mb-0 px-8 max-w-2xl mx-auto ${currentStep === 1 ? 'pt-8' : ''}`}>
                 <div className="absolute top-4 left-10 right-10 h-0.5 bg-gray-200 -z-10">
                     <div
                         className="h-full bg-[#0A0A0A] transition-all duration-500"
@@ -221,16 +332,13 @@ export function RestaurantWidget() {
                 })}
             </div>
 
-            <Card className="rounded-none overflow-hidden min-h-[450px]">
+            <Card className="rounded-none overflow-hidden min-h-[450px] border-none shadow-none">
                 <CardContent className="p-4 pt-0 bg-white">
 
                     {/* STEP 1: FIND (Calendar + Times) */}
                     {currentStep === 1 && (
-                        <div className="grid grid-cols-2 gap-4 h-full">
-
-                            {/* LEFT COL: CALENDAR */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
                             <div className="flex flex-col">
-
                                 <div className="max-w-[280px] mx-auto w-full">
                                     <div className="flex justify-between items-center mb-2">
                                         <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-1 hover:bg-gray-100 rounded-full transition-colors">
@@ -243,43 +351,29 @@ export function RestaurantWidget() {
                                             <ChevronRight className="w-4 h-4 text-gray-400" />
                                         </button>
                                     </div>
-
                                     <div className="grid grid-cols-7 gap-1 mb-2 text-center border-b pb-2">
                                         {weekDays.map(d => (
                                             <div key={d} className="font-black text-[10px] uppercase tracking-widest text-[#C59D5F]">{d}</div>
                                         ))}
                                     </div>
-
                                     <div className="grid grid-cols-7 gap-1">
                                         {paddingDays.map((_, i) => <div key={`pad-${i}`} />)}
-
                                         {daysInMonth.map(date => {
                                             const status = getDayStatus(date);
                                             const isSelected = selectedDate && isSameDay(date, selectedDate);
                                             const isPast = isBefore(date, startOfDay(new Date()));
-
                                             let style = {};
                                             let className = "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 mx-auto ";
-
                                             if (isSelected) {
                                                 style = { backgroundColor: colors.accent, color: 'white', boxShadow: '0 2px 6px rgba(197, 157, 95, 0.4)' };
                                                 className += "cursor-pointer transform scale-105";
                                             } else if (status === 'closed' || isPast) {
                                                 className += "bg-gray-100 text-gray-300 cursor-not-allowed";
-                                            } else if (status === 'full') {
-                                                className += "bg-white border text-gray-800 cursor-not-allowed";
-                                                style = { borderColor: 'red' };
                                             } else {
                                                 className += "bg-white text-gray-700 hover:bg-[#F9F9F9] hover:text-[#C59D5F] cursor-pointer border border-transparent hover:border-[#C59D5F]";
                                             }
-
                                             return (
-                                                <div
-                                                    key={date.toString()}
-                                                    onClick={() => !isPast && handleDateSelect(date)}
-                                                    className={className}
-                                                    style={style}
-                                                >
+                                                <div key={date.toString()} onClick={() => !isPast && handleDateSelect(date)} className={className} style={style}>
                                                     {format(date, 'd')}
                                                 </div>
                                             );
@@ -287,69 +381,41 @@ export function RestaurantWidget() {
                                     </div>
                                 </div>
                             </div>
-
-                            {/* RIGHT COL: LEGEND AND SLOTS */}
                             <div className="flex flex-col border-l pl-0 md:pl-8 border-gray-100">
-                                {/* Legend */}
                                 <div className="flex flex-wrap gap-x-4 gap-y-2 mb-4 text-[10px] uppercase font-bold tracking-wider text-gray-500">
                                     <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded" style={{ backgroundColor: colors.white, border: '1px solid #CCC' }}></div> Disponible</div>
                                     <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-gray-200"></div> Cerrado</div>
                                     <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded flex justify-center items-center text-white" style={{ backgroundColor: colors.accent }}></div> Seleccionado</div>
-                                    <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-white border border-red-500"></div> Completo</div>
                                 </div>
-
-                                {/* Divider or Info if no date */}
                                 {!selectedDate && (
                                     <div className="flex-1 flex flex-col items-center justify-center text-gray-300 text-center p-8 border-2 border-dashed border-gray-100 rounded-lg">
                                         <Play className="w-12 h-12 mb-4 text-gray-200" />
                                         <p className="font-light italic">Seleccione un día en el calendario para ver disponibilidad.</p>
                                     </div>
                                 )}
-
-                                {/* Time Slots */}
                                 {selectedDate && timeSlots && (
                                     <div className="animate-in fade-in slide-in-from-right-4 duration-500">
                                         <h3 className="font-bold text-lg mb-6 flex items-center gap-2" style={{ fontFamily: "'Oswald', sans-serif" }}>
                                             <span className="text-[#C59D5F]">Disponibilidad:</span> {format(selectedDate, "d 'de' MMMM", { locale: es })}
                                         </h3>
-
-                                        {/* Lunch */}
                                         <div className="mb-6">
                                             <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3 border-b pb-1">Comida</h4>
                                             <div className="grid grid-cols-3 gap-2">
                                                 {timeSlots.lunch.map(t => (
-                                                    <Button
-                                                        key={t}
-                                                        className="text-white text-sm py-2 h-auto font-bold tracking-wider hover:translate-y-[-2px] transition-transform shadow-sm"
-                                                        style={{ backgroundColor: colors.accent }}
-                                                        onClick={() => handleTimeSelect(t)}
-                                                    >
-                                                        {t}
-                                                    </Button>
+                                                    <Button key={t} className="text-white text-sm py-2 h-auto font-bold tracking-wider hover:translate-y-[-2px] transition-transform shadow-sm" style={{ backgroundColor: colors.accent }} onClick={() => handleTimeSelect(t)}>{t}</Button>
                                                 ))}
                                             </div>
                                         </div>
-
-                                        {/* Dinner */}
                                         <div>
                                             <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3 border-b pb-1">Cena</h4>
                                             {timeSlots.dinner.length > 0 ? (
                                                 <div className="grid grid-cols-3 gap-2">
                                                     {timeSlots.dinner.map(t => (
-                                                        <Button
-                                                            key={t}
-                                                            className="text-white text-sm py-2 h-auto font-bold tracking-wider hover:translate-y-[-2px] transition-transform shadow-sm"
-                                                            style={{ backgroundColor: colors.accent }}
-                                                            onClick={() => handleTimeSelect(t)}
-                                                        >
-                                                            {t}
-                                                        </Button>
+                                                        <Button key={t} className="text-white text-sm py-2 h-auto font-bold tracking-wider hover:translate-y-[-2px] transition-transform shadow-sm" style={{ backgroundColor: colors.accent }} onClick={() => handleTimeSelect(t)}>{t}</Button>
                                                     ))}
                                                 </div>
                                             ) : (
-                                                <p className="text-sm text-gray-400 italic font-light bg-gray-50 p-2 text-center rounded">
-                                                    Restaurante cerrado para cenas.
-                                                </p>
+                                                <p className="text-sm text-gray-400 italic font-light bg-gray-50 p-2 text-center rounded">Restaurante cerrado para cenas.</p>
                                             )}
                                         </div>
                                     </div>
@@ -361,7 +427,6 @@ export function RestaurantWidget() {
                     {/* STEP 2: INFORMATION */}
                     {currentStep === 2 && selectedDate && (
                         <div className="animate-in fade-in slide-in-from-right-8 duration-500 max-w-2xl mx-auto">
-                            {/* Summary Box */}
                             <div className="bg-gray-50 p-4 border-l-4 border-[#C59D5F] mb-6 shadow-sm">
                                 <h3 className="text-lg font-bold mb-3" style={{ fontFamily: "'Oswald', sans-serif" }}>Resumen de Reserva</h3>
                                 <div className="grid grid-cols-2 gap-4 text-sm">
@@ -383,40 +448,25 @@ export function RestaurantWidget() {
                                     </div>
                                 </div>
                             </div>
-
-                            {/* Form */}
                             <div className="grid gap-4">
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-3 gap-4">
                                     <div className="grid gap-1">
                                         <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Nombre</label>
-                                        <input
-                                            className="border p-3 text-sm rounded-none focus:outline-none focus:border-[#C59D5F] transition-colors bg-white"
-                                            placeholder="Nombre"
-                                            value={formData.name}
-                                            onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                        />
+                                        <input className="border p-3 text-sm rounded-none focus:outline-none focus:border-[#C59D5F] transition-colors bg-white" placeholder="Nombre" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
                                     </div>
                                     <div className="grid gap-1">
-                                        <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Apellidos</label>
-                                        <input
-                                            className="border p-3 text-sm rounded-none focus:outline-none focus:border-[#C59D5F] transition-colors bg-white"
-                                            placeholder="Apellidos"
-                                            value={formData.surname}
-                                            onChange={e => setFormData({ ...formData, surname: e.target.value })}
-                                        />
+                                        <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Primer Apellido</label>
+                                        <input className="border p-3 text-sm rounded-none focus:outline-none focus:border-[#C59D5F] transition-colors bg-white" placeholder="Apellido" value={formData.surname} onChange={e => setFormData({ ...formData, surname: e.target.value })} />
+                                    </div>
+                                    <div className="grid gap-1">
+                                        <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Segundo Apellido</label>
+                                        <input className="border p-3 text-sm rounded-none focus:outline-none focus:border-[#C59D5F] transition-colors bg-white" placeholder="Opcional" value={additionalData.surname2} onChange={e => setAdditionalData({ ...additionalData, surname2: e.target.value })} />
                                     </div>
                                 </div>
-
                                 <div className="grid gap-1">
                                     <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Email</label>
-                                    <input
-                                        className="border p-3 text-sm rounded-none focus:outline-none focus:border-[#C59D5F] transition-colors bg-white"
-                                        placeholder="ejemplo@email.com"
-                                        value={formData.email}
-                                        onChange={e => setFormData({ ...formData, email: e.target.value })}
-                                    />
+                                    <input className="border p-3 text-sm rounded-none focus:outline-none focus:border-[#C59D5F] transition-colors bg-white" placeholder="ejemplo@email.com" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
                                 </div>
-
                                 <div className="grid grid-cols-4 gap-4">
                                     <div className="grid gap-1 col-span-1">
                                         <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Prefijo</label>
@@ -428,114 +478,73 @@ export function RestaurantWidget() {
                                     </div>
                                     <div className="grid gap-1 col-span-3">
                                         <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Teléfono</label>
-                                        <input
-                                            className="border p-3 text-sm rounded-none focus:outline-none focus:border-[#C59D5F] transition-colors bg-white"
-                                            placeholder="000 000 000"
-                                            value={formData.phone}
-                                            onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                                        />
+                                        <input className="border p-3 text-sm rounded-none focus:outline-none focus:border-[#C59D5F] transition-colors bg-white" placeholder="000 000 000" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
                                     </div>
                                 </div>
-
-                                {/* Comments */}
                                 <div className="grid gap-1">
-                                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Introduce un comentario sobre la reserva</label>
-                                    <textarea
-                                        className="border p-3 text-sm rounded-none focus:outline-none focus:border-[#C59D5F] transition-colors bg-white resize-none"
-                                        rows={2}
-                                        value={comment}
-                                        onChange={e => setComment(e.target.value)}
-                                    ></textarea>
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Introduce un comentario</label>
+                                    <textarea className="border p-3 text-sm rounded-none focus:outline-none focus:border-[#C59D5F] transition-colors bg-white resize-none" rows={2} value={comment} onChange={e => setComment(e.target.value)}></textarea>
                                 </div>
-
-                                {/* Allergies */}
                                 <div className="grid gap-2">
-                                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">¿Tiene algún comensal alguna intolerancia/alergia?</label>
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">¿Alergias?</label>
                                     <div className="flex gap-4">
-                                        <label className="flex items-center gap-2 cursor-pointer">
-                                            <input type="checkbox" className="accent-[#C59D5F] w-4 h-4 cursor-pointer" checked={hasAllergy === true} onChange={() => setHasAllergy(true)} />
-                                            <span className="text-sm">Sí</span>
-                                        </label>
-                                        <label className="flex items-center gap-2 cursor-pointer">
-                                            <input type="checkbox" className="accent-[#C59D5F] w-4 h-4 cursor-pointer" checked={hasAllergy === false} onChange={() => setHasAllergy(false)} />
-                                            <span className="text-sm">No</span>
-                                        </label>
+                                        <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" className="accent-[#C59D5F] w-4 h-4 cursor-pointer" checked={hasAllergy === true} onChange={() => setHasAllergy(true)} /><span className="text-sm">Sí</span></label>
+                                        <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" className="accent-[#C59D5F] w-4 h-4 cursor-pointer" checked={hasAllergy === false} onChange={() => setHasAllergy(false)} /><span className="text-sm">No</span></label>
                                     </div>
                                 </div>
-
-                                {/* Legal Checks */}
                                 <div className="grid gap-2 mt-2">
-                                    <label className="flex items-start gap-2 cursor-pointer">
-                                        <input type="checkbox" className="accent-[#C59D5F] w-4 h-4 mt-0.5 cursor-pointer" checked={acceptTerms} onChange={e => setAcceptTerms(e.target.checked)} />
-                                        <span className="text-xs text-gray-600">Acepto las condiciones de uso, política de privacidad y aviso legal</span>
-                                    </label>
-                                    <label className="flex items-start gap-2 cursor-pointer">
-                                        <input type="checkbox" className="accent-[#C59D5F] w-4 h-4 mt-0.5 cursor-pointer" checked={acceptData} onChange={e => setAcceptData(e.target.checked)} />
-                                        <span className="text-xs text-gray-600">Consiento el tratamiento de datos personales</span>
-                                    </label>
-                                    <label className="flex items-start gap-2 cursor-pointer">
-                                        <input type="checkbox" className="accent-[#C59D5F] w-4 h-4 mt-0.5 cursor-pointer" checked={acceptMarketing} onChange={e => setAcceptMarketing(e.target.checked)} />
-                                        <span className="text-xs text-gray-600">Consiento la recepción de comunicaciones del restaurante por e-mail y/o SMS con fines comerciales</span>
-                                    </label>
+                                    <label className="flex items-start gap-2 cursor-pointer"><input type="checkbox" className="accent-[#C59D5F] w-4 h-4 mt-0.5 cursor-pointer" checked={acceptTerms} onChange={e => setAcceptTerms(e.target.checked)} /><span className="text-xs text-gray-600">Acepto condiciones</span></label>
+                                    <label className="flex items-start gap-2 cursor-pointer"><input type="checkbox" className="accent-[#C59D5F] w-4 h-4 mt-0.5 cursor-pointer" checked={acceptData} onChange={e => setAcceptData(e.target.checked)} /><span className="text-xs text-gray-600">Consiento tratamiento</span></label>
                                 </div>
                             </div>
-
                             <div className="mt-8">
-                                <Button
-                                    className="w-full py-4 text-base font-bold uppercase tracking-widest text-white hover:bg-black transition-colors shadow-lg"
-                                    style={{ backgroundColor: colors.accent, fontFamily: "'Oswald', sans-serif" }}
-                                    onClick={() => setCurrentStep(3)}
-                                >
-                                    Continuar a la Confirmación
-                                </Button>
-                            </div>
-
-                            {/* Legal Footer */}
-                            <div className="mt-8 pt-4 border-t border-gray-100 text-[10px] text-gray-400 leading-relaxed">
-                                <p className="font-bold mb-1">Información básica sobre protección de datos de carácter personal</p>
-                                <p className="mb-2">En cumplimiento del Reglamento General de Protección de Datos de Carácter Personal, se informa al interesado de lo siguiente:</p>
-                                <ul className="list-none space-y-1">
-                                    <li><span className="font-bold">Responsable:</span> SOTO DEL PRIOR S.L.</li>
-                                    <li><span className="font-bold">Finalidad:</span> La prestación de servicios y la gestión de la relación comercial. Gestión de duplicidades con otros restaurantes.</li>
-                                    <li><span className="font-bold">Legitimación:</span> Consentimiento del interesado. Ejecución de un contrato en el que el interesado es parte.</li>
-                                    <li><span className="font-bold">Destinatarios:</span> Comunicación a restaurantes afectados en caso de duplicidad de reservas. Se podrán realizar cesiones de datos para fines estadísticos.</li>
-                                    <li><span className="font-bold">Derechos:</span> Acceso, Rectificación, Supresión, Limitación del Tratamiento, Portabilidad y Oposición.</li>
-                                </ul>
+                                <Button className="w-full py-4 text-base font-bold uppercase tracking-widest text-white hover:bg-black transition-colors shadow-lg" style={{ backgroundColor: colors.accent, fontFamily: "'Oswald', sans-serif" }} onClick={() => setCurrentStep(3)}>Continuar</Button>
                             </div>
                         </div>
                     )}
 
-                    {/* STEP 3: ADDITIONAL */}
+                    {/* STEP 3: ADDITIONAL / STRIPE */}
                     {currentStep === 3 && (
-                        <div className="animate-in fade-in slide-in-from-right-8 duration-500 max-w-2xl mx-auto text-center pt-8">
+                        <div className="animate-in fade-in slide-in-from-right-8 duration-500 max-w-2xl mx-auto pt-6 pb-8">
+                            <h3 className="text-xl font-bold mb-2 text-center" style={{ fontFamily: "'Oswald', sans-serif" }}>GARANTÍA DE RESERVA</h3>
+                            <div className="text-left max-w-lg mx-auto space-y-5">
+                                {/* Additional CRM Fields */}
+                                <div className="border-b border-gray-100 pb-4">
+                                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#C59D5F] mb-3" style={{ fontFamily: "'Oswald', sans-serif" }}>Datos opcionales</h4>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <input type="number" className="border p-2.5 text-sm rounded-none focus:outline-none" placeholder="Edad" value={additionalData.age} onChange={e => setAdditionalData({...additionalData, age: e.target.value})} />
+                                        <select className="border p-2.5 text-sm rounded-none focus:outline-none" value={additionalData.gender} onChange={e => setAdditionalData({...additionalData, gender: e.target.value})}>
+                                            <option value="">Sexo</option>
+                                            <option value="M">M</option><option value="F">F</option>
+                                        </select>
+                                    </div>
+                                </div>
 
-                            <h3 className="text-xl font-bold mb-6" style={{ fontFamily: "'Oswald', sans-serif" }}>INFORMACIÓN ADICIONAL</h3>
-
-                            <p className="text-sm text-gray-600 mb-8 max-w-lg mx-auto leading-relaxed">
-                                Por favor, responda a las siguientes preguntas para mejorar su experiencia en nuestro restaurante:
-                            </p>
-
-                            <div className="text-left max-w-md mx-auto mb-8">
-                                <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 block">
-                                    ¿Tienes algún bono? (escriba aquí su número de bono) (en caso de no tener bono pulse en reservar)
-                                </label>
-                                <textarea
-                                    className="w-full border p-4 text-sm rounded-none focus:outline-none focus:border-[#C59D5F] transition-colors bg-white resize-none"
-                                    rows={4}
-                                    placeholder="Ej: BONO-REGALO-2024..."
-                                    value={bonusCode}
-                                    onChange={e => setBonusCode(e.target.value)}
-                                ></textarea>
+                                {/* Stripe Form */}
+                                <div className="mt-6">
+                                    {stripeEnabled ? (
+                                        <CardForm 
+                                            onSuccess={(pmId) => handleSubmitReservation(pmId)} 
+                                            submitting={submitting} 
+                                            colors={colors}
+                                            amount={20}
+                                        />
+                                    ) : (
+                                        <div className="p-4 bg-gray-50 text-center italic text-sm text-gray-500">
+                                            No se requiere garantía con tarjeta para esta reserva.
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
-                            <div className="mt-8 max-w-md mx-auto">
+                            <div className="mt-8 max-w-lg mx-auto">
                                 <Button
                                     className="w-full py-4 text-base font-bold uppercase tracking-widest text-white hover:bg-black transition-colors shadow-lg"
                                     style={{ backgroundColor: colors.accent, fontFamily: "'Oswald', sans-serif" }}
-                                    onClick={handleSubmitReservation}
+                                    onClick={handleMainSubmit}
                                     disabled={submitting}
                                 >
-                                    {submitting ? 'ENVIANDO...' : 'RESERVAR'}
+                                    {submitting ? 'PROCESANDO...' : 'RESERVAR AHORA'}
                                 </Button>
                             </div>
                         </div>
@@ -543,64 +552,18 @@ export function RestaurantWidget() {
 
                     {/* STEP 4: CONFIRMATION */}
                     {currentStep === 4 && (
-                        <div className="animate-in fade-in zoom-in duration-500 h-full pt-4">
-
-                            {/* Success Status */}
+                        <div className="animate-in fade-in zoom-in duration-500 h-full pt-4 text-center">
                             <div className="flex flex-col items-center justify-center pb-8 border-b border-gray-100 mb-8">
-                                <div className="w-24 h-24 rounded-full bg-[#fcebbe] flex items-center justify-center mb-6">
-                                    <div className="w-16 h-16 rounded-full bg-[#C59D5F] flex items-center justify-center shadow-lg">
-                                        <Check className="w-10 h-10 text-white" strokeWidth={4} />
-                                    </div>
+                                <div className="w-20 h-20 rounded-full bg-[#C59D5F] flex items-center justify-center shadow-lg mb-6">
+                                    <Check className="w-10 h-10 text-white" strokeWidth={4} />
                                 </div>
-                                <h2 className="text-3xl font-bold uppercase tracking-wide text-[#0A0A0A]" style={{ fontFamily: "'Oswald', sans-serif" }}>
-                                    Reserva Confirmada
-                                </h2>
+                                <h2 className="text-3xl font-bold uppercase tracking-wide" style={{ fontFamily: "'Oswald', sans-serif" }}>Reserva Confirmada</h2>
                             </div>
-
-                            {/* Details */}
-                            <div className="max-w-md mx-auto space-y-3 mb-8 pl-4">
-                                <div className="flex items-center gap-3 text-gray-700">
-                                    <Calendar className="w-5 h-5 text-[#C59D5F]" />
-                                    <span className="text-lg font-bold" style={{ fontFamily: "'Oswald', sans-serif" }}>
-                                        {selectedDate ? format(selectedDate, 'dd-MM-yyyy', { locale: es }) : ''}, {selectedTime}h.
-                                    </span>
-                                </div>
-                                <div className="flex items-center gap-3 text-gray-700">
-                                    <Users className="w-5 h-5 text-[#C59D5F]" />
-                                    <span className="text-lg font-bold" style={{ fontFamily: "'Oswald', sans-serif" }}>
-                                        {pax} personas.
-                                    </span>
-                                </div>
-                                <div className="flex items-center gap-3 text-gray-700">
-                                    <MapPin className="w-5 h-5 text-[#C59D5F]" />
-                                    <span className="text-md">
-                                        {restaurantName || 'Restaurante'}
-                                    </span>
-                                </div>
+                            <div className="max-w-md mx-auto space-y-3 mb-8">
+                                <p className="text-lg font-bold" style={{ fontFamily: "'Oswald', sans-serif" }}>{selectedDate ? format(selectedDate, 'dd-MM-yyyy') : ''}, {selectedTime}h.</p>
+                                <p>{pax} personas en {restaurantName}.</p>
                             </div>
-
-                            {/* Personal Info & Footer */}
-                            <div className="border-t border-gray-100 pt-8 max-w-md mx-auto">
-                                <h3 className="text-xl font-bold uppercase mb-4" style={{ fontFamily: "'Oswald', sans-serif" }}>
-                                    Reserva a nombre de: {formData.name || 'CLIENTE'} {formData.surname || ''}
-                                </h3>
-
-                                <div className="text-gray-500 text-sm space-y-1">
-                                    <p>Gracias por reservar en {restaurantName || 'nuestro restaurante'}.</p>
-                                    <p>Recibirá en breve un email de confirmación.</p>
-                                </div>
-
-                                <div className="mt-8 text-center">
-                                    <Button
-                                        className="text-white px-8 py-3 font-bold uppercase tracking-wider text-xs"
-                                        style={{ backgroundColor: '#0A0A0A' }}
-                                        onClick={() => { setCurrentStep(1); setSelectedDate(null); setTimeSlots(null); setFormData({ name: '', surname: '', email: '', phone: '', prefix: '+34' }); setComment(''); setBonusCode(''); setHasAllergy(null); setAcceptTerms(false); setAcceptData(false); setAcceptMarketing(false); setCreatedBooking(null); }}
-                                    >
-                                        Volver al Inicio
-                                    </Button>
-                                </div>
-                            </div>
-
+                            <Button className="px-8 py-3 bg-black text-white font-bold uppercase tracking-wider text-xs rounded-none" onClick={() => window.location.reload()}>Volver al Inicio</Button>
                         </div>
                     )}
 
