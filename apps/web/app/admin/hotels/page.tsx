@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { fetchAPI } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
-import { Building2, Settings, Share2, LayoutDashboard, BedDouble, Users, RefreshCw } from 'lucide-react';
+import { Building2, Settings, Share2, LayoutDashboard, BedDouble, Users, RefreshCw, Plus } from 'lucide-react';
 
 export default function HotelsPage() {
     const [hotels, setHotels] = useState<any[]>([]);
