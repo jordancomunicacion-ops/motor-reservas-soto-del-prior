@@ -473,7 +473,12 @@ export class RestaurantService {
         return this.prisma.restaurantWaitlist.create({
             data: {
                 restaurantId,
-                ...data
+                date: new Date(data.date),
+                pax: data.pax,
+                name: data.name,
+                email: data.email,
+                phone: data.phone,
+                notes: data.notes
             }
         });
     }
@@ -481,7 +486,7 @@ export class RestaurantService {
     async getWaitlist(restaurantId: string) {
         return this.prisma.restaurantWaitlist.findMany({
             where: { restaurantId, status: { in: ['WAITING', 'NOTIFIED'] } },
-            orderBy: { createdAt: 'asc' }
+            orderBy: { createdAt: 'desc' }
         });
     }
 
@@ -716,25 +721,5 @@ export class RestaurantService {
         });
     }
 
-    async addToWaitlist(restaurantId: string, data: any) {
-        return this.prisma.restaurantWaitlist.create({
-            data: {
-                restaurantId,
-                date: new Date(data.date),
-                pax: data.pax,
-                name: data.name,
-                email: data.email,
-                phone: data.phone,
-                notes: data.notes
-            }
-        });
-    }
-
-    async getWaitlist(restaurantId: string) {
-        return this.prisma.restaurantWaitlist.findMany({
-            where: { restaurantId },
-            orderBy: { createdAt: 'desc' }
-        });
-    }
 }
 
