@@ -124,15 +124,12 @@ export default function EventsListPage() {
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-primary/10 dark:bg-primary/20 rounded-lg text-primary">
-                        <PartyPopper className="w-6 h-6" />
-                    </div>
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight">Gestión de Eventos</h1>
                         <p className="text-xs text-muted-foreground">Crea y gestiona eventos puntuales para tus establecimientos.</p>
                     </div>
                 </div>
-                <Button onClick={() => setShowCreate(!showCreate)} className={`gap-2 ${showCreate ? 'bg-zinc-100 text-zinc-900 hover:bg-zinc-200' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>
+                <Button onClick={() => setShowCreate(!showCreate)} className={`gap-2 ${showCreate ? 'bg-secondary text-secondary-foreground hover:bg-secondary/80' : 'bg-primary text-white hover:opacity-90 shadow-lg shadow-primary/20'}`}>
                     {showCreate ? 'Cerrar' : <><Plus className="w-4 h-4" /> Nuevo Evento</>}
                 </Button>
             </div>
