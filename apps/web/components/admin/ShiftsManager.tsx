@@ -163,7 +163,7 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
 
     return (
         <div className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end bg-muted/30 p-5 rounded-2xl border-2 border-dashed border-muted">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 items-end bg-muted/30 p-5 rounded-2xl border-2 border-dashed border-muted">
                 <div className="space-y-2 lg:col-span-1">
                     <Label className="text-xs font-bold uppercase opacity-60">Categoría</Label>
                     <Select 
@@ -209,8 +209,39 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
                         onChange={(e) => setNewShift({...newShift, slotInterval: parseInt(e.target.value)})}
                     />
                 </div>
-                <Button onClick={handleAddShift} className="gap-2 shadow-md">
-                    <Plus className="w-4 h-4" /> Añadir
+                <div className="space-y-2 lg:col-span-1">
+                    <Label className="text-xs font-bold uppercase opacity-60">Días</Label>
+                    <div className="flex gap-1">
+                        {days.map((d) => {
+                            const isSelected = newShift.daysOfWeek.split(',').includes(d.value);
+                            return (
+                                <button
+                                    key={d.value}
+                                    type="button"
+                                    onClick={() => {
+                                        const currentDays = newShift.daysOfWeek ? newShift.daysOfWeek.split(',') : [];
+                                        let newDays;
+                                        if (isSelected) {
+                                            newDays = currentDays.filter(day => day !== d.value);
+                                        } else {
+                                            newDays = [...currentDays, d.value];
+                                        }
+                                        setNewShift({...newShift, daysOfWeek: newDays.sort().join(',')});
+                                    }}
+                                    className={`w-7 h-7 rounded-full text-[10px] font-bold transition-all ${
+                                        isSelected 
+                                            ? 'bg-primary text-white shadow-md scale-110' 
+                                            : 'bg-white text-muted-foreground border hover:bg-muted'
+                                    }`}
+                                >
+                                    {d.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+                <Button onClick={handleAddShift} className="gap-2 shadow-md h-10">
+                    <Plus className="w-4 h-4" /> Añadir Turno
                 </Button>
             </div>
 
