@@ -19,9 +19,9 @@ export class WaitlistService {
         this.logger.log(`Checking waitlist for restaurant ${restaurantId} on date ${date.toISOString()}`);
 
         const startOfDay = new Date(date);
-        startOfDay.setHours(0,0,0,0);
+        startOfDay.setUTCHours(0,0,0,0);
         const endOfDay = new Date(date);
-        endOfDay.setHours(23,59,59,999);
+        endOfDay.setUTCHours(23,59,59,999);
 
         // 1. Find all WAITING entries for this day
         const waitlistEntries = await this.prisma.restaurantWaitlist.findMany({

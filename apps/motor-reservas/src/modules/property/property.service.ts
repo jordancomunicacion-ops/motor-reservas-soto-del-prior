@@ -196,4 +196,19 @@ export class PropertyService {
             },
         });
     }
+
+    async getHotelZones(hotelId: string) {
+        const hotel: any = await this.prisma.hotel.findUnique({
+            where: { id: hotelId },
+            include: { zones: true, restaurant: { include: { zones: true } } }
+        });
+
+        if (!hotel) return [];
+
+        // Combine hotel-specific zones and restaurant zones if linked
+        const hotelZones = hotel.zones || [];
+        const restaurantZones = hotel.restaurant?.zones || [];
+
+        return [...hotelZones, ...restaurantZones];
+    }
 }

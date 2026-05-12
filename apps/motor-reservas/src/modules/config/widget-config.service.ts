@@ -26,7 +26,9 @@ export class WidgetConfigService {
                 secondaryColor: '#1e40af',
                 customCss: '',
                 showLogo: true,
-                title: null
+                title: null,
+                showCrmFields: true,
+                skipGuaranteeStep: false
             } as any;
         }
 

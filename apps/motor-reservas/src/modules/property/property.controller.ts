@@ -57,4 +57,9 @@ export class PropertyController {
     createRoom(@Param('id') roomTypeId: string, @Body('name') name: string) {
         return this.propertyService.createRoom(roomTypeId, name);
     }
+
+    @Get('hotels/:id/zones')
+    getHotelZones(@Param('id') id: string) {
+        return this.propertyService.getHotelZones(id);
+    }
 }

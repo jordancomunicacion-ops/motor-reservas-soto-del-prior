@@ -45,8 +45,13 @@ export class RestaurantController {
     }
 
     @Get(':id/tables')
-    getTables(@Param('id') id: string) {
-        return this.service.getTables(id);
+    getTables(@Param('id') id: string, @Query('date') date?: string) {
+        return this.service.getTables(id, date);
+    }
+
+    @Get(':id/zones')
+    getZones(@Param('id') id: string) {
+        return this.service.getTables(id); // getTables returns the zones with tables
     }
 
     @Post(':id/zones/sync')
@@ -108,6 +113,11 @@ export class RestaurantController {
         return this.service.updateBookingStatus(id, body.status, body.tableId);
     }
 
+    @Patch('bookings/:id')
+    updateBooking(@Param('id') id: string, @Body() body: any) {
+        return this.service.updateBooking(id, body);
+    }
+
     // --- Synergy & Shifts ---
     @Get(':id/slots')
     getAvailableSlots(
@@ -126,8 +136,12 @@ export class RestaurantController {
     }
 
     @Post(':id/shifts')
-    createShift(@Param('id') id: string, @Body() body: any) {
-        return this.service.createShift(id, body);
+    async createShift(@Param('id') id: string, @Body() body: any) {
+        try {
+            return await this.service.createShift(id, body);
+        } catch (e: any) {
+            return { error: true, message: e.message };
+        }
     }
 
     @Post('linked-reservation')

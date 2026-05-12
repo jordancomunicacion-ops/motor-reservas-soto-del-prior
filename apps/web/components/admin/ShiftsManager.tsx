@@ -15,6 +15,7 @@ import { es } from 'date-fns/locale';
 interface Closure {
     id: string;
     date: string;
+    endDate?: string;
     reason?: string;
 }
 
@@ -67,7 +68,8 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
     });
     
     const [closures, setClosures] = useState<Closure[]>([]);
-    const [newClosure, setNewClosure] = useState({ date: '', reason: '' });
+    const [closureType, setClosureType] = useState<'SINGLE' | 'PERIOD'>('SINGLE');
+    const [newClosure, setNewClosure] = useState({ date: '', endDate: '', reason: '' });
 
     useEffect(() => {
         loadShifts();
@@ -98,10 +100,16 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
         if (!newShift.name) return alert('El nombre del turno es obligatorio');
         
         try {
-            await fetchAPI(`/restaurant/${restaurantId}/shifts`, {
+            const result = await fetchAPI(`/restaurant/${restaurantId}/shifts`, {
                 method: 'POST',
-                body: JSON.stringify(newShift)
+                body: JSON.stringify({
+                    ...newShift,
+                    slotInterval: Number(newShift.slotInterval)
+                })
             });
+            if (result?.error) {
+                throw new Error(result.message);
+            }
             setNewShift({
                 name: 'Comida',
                 type: 'LUNCH',
@@ -111,9 +119,9 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
                 daysOfWeek: '1,2,3,4,5,6,0'
             });
             loadShifts();
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
-            alert('Error al crear el turno');
+            alert(`Error al crear el turno: ${e.message || 'Error desconocido'}`);
         }
     }
 
@@ -133,13 +141,20 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
 
     async function handleAddClosure() {
         if (!newClosure.date) return alert('La fecha es obligatoria');
+        if (closureType === 'PERIOD' && !newClosure.endDate) return alert('La fecha de fin es obligatoria');
         
         try {
+            const payload = {
+                date: newClosure.date,
+                reason: newClosure.reason,
+                endDate: closureType === 'PERIOD' ? newClosure.endDate : undefined
+            };
+
             await fetchAPI(`/restaurant/${restaurantId}/closures`, {
                 method: 'POST',
-                body: JSON.stringify(newClosure)
+                body: JSON.stringify(payload)
             });
-            setNewClosure({ date: '', reason: '' });
+            setNewClosure({ date: '', endDate: '', reason: '' });
             loadClosures();
         } catch (e) {
             console.error(e);
@@ -323,29 +338,57 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end bg-red-50/50 dark:bg-red-900/10 p-5 rounded-2xl border-2 border-dashed border-red-100 dark:border-red-900/30 mb-6">
-                    <div className="space-y-2">
-                        <Label className="text-xs font-bold uppercase opacity-60">Fecha a Bloquear</Label>
-                        <Input 
-                            type="date" 
-                            className="bg-white"
-                            value={newClosure.date}
-                            onChange={(e) => setNewClosure({...newClosure, date: e.target.value})}
-                        />
+                <div className="bg-red-50/50 dark:bg-red-900/10 p-5 rounded-2xl border-2 border-dashed border-red-100 dark:border-red-900/30 mb-6">
+                    <div className="flex gap-4 mb-4">
+                        <button 
+                            onClick={() => setClosureType('SINGLE')}
+                            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${closureType === 'SINGLE' ? 'bg-red-600 text-white shadow-md' : 'bg-white text-red-600 border border-red-200 hover:bg-red-50'}`}
+                        >
+                            Día Suelto
+                        </button>
+                        <button 
+                            onClick={() => setClosureType('PERIOD')}
+                            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${closureType === 'PERIOD' ? 'bg-red-600 text-white shadow-md' : 'bg-white text-red-600 border border-red-200 hover:bg-red-50'}`}
+                        >
+                            Periodo / Vacaciones
+                        </button>
                     </div>
-                    <div className="space-y-2">
-                        <Label className="text-xs font-bold uppercase opacity-60">Motivo (Opcional)</Label>
-                        <Input 
-                            type="text" 
-                            className="bg-white"
-                            placeholder="Ej: Vacaciones, Evento Privado"
-                            value={newClosure.reason}
-                            onChange={(e) => setNewClosure({...newClosure, reason: e.target.value})}
-                        />
+
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                        <div className="space-y-2">
+                            <Label className="text-xs font-bold uppercase opacity-60">{closureType === 'SINGLE' ? 'Fecha a Bloquear' : 'Fecha Inicio'}</Label>
+                            <Input 
+                                type="date" 
+                                className="bg-white"
+                                value={newClosure.date}
+                                onChange={(e) => setNewClosure({...newClosure, date: e.target.value})}
+                            />
+                        </div>
+                        {closureType === 'PERIOD' && (
+                            <div className="space-y-2 animate-in fade-in slide-in-from-left-4 duration-300">
+                                <Label className="text-xs font-bold uppercase opacity-60">Fecha Fin</Label>
+                                <Input 
+                                    type="date" 
+                                    className="bg-white"
+                                    value={newClosure.endDate}
+                                    onChange={(e) => setNewClosure({...newClosure, endDate: e.target.value})}
+                                />
+                            </div>
+                        )}
+                        <div className={`space-y-2 ${closureType === 'SINGLE' ? 'md:col-span-1' : ''}`}>
+                            <Label className="text-xs font-bold uppercase opacity-60">Motivo (Opcional)</Label>
+                            <Input 
+                                type="text" 
+                                className="bg-white"
+                                placeholder={closureType === 'PERIOD' ? "Ej: Vacaciones de Verano" : "Ej: Evento Privado"}
+                                value={newClosure.reason}
+                                onChange={(e) => setNewClosure({...newClosure, reason: e.target.value})}
+                            />
+                        </div>
+                        <Button onClick={handleAddClosure} variant="destructive" className="gap-2 shadow-md">
+                            <Plus className="w-4 h-4" /> {closureType === 'SINGLE' ? 'Bloquear Día' : 'Bloquear Periodo'}
+                        </Button>
                     </div>
-                    <Button onClick={handleAddClosure} variant="destructive" className="gap-2 shadow-md">
-                        <Plus className="w-4 h-4" /> Bloquear Día
-                    </Button>
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-2">
@@ -356,16 +399,30 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
                                     <CalendarOff className="w-4 h-4" />
                                 </div>
                                 <div>
-                                    <div className="font-medium capitalize">
-                                        {(() => {
-                                            try {
-                                                return format(new Date(closure.date), "eeee d 'de' MMMM", { locale: es });
-                                            } catch (e) {
-                                                return 'Fecha no válida';
-                                            }
-                                        })()}
+                                    <div className="font-bold flex items-center gap-2">
+                                        {closure.endDate && <Badge variant="destructive" className="text-[9px] h-4 px-1 uppercase tracking-tighter">Periodo</Badge>}
+                                        <span className="capitalize">
+                                            {(() => {
+                                                try {
+                                                    const start = format(new Date(closure.date), "eeee d 'de' MMMM", { locale: es });
+                                                    if (closure.endDate) {
+                                                        const end = format(new Date(closure.endDate), "eeee d 'de' MMMM", { locale: es });
+                                                        return (
+                                                            <span className="flex flex-col md:flex-row md:items-center gap-1">
+                                                                <span className="text-red-600">{format(new Date(closure.date), "d MMM yyyy", { locale: es })}</span>
+                                                                <span className="opacity-40 text-xs">al</span>
+                                                                <span className="text-red-600">{format(new Date(closure.endDate), "d MMM yyyy", { locale: es })}</span>
+                                                            </span>
+                                                        );
+                                                    }
+                                                    return start;
+                                                } catch (e) {
+                                                    return 'Fecha no válida';
+                                                }
+                                            })()}
+                                        </span>
                                     </div>
-                                    {closure.reason && <div className="text-xs text-muted-foreground">{closure.reason}</div>}
+                                    {closure.reason && <div className="text-xs text-muted-foreground mt-0.5">{closure.reason}</div>}
                                 </div>
                             </div>
                             <Button 

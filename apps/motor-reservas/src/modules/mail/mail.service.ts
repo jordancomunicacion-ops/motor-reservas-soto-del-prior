@@ -25,22 +25,21 @@ export class MailService {
     }
 
     private getTransporter(customConfig?: any): nodemailer.Transporter {
-        if (!customConfig || !customConfig.host || !customConfig.user || !customConfig.pass) {
-            return this.defaultTransporter;
-        }
-
-        return nodemailer.createTransport({
-            host: customConfig.host,
-            port: parseInt(customConfig.port || '587'),
-            secure: customConfig.secure || false,
+        const config = {
+            host: customConfig?.host || process.env.SMTP_HOST || 'smtp.office365.com',
+            port: parseInt(customConfig?.port || process.env.SMTP_PORT || '587'),
+            secure: customConfig?.secure || false,
             auth: {
-                user: customConfig.user,
-                pass: customConfig.pass,
+                user: customConfig?.user || process.env.SMTP_USER,
+                pass: customConfig?.pass || process.env.SMTP_PASS,
             },
             tls: {
+                ciphers: 'SSLv3', // Required for some Outlook/Office 365 setups
                 rejectUnauthorized: false
             }
-        });
+        };
+
+        return nodemailer.createTransport(config);
     }
 
     private processTemplate(html: string, data: any): string {
@@ -56,7 +55,11 @@ export class MailService {
     async sendEmail(to: string, subject: string, html: string, fromName?: string, replyTo?: string, customConfig?: any) {
         try {
             const transporter = this.getTransporter(customConfig);
-            const fromEmail = customConfig?.from || process.env.SMTP_FROM || process.env.SMTP_USER;
+            
+            // Outlook Requirement: The 'from' email MUST match the authenticated 'user' email
+            // if 'customConfig.from' is provided, we use it, otherwise we fallback to the authenticated user.
+            const authenticatedUser = customConfig?.user || process.env.SMTP_USER;
+            const fromEmail = customConfig?.from || authenticatedUser;
             
             const info = await transporter.sendMail({
                 from: `"${fromName || 'SOTO DEL PRIOR'}" <${fromEmail}>`,
@@ -65,10 +68,10 @@ export class MailService {
                 subject,
                 html,
             });
-            this.logger.log(`Email sent successfully: ${info.messageId}`);
+            this.logger.log(`Email sent successfully to ${to}: ${info.messageId}`);
             return info;
         } catch (error) {
-            this.logger.error(`Failed to send email to ${to}`, error);
+            this.logger.error(`Failed to send email to ${to}. Host: ${customConfig?.host || process.env.SMTP_HOST}. Error: ${error.message}`, error.stack);
             return null;
         }
     }
@@ -82,9 +85,18 @@ export class MailService {
 
         if (!restaurant) return;
 
+        const mailConfig: any = restaurant.mailConfig || {};
+        
+        // NEW: Check if notifications are enabled (stored in mailConfig to avoid schema changes)
+        if (mailConfig.notificationsEnabled === false) {
+            this.logger.log(`Skipping email notification for restaurant ${restaurant.name}: Notifications are disabled.`);
+            return;
+        }
+
+
         const templates: any = restaurant.emailTemplates || {};
         const customHtml = templates[type];
-        const mailConfig = restaurant.mailConfig;
+
         
         let html = '';
         let subject = '';
@@ -132,9 +144,18 @@ export class MailService {
 
         if (!hotel) return;
 
+        const mailConfig: any = hotel.mailConfig || {};
+
+        // NEW: Check if notifications are enabled (stored in mailConfig to avoid schema changes)
+        if (mailConfig.notificationsEnabled === false) {
+            this.logger.log(`Skipping email notification for hotel ${hotel.name}: Notifications are disabled.`);
+            return;
+        }
+
+
         const templates: any = hotel.emailTemplates || {};
         const customHtml = templates[type];
-        const mailConfig = hotel.mailConfig;
+
         
         let html = '';
         let subject = '';

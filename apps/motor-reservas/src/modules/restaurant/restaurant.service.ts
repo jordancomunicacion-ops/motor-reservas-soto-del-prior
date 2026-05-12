@@ -1,8 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma/prisma.service';
-import { MailService } from '../mail/mail.service';
 import { WaitlistService } from './waitlist.service';
+import { CrmService } from '../crm/crm.service';
+import { CrmIntegrationService } from '../crm/crm-integration.service';
+import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class RestaurantService {
@@ -10,153 +11,22 @@ export class RestaurantService {
 
     constructor(
         private prisma: PrismaService,
-        private mailService: MailService,
         private waitlistService: WaitlistService,
+        private crmService: CrmService,
+        private crmIntegrationService: CrmIntegrationService,
+        private mailService: MailService
     ) { }
 
-    // ... (existing code) ...
 
-    @Cron(CronExpression.EVERY_HOUR)
-    async process48hReminders() {
-        this.logger.log('Running 48h reminder check for restaurant reservations...');
-        const targetDateStart = new Date();
-        targetDateStart.setHours(targetDateStart.getHours() + 48, 0, 0, 0);
-        const targetDateEnd = new Date(targetDateStart);
-        targetDateEnd.setHours(targetDateEnd.getHours() + 1, 0, 0, 0);
-
-        const bookings = await this.prisma.resBooking.findMany({
-            where: {
-                status: 'CONFIRMED', // We only want to review confirmed bookings that haven't been reconfirmed
-                date: {
-                    gte: targetDateStart,
-                    lt: targetDateEnd
-                }
-            }
-        });
-
-        if (bookings.length === 0) return;
-
-        this.logger.log(`Found ${bookings.length} reservations to remind.`);
-
-        for (const booking of bookings) {
-            try {
-                // Change status to TO_REVIEW
-                await this.prisma.resBooking.update({
-                    where: { id: booking.id },
-                    data: { status: 'TO_REVIEW' }
-                });
-
-                // Send reminder email
-                if (booking.guestEmail) {
-                    await this.mailService.sendRestaurantNotification(booking, 'reminder');
-                }
-            } catch (error) {
-                this.logger.error(`Error processing reminder for booking ${booking.id}:`, error);
-            }
-        }
-    }
-
-    // --- Public Reservation Flow ---
-
-    async createPublicReservation(data: {
-        restaurantId: string;
-        date: string;
-        time: string;
-        pax: number;
-        name: string;
-        email: string;
-        phone: string;
-        notes?: string;
-        // CRM Additional Fields
-        surname2?: string;
-        age?: number;
-        gender?: string;
-        whatsapp?: string;
-        instagram?: string;
-        facebook?: string;
-        tiktok?: string;
-        linkedin?: string;
-        xTwitter?: string;
-        paymentMethodId?: string;
-    }) {
-        // 1. Combine Date + Time
-        const [hours, minutes] = data.time.split(':').map(Number);
-        const start = new Date(data.date); // Assuming YYYY-MM-DD
-        start.setHours(hours, minutes, 0, 0);
-
-        // 2. Initial Status PENDING
-        const booking = await this.prisma.resBooking.create({
+    async createRestaurant(data: any) {
+        return this.prisma.restaurant.create({
             data: {
-                restaurantId: data.restaurantId,
-                date: start,
-                pax: data.pax,
-                guestName: data.name,
-                guestSurname2: data.surname2,
-                guestEmail: data.email,
-                guestPhone: data.phone,
-                guestAge: data.age ? Number(data.age) : null,
-                guestGender: data.gender,
-                guestWhatsapp: data.whatsapp,
-                instagram: data.instagram,
-                facebook: data.facebook,
-                tiktok: data.tiktok,
-                linkedin: data.linkedin,
-                xTwitter: data.xTwitter,
-                notes: data.notes,
-                status: 'PENDING_CONFIRMATION',
-                origin: 'WIDGET',
-                stripePaymentMethodId: data.paymentMethodId
+                ...data,
+                widgetConfig: {
+                    create: {} // Create default widget config
+                }
             }
         });
-
-        // 3. Send Email
-        await this.mailService.sendRestaurantNotification(booking, 'created');
-
-        // 4. Sync with CRM removed
-        
-        return booking;
-    }
-
-    async confirmReservation(bookingId: string) {
-        const booking = await this.prisma.resBooking.findUnique({ where: { id: bookingId } });
-        if (!booking) throw new Error('Reserva no encontrada');
-
-        if (booking.status === 'CONFIRMED') return booking;
-
-        const updated = await this.prisma.resBooking.update({
-            where: { id: bookingId },
-            data: { status: 'CONFIRMED' }
-        });
-
-        await this.mailService.sendRestaurantNotification(updated, 'confirmed');
-
-        // Sync with CRM removed
-        
-        return updated;
-    }
-
-    async cancelReservation(bookingId: string) {
-        const booking = await this.prisma.resBooking.findUnique({ where: { id: bookingId } });
-        if (!booking) throw new Error('Reserva no encontrada');
-
-        const updated = await this.prisma.resBooking.update({
-            where: { id: bookingId },
-            data: { status: 'CANCELLED' }
-        });
-
-        await this.mailService.sendRestaurantNotification(updated, 'cancelled');
-
-        // Trigger waitlist check
-        this.waitlistService.checkWaitlistForAvailability(
-            updated.restaurantId,
-            updated.date
-        );
-        
-        return updated;
-    }
-
-    async createRestaurant(data: { name: string; currency: string }) {
-        return this.prisma.restaurant.create({ data });
     }
 
     async getRestaurants() {
@@ -166,7 +36,7 @@ export class RestaurantService {
     async getRestaurant(id: string) {
         return this.prisma.restaurant.findUnique({ 
             where: { id },
-            include: { hotel: true, widgetConfig: true }
+            include: { hotel: true, widgetConfig: true, shifts: true }
         });
     }
 
@@ -266,57 +136,67 @@ export class RestaurantService {
 
     // --- Tables ---
     async syncTables(zoneId: string, tables: any[]) {
-        const results: any[] = [];
-        const idMap: Record<string, string> = {};
+        return this.prisma.$transaction(async (tx) => {
+            const results: any[] = [];
+            const idMap: Record<string, string> = {};
 
-        // 1. Create/Update tables and build ID map
-        for (const t of tables) {
-            const tableData: any = {
-                x: t.x, y: t.y, width: t.width, height: t.height,
-                rotation: t.rotation, shape: t.shape,
-                name: t.name, capacity: t.capacity,
-                minPax: t.minPax, maxPax: t.maxPax,
-                seatsLostPerJoin: t.seatsLostPerJoin || 1,
-                metadata: t.metadata || {}
-            };
-            
-            // Temporary store contiguousTableIds if present as a top-level prop or in metadata
-            const cids = t.contiguousTableIds || t.metadata?.contiguousTableIds || [];
-            
-            let synced;
-            if (t.id && !t.id.startsWith('temp-')) {
-                synced = await this.prisma.table.update({
-                    where: { id: t.id },
-                    data: tableData
-                });
-                idMap[t.id] = synced.id;
-            } else {
-                synced = await this.prisma.table.create({
-                    data: { zoneId, ...tableData }
-                });
-                if (t.id) idMap[t.id] = synced.id;
-            }
-            results.push({ ...synced, _originalCids: cids });
-        }
+            // 1. Create/Update tables and build ID map
+            for (const t of tables) {
+                const capacity = Number(t.capacity) || 4;
+                const tableData: any = {
+                    x: Number(t.x) || 0,
+                    y: Number(t.y) || 0,
+                    width: Number(t.width) || 60,
+                    height: Number(t.height) || 60,
+                    rotation: Number(t.rotation) || 0,
+                    shape: t.shape || 'RECTANGLE',
+                    name: t.name || 'Mesa',
+                    capacity: capacity,
+                    minPax: Number(t.minPax) || 1,
+                    maxPax: Number(t.maxPax) || capacity,
+                    seatsLostPerJoin: Number(t.seatsLostPerJoin) || 1,
+                    metadata: t.metadata || {}
+                };
 
-        // 2. Second pass: Fix contiguousTableIds in metadata using the idMap
-        for (const res of results) {
-            const originalCids = res._originalCids || [];
-            const mappedCids = originalCids.map((cid: string) => idMap[cid] || cid);
-            
-            await this.prisma.table.update({
-                where: { id: res.id },
-                data: {
-                    metadata: {
-                        ...(res.metadata as any || {}),
-                        contiguousTableIds: mappedCids
-                    }
+                // Temporary store contiguousTableIds if present as a top-level prop or in metadata
+                const cids = t.contiguousTableIds || t.metadata?.contiguousTableIds || [];
+
+                let synced;
+                if (t.id && !t.id.startsWith('temp-')) {
+                    synced = await tx.table.update({
+                        where: { id: t.id },
+                        data: tableData
+                    });
+                    idMap[t.id] = synced.id;
+                } else {
+                    synced = await tx.table.create({
+                        data: { zoneId, ...tableData }
+                    });
+                    if (t.id) idMap[t.id] = synced.id;
                 }
-            });
-        }
+                results.push({ ...synced, _originalCids: cids });
+            }
 
-        // Return the final updated tables
-        return this.prisma.table.findMany({ where: { zoneId, isActive: true } });
+            // 2. Second pass: Fix contiguousTableIds in metadata using the idMap
+            const finalResults: any[] = [];
+            for (const res of results) {
+                const originalCids = res._originalCids || [];
+                const mappedCids = originalCids.map((cid: string) => idMap[cid] || cid);
+
+                const updated = await tx.table.update({
+                    where: { id: res.id },
+                    data: {
+                        metadata: {
+                            ...(res.metadata as any || {}),
+                            contiguousTableIds: mappedCids
+                        }
+                    }
+                });
+                finalResults.push(updated);
+            }
+
+            return finalResults;
+        });
     }
 
     async createTable(zoneId: string, name: string, capacity: number) {
@@ -325,23 +205,56 @@ export class RestaurantService {
         });
     }
 
-    async getVisitCount(email?: string | null, phone?: string | null): Promise<number> {
-        if (!email && !phone) return 0;
+    async getGuestStats(email?: string | null, phone?: string | null) {
+        if (!email && !phone) return { visitCount: 0, firstVisit: null, cancelledCount: 0, totalBookings: 0, cancellationRate: 0 };
         
-        return this.prisma.resBooking.count({
+        const bookings = await this.prisma.resBooking.findMany({
             where: {
                 OR: [
                     email ? { guestEmail: email } : null,
                     phone ? { guestPhone: phone } : null
-                ].filter(Boolean) as any,
-                status: 'SEATED' // Only count actual past visits
+                ].filter(Boolean) as any
+            },
+            select: {
+                status: true,
+                date: true
             }
         });
+
+        const totalBookings = bookings.length;
+        const visitCount = bookings.filter(b => b.status === 'SEATED').length;
+        const cancelledCount = bookings.filter(b => b.status === 'CANCELLED' || b.status === 'NO_SHOW').length;
+        
+        // Find first reservation date
+        let firstVisit: Date | null = null;
+        if (bookings.length > 0) {
+            firstVisit = bookings.reduce((prev, curr) => 
+                (curr.date < prev.date) ? curr : prev
+            ).date;
+        }
+
+        return {
+            visitCount,
+            firstVisit,
+            cancelledCount,
+            totalBookings,
+            cancellationRate: totalBookings > 0 ? Math.round((cancelledCount / totalBookings) * 100) : 0
+        };
     }
 
-    async getTables(restaurantId: string) {
-        const start = new Date(new Date().setHours(0, 0, 0, 0));
-        const end = new Date(new Date().setHours(23, 59, 59, 999));
+    async getTables(restaurantId: string, dateStr?: string) {
+        let start: Date;
+        let end: Date;
+
+        if (dateStr) {
+            start = new Date(dateStr);
+            start.setUTCHours(0, 0, 0, 0);
+            end = new Date(dateStr);
+            end.setUTCHours(23, 59, 59, 999);
+        } else {
+            start = new Date(new Date().setUTCHours(0, 0, 0, 0));
+            end = new Date(new Date().setUTCHours(23, 59, 59, 999));
+        }
 
         const zones = await this.prisma.zone.findMany({
             where: { restaurantId, isActive: true },
@@ -358,21 +271,24 @@ export class RestaurantService {
             where: {
                 restaurantId,
                 date: { gte: start, lte: end },
-                status: { not: 'CANCELLED' }
+                status: { notIn: ['CANCELLED', 'RELEASED', 'NO_SHOW'] }
             },
             orderBy: { date: 'asc' }
         });
 
-        // Cache for visit counts to avoid redundant queries for the same guest
-        const visitCountCache: Record<string, number> = {};
+        // Cache for guest stats to avoid redundant queries for the same guest
+        const guestStatsCache: Record<string, any> = {};
 
-        // Process bookings: calculate visit counts and distribute to tables
+        // Process bookings: calculate guest stats and distribute to tables
         for (const booking of bookings) {
             const cacheKey = booking.guestEmail || booking.guestPhone || booking.id;
-            if (visitCountCache[cacheKey] === undefined) {
-                visitCountCache[cacheKey] = await this.getVisitCount(booking.guestEmail, booking.guestPhone);
+            if (guestStatsCache[cacheKey] === undefined) {
+                guestStatsCache[cacheKey] = await this.getGuestStats(booking.guestEmail, booking.guestPhone);
             }
-            (booking as any).visitCount = visitCountCache[cacheKey];
+            
+            const stats = guestStatsCache[cacheKey];
+            (booking as any).visitCount = stats.visitCount;
+            (booking as any).guestStats = stats;
         }
 
         // Distribute bookings to tables (including linked/grouped tables)
@@ -396,16 +312,91 @@ export class RestaurantService {
         return zones;
     }
 
-
     // --- Bookings ---
+    async updateBooking(id: string, data: any) {
+        return this.prisma.resBooking.update({
+            where: { id },
+            data,
+            include: { table: { include: { zone: true } } }
+        });
+    }
+
     async createBooking(data: any) {
         // Basic impl, can be expanded for validation
-        const booking = await this.prisma.resBooking.create({ data });
+        const { name, ...rest } = data;
+        const booking = await this.prisma.resBooking.create({ 
+            data: {
+                ...rest,
+                guestName: data.guestName || name
+            } 
+        });
+
+        // Auto-assign Table if not provided
+        if (!booking.tableId && booking.restaurantId && booking.date) {
+            const restaurant = await this.prisma.restaurant.findUnique({ where: { id: booking.restaurantId }, select: { defaultDuration: true } });
+            const tableId = await this.findAvailableTable(booking.restaurantId, new Date(booking.date), booking.pax, restaurant?.defaultDuration || 90);
+            if (tableId) {
+                await this.prisma.resBooking.update({
+                    where: { id: booking.id },
+                    data: { tableId }
+                });
+            }
+        }
+
+        // Identify Guest in CRM
+        this.crmService.identify({
+            email: booking.guestEmail ?? undefined,
+            phone: booking.guestPhone ?? undefined,
+            firstName: booking.guestName.split(' ')[0],
+            lastName: booking.guestName.split(' ').slice(1).join(' ')
+        }).catch(err => this.logger.error(`Error identifying guest in CRM: ${err.message}`));
         
-        // Sync with CRM (commented out for now as service is not injected)
-        // this.crmIntegrationService.syncRestaurantBooking(booking.id);
+        // Sync with CRM
+        this.crmIntegrationService.syncRestaurantBooking(booking.id).catch(err => {
+            this.logger.error(`Error syncing booking ${booking.id} to CRM:`, err);
+        });
         
         return booking;
+    }
+
+    private async findAvailableTable(restaurantId: string, date: Date, pax: number, duration: number): Promise<string | null> {
+        const startOfDay = new Date(date);
+        startOfDay.setUTCHours(0, 0, 0, 0);
+        const endOfDay = new Date(date);
+        endOfDay.setUTCHours(23, 59, 59, 999);
+
+        const tables = await this.prisma.table.findMany({
+            where: { zone: { restaurantId }, isActive: true }
+        });
+
+        const bookings = await this.prisma.resBooking.findMany({
+            where: {
+                restaurantId,
+                date: { gte: startOfDay, lte: endOfDay },
+                status: { notIn: ['CANCELLED', 'RELEASED', 'NO_SHOW'] }
+            },
+            select: { id: true, date: true, duration: true, tableId: true }
+        });
+
+        // 1. Try single table
+        const freeTables = tables.filter(table => {
+            const isBooked = bookings.some(b => {
+                if (!b.tableId || b.tableId !== table.id) return false;
+                const bStart = new Date(b.date);
+                const bEnd = new Date(bStart.getTime() + (b.duration || duration) * 60000);
+                
+                const slotEnd = new Date(date.getTime() + duration * 60000);
+                return (date < bEnd && slotEnd > bStart);
+            });
+            return !isBooked;
+        });
+
+        // Find smallest table that fits
+        const bestTable = freeTables
+            .filter(t => t.maxPax >= pax && t.minPax <= pax)
+            .sort((a, b) => (a.maxPax - b.maxPax))[0];
+
+        return bestTable ? bestTable.id : null;
     }
 
     async updateBookingStatus(bookingId: string, status: string, tableId?: string) {
@@ -425,6 +416,49 @@ export class RestaurantService {
             );
         }
 
+        // If seated, update the CRM Customer Profile
+        if (status === 'SEATED') {
+            try {
+                const profile = await this.crmService.identify({
+                    email: booking.guestEmail ?? undefined,
+                    phone: booking.guestPhone ?? undefined
+                });
+                
+                if (profile) {
+                    await (this.prisma as any).customerProfile.update({
+                        where: { id: profile.id },
+                        data: {
+                            visitCount: { increment: 1 },
+                            lastInteraction: new Date(),
+                            lifecycleStage: 'CUSTOMER'
+                        }
+                    });
+                }
+            } catch (err) {
+                this.logger.error(`Error updating CRM profile on seat: ${err.message}`);
+            }
+        }
+
+        // Sync with CRM
+        this.crmIntegrationService.syncRestaurantBooking(booking.id, 'UPDATED').catch(err => {
+            this.logger.error(`Error syncing updated booking ${booking.id} to CRM:`, err);
+        });
+
+        // NEW: Send Status Notifications
+        if (booking.guestEmail) {
+            if (status === 'CONFIRMED') {
+                this.mailService.sendRestaurantNotification(booking, 'confirmed').catch(err => this.logger.error(`Error sending confirm email:`, err));
+            } else if (status === 'CANCELLED') {
+                this.mailService.sendRestaurantNotification(booking, 'cancelled').catch(err => this.logger.error(`Error sending cancel email:`, err));
+            }
+        }
+
+
+        // Trigger dynamic adaptation: try to assign other unassigned bookings
+        this.autoAssignPendingBookings(booking.restaurantId, booking.date).catch(err => {
+            this.logger.error(`Error in dynamic adaptation for restaurant ${booking.restaurantId}:`, err);
+        });
+
         return booking;
     }
 
@@ -435,20 +469,20 @@ export class RestaurantService {
 
         if (startDateStr && endDateStr) {
             start = new Date(startDateStr);
-            start.setHours(0, 0, 0, 0);
+            start.setUTCHours(0, 0, 0, 0);
             end = new Date(endDateStr);
-            end.setHours(23, 59, 59, 999);
+            end.setUTCHours(23, 59, 59, 999);
         } else if (dateStr) {
             start = new Date(dateStr);
-            start.setHours(0, 0, 0, 0);
+            start.setUTCHours(0, 0, 0, 0);
             end = new Date(dateStr);
-            end.setHours(23, 59, 59, 999);
+            end.setUTCHours(23, 59, 59, 999);
         } else {
             // Default to today
             start = new Date();
-            start.setHours(0, 0, 0, 0);
+            start.setUTCHours(0, 0, 0, 0);
             end = new Date();
-            end.setHours(23, 59, 59, 999);
+            end.setUTCHours(23, 59, 59, 999);
         }
 
         const bookings = await this.prisma.resBooking.findMany({
@@ -460,9 +494,11 @@ export class RestaurantService {
             orderBy: { date: 'asc' }
         });
 
-        // Add visit count
+        // Add guest stats
         for (const booking of bookings) {
-            (booking as any).visitCount = await this.getVisitCount(booking.guestEmail, booking.guestPhone);
+            const stats = await this.getGuestStats(booking.guestEmail, booking.guestPhone);
+            (booking as any).visitCount = stats.visitCount;
+            (booking as any).guestStats = stats;
         }
 
         return bookings;
@@ -498,28 +534,55 @@ export class RestaurantService {
     }
 
     async createShift(restaurantId: string, data: any) {
-        return this.prisma.shift.create({
-            data: { ...data, restaurantId }
-        });
+        try {
+            return await this.prisma.shift.create({
+                data: { ...data, restaurantId }
+            });
+        } catch (error: any) {
+            console.error('Error creating shift:', error);
+            throw new Error(`Error de base de datos: ${error.message || 'Error desconocido'}`);
+        }
     }
 
     async getAvailableSlots(restaurantId: string, dateStr: string, pax: number, type?: string) {
+        console.log('--- BUSCANDO HUECOS (PROD) --- Restaurant:', restaurantId, 'Fecha:', dateStr, 'Pax:', pax);
         const date = new Date(dateStr);
+        const now = new Date();
+        now.setUTCHours(0, 0, 0, 0);
+
+        // Si la fecha es anterior a hoy, devolvemos cerrado/vacío sin más
+        if (date < now) {
+            console.log('Fecha pasada detectada:', dateStr);
+            return { slots: [], closed: true, message: 'Fecha pasada' };
+        }
+
         const dayOfWeek = date.getDay(); // 0-6
-        
+
         const shifts = await this.prisma.shift.findMany({
             where: {
                 restaurantId,
                 isActive: true,
-                daysOfWeek: { contains: dayOfWeek.toString() },
                 ...(type ? { type } : {})
             }
         });
 
+        // Filtro manual exacto de días de la semana para evitar errores de 'contains'
+        const activeShifts = shifts.filter(s => {
+            const days = s.daysOfWeek.split(',').map(d => d.trim());
+            return days.includes(dayOfWeek.toString());
+        });
+
+        console.log('Turnos activos encontrados para este día de la semana:', activeShifts.length);
+
+        // Si no hay turnos, está CERRADO, no COMPLETO
+        if (activeShifts.length === 0) {
+            return { slots: [], closed: true, message: 'No hay turnos para este día' };
+        }
+
         const startOfDay = new Date(date);
-        startOfDay.setHours(0, 0, 0, 0);
+        startOfDay.setUTCHours(0, 0, 0, 0);
         const endOfDay = new Date(date);
-        endOfDay.setHours(23, 59, 59, 999);
+        endOfDay.setUTCHours(23, 59, 59, 999);
 
         // Check for events on this date and their blocked zones
         const dayEvents = await this.prisma.event.findMany({
@@ -528,18 +591,23 @@ export class RestaurantService {
                 date: { gte: startOfDay, lte: endOfDay },
                 isActive: true
             },
-            include: { zones: true }
+            include: {
+                zones: true,
+                _count: {
+                    select: { bookings: true }
+                }
+            }
         });
 
         const blockedZoneIds = dayEvents.flatMap(e => e.zones.map(z => z.id));
 
         const tables = await this.prisma.table.findMany({
-            where: { 
-                zone: { 
+            where: {
+                zone: {
                     restaurantId,
                     id: blockedZoneIds.length > 0 ? { notIn: blockedZoneIds } : undefined
-                }, 
-                isActive: true 
+                },
+                isActive: true
             }
         });
 
@@ -547,32 +615,49 @@ export class RestaurantService {
             where: {
                 restaurantId,
                 date: { gte: startOfDay, lte: endOfDay },
-                status: { notIn: ['CANCELLED', 'NO_SHOW'] }
+                status: { notIn: ['CANCELLED', 'RELEASED', 'NO_SHOW'] }
             },
             select: { id: true, date: true, duration: true, tableId: true }
         });
 
         const availableSlots: string[] = [];
-        
+
         const restaurant = await this.prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { defaultDuration: true } });
         const defaultDuration = restaurant?.defaultDuration || 90;
 
-        for (const shift of shifts) {
+        for (const shift of activeShifts) {
             const slots = this.generateSlots(shift.startTime, shift.endTime, shift.slotInterval);
-            
+
             for (const slot of slots) {
                 const [h, m] = slot.split(':').map(Number);
                 const slotTime = new Date(date);
-                slotTime.setHours(h, m, 0, 0);
+                slotTime.setUTCHours(h, m, 0, 0);
+
+                // No permitir horas que ya han pasado si el día es hoy
+                const now = new Date();
+                if (date.toISOString().split('T')[0] === now.toISOString().split('T')[0] && slotTime < now) {
+                    continue;
+                }
 
                 if (this.isSlotAvailable(slotTime, pax, tables, bookings, defaultDuration)) {
-                    availableSlots.push(slot);
+                    // Evitar duplicados en la lista de slots
+                    if (!availableSlots.includes(slot)) {
+                        availableSlots.push(slot);
+                    }
                 }
             }
         }
 
+        console.log('Huecos finales encontrados:', availableSlots.length);
+
+        // Si es una fecha pasada, siempre devolvemos closed: true
+        if (date < now) {
+            return { slots: [], closed: true, message: 'Fecha pasada' };
+        }
+
         return {
             slots: availableSlots,
+            closed: activeShifts.length === 0,
             event: dayEvents[0] || null
         };
     }
@@ -612,7 +697,6 @@ export class RestaurantService {
         const cluster: any[] = [startTable];
         visited.add(startTable.id);
 
-        let currentTotalCapacity = startTable.maxPax;
         let head = 0;
 
         while (head < cluster.length) {
@@ -675,9 +759,9 @@ export class RestaurantService {
     }) {
         const [hours, minutes] = data.time.split(':').map(Number);
         const start = new Date(data.date);
-        start.setHours(hours, minutes, 0, 0);
+        start.setUTCHours(hours, minutes, 0, 0);
 
-        return this.prisma.resBooking.create({
+        const booking = await this.prisma.resBooking.create({
             data: {
                 restaurantId: data.restaurantId,
                 hotelBookingId: data.bookingId,
@@ -690,6 +774,95 @@ export class RestaurantService {
                 origin: 'HOTEL_SYNERGY'
             }
         });
+
+        // Auto-assign Table (only for groups of 12 or less)
+        const restaurant = await this.prisma.restaurant.findUnique({ where: { id: data.restaurantId }, select: { defaultDuration: true } });
+        let tableId: string | null = null;
+        if (data.pax <= 12) {
+            tableId = await this.findAvailableTable(data.restaurantId, start, data.pax, restaurant?.defaultDuration || 90);
+        }
+        if (tableId) {
+            await this.prisma.resBooking.update({
+                where: { id: booking.id },
+                data: { tableId }
+            });
+        }
+
+        return booking;
+    }
+
+    async confirmReservation(id: string) {
+        return this.updateBookingStatus(id, 'CONFIRMED');
+    }
+
+    async cancelReservation(id: string) {
+        return this.updateBookingStatus(id, 'CANCELLED');
+    }
+
+    async createPublicReservation(data: any) {
+        const [hours, minutes] = data.time.split(':').map(Number);
+        const start = new Date(data.date);
+        start.setUTCHours(hours, minutes, 0, 0);
+
+        const booking = await this.prisma.resBooking.create({
+            data: {
+                restaurantId: data.restaurantId,
+                date: start,
+                pax: data.pax,
+                guestName: data.guestName || data.name,
+                guestEmail: data.guestEmail || data.email,
+                guestPhone: data.guestPhone || data.phone,
+                guestSurname2: data.guestSurname2 || data.surname2,
+                guestAge: data.guestAge || data.age,
+                guestGender: data.guestGender || data.gender,
+                guestWhatsapp: data.guestWhatsapp || data.whatsapp,
+                instagram: data.instagram,
+                facebook: data.facebook,
+                tiktok: data.tiktok,
+                linkedin: data.linkedin,
+                xTwitter: data.xTwitter,
+                notes: data.notes,
+                status: 'PENDING_CONFIRMATION',
+                origin: 'WEB',
+                stripePaymentMethodId: data.paymentMethodId
+            }
+        });
+
+        // Auto-assign Table (only for groups of 12 or less)
+        const restaurant = await this.prisma.restaurant.findUnique({ where: { id: data.restaurantId }, select: { defaultDuration: true } });
+        let tableId: string | null = null;
+        if (data.pax <= 12) {
+            tableId = await this.findAvailableTable(data.restaurantId, start, data.pax, restaurant?.defaultDuration || 90);
+        }
+        if (tableId) {
+            await this.prisma.resBooking.update({
+                where: { id: booking.id },
+                data: { tableId }
+            });
+        }
+
+        // Identify Guest in CRM
+        this.crmService.identify({
+            email: booking.guestEmail ?? undefined,
+            phone: booking.guestPhone ?? undefined,
+            firstName: booking.guestName.split(' ')[0],
+            lastName: booking.guestName.split(' ').slice(1).join(' ')
+        }).catch(err => this.logger.error(`Error identifying guest in CRM: ${err.message}`));
+        
+        // Sync with CRM
+        this.crmIntegrationService.syncRestaurantBooking(booking.id).catch(err => {
+            this.logger.error(`Error syncing booking ${booking.id} to CRM:`, err);
+        });
+
+        // NEW: Send Confirmation Email (If guest has email)
+        if (booking.guestEmail) {
+            this.mailService.sendRestaurantNotification(booking, 'created').catch(err => {
+                this.logger.error(`Error sending confirmation email for booking ${booking.id}:`, err);
+            });
+        }
+        
+        return booking;
+
     }
 
     async deleteShift(id: string) {
@@ -705,11 +878,12 @@ export class RestaurantService {
         });
     }
 
-    async createClosure(restaurantId: string, data: { date: string, reason?: string }) {
+    async createClosure(restaurantId: string, data: { date: string, endDate?: string, reason?: string }) {
         return this.prisma.restaurantClosure.create({
             data: {
                 restaurantId,
                 date: new Date(data.date),
+                endDate: data.endDate ? new Date(data.endDate) : null,
                 reason: data.reason
             }
         });
@@ -728,8 +902,8 @@ export class RestaurantService {
         });
     }
 
-    async authorizeUser(restaurantId: string, data: { email: string, permissions: string[] }) {
-        const { email, permissions } = data;
+    async authorizeUser(restaurantId: string, data: { email: string, password?: string, role?: string, permissions: string[] }) {
+        const { email, password, role, permissions } = data;
         
         const user = await this.prisma.user.findUnique({ where: { email } });
         
@@ -738,6 +912,8 @@ export class RestaurantService {
                 where: { email },
                 data: {
                     restaurantId,
+                    role: role || user.role,
+                    password: password || user.password,
                     permissions: permissions.join(',')
                 }
             });
@@ -746,9 +922,9 @@ export class RestaurantService {
                 data: {
                     email,
                     restaurantId,
-                    password: 'INVITED',
+                    password: password || 'INVITED',
+                    role: role || 'STAFF',
                     permissions: permissions.join(','),
-                    role: 'STAFF'
                 }
             });
         }
@@ -763,5 +939,41 @@ export class RestaurantService {
             }
         });
     }
-}
 
+    async autoAssignPendingBookings(restaurantId: string, date: Date) {
+        const startOfDay = new Date(date);
+        startOfDay.setUTCHours(0, 0, 0, 0);
+        const endOfDay = new Date(date);
+        endOfDay.setUTCHours(23, 59, 59, 999);
+
+        const pendingBookings = await this.prisma.resBooking.findMany({
+            where: {
+                restaurantId,
+                date: { gte: startOfDay, lte: endOfDay },
+                tableId: null,
+                status: { notIn: ['CANCELLED', 'NO_SHOW'] }
+            },
+            orderBy: { pax: 'desc' } // Assign larger groups first for better optimization
+        });
+
+        if (pendingBookings.length === 0) return;
+
+        this.logger.log(`Attempting to auto-assign ${pendingBookings.length} pending bookings for ${date.toDateString()}`);
+
+        const restaurant = await this.prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { defaultDuration: true } });
+        const duration = restaurant?.defaultDuration || 90;
+
+        for (const booking of pendingBookings) {
+            if (booking.pax > 12) continue; // Manual handling for large groups
+            
+            const tableId = await this.findAvailableTable(restaurantId, new Date(booking.date), booking.pax, duration);
+            if (tableId) {
+                await this.prisma.resBooking.update({
+                    where: { id: booking.id },
+                    data: { tableId }
+                });
+                this.logger.log(`Auto-assigned booking ${booking.id} to table ${tableId}`);
+            }
+        }
+    }
+}

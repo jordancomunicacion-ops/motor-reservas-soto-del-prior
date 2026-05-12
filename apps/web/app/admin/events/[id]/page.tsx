@@ -149,16 +149,31 @@ export default function EventDetailPage() {
                             {(event.hotel || event.restaurant) && (
                                 <div className="pt-4 border-t border-gray-100 dark:border-zinc-700">
                                     <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider mb-2">Viculación</p>
-                                    {event.hotel && (
-                                        <div className="flex items-center gap-2 text-sm font-medium text-blue-600 bg-blue-50 px-3 py-2 rounded-lg">
-                                            <Building2 className="w-4 h-4" /> Hotel: {event.hotel.name}
-                                        </div>
-                                    )}
-                                    {event.restaurant && (
-                                        <div className="flex items-center gap-2 text-sm font-medium text-orange-600 bg-orange-50 px-3 py-2 rounded-lg">
-                                            <Utensils className="w-4 h-4" /> Restaurante: {event.restaurant.name}
-                                        </div>
-                                    )}
+                                    <div className="space-y-2">
+                                        {event.hotel && (
+                                            <div className="flex items-center gap-2 text-sm font-medium text-blue-600 bg-blue-50 px-3 py-2 rounded-lg">
+                                                <Building2 className="w-4 h-4" /> Hotel: {event.hotel.name}
+                                            </div>
+                                        )}
+                                        {event.restaurant && (
+                                            <div className="flex items-center gap-2 text-sm font-medium text-orange-600 bg-orange-50 px-3 py-2 rounded-lg">
+                                                <Utensils className="w-4 h-4" /> Restaurante: {event.restaurant.name}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {event.zones && event.zones.length > 0 && (
+                                <div className="pt-4 border-t border-gray-100 dark:border-zinc-700">
+                                    <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider mb-2">Áreas Reservadas</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {event.zones.map((zone: any) => (
+                                            <span key={zone.id} className="text-[10px] font-bold px-2 py-1 bg-zinc-100 dark:bg-zinc-700 rounded uppercase">
+                                                {zone.name}
+                                            </span>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
                             

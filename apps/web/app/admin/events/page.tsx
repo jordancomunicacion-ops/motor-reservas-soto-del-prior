@@ -28,14 +28,27 @@ export default function EventsListPage() {
     const [availableZones, setAvailableZones] = useState<any[]>([]);
 
     useEffect(() => {
-        if (formData.restaurantId) {
-            fetchAPI(`/restaurant/${formData.restaurantId}/zones`)
-                .then(setAvailableZones)
-                .catch(() => setAvailableZones([]));
-        } else {
-            setAvailableZones([]);
+        async function fetchZones() {
+            if (formData.restaurantId) {
+                try {
+                    const data = await fetchAPI(`/restaurant/${formData.restaurantId}/zones`);
+                    setAvailableZones(data);
+                } catch (e) {
+                    setAvailableZones([]);
+                }
+            } else if (formData.hotelId) {
+                try {
+                    const data = await fetchAPI(`/property/hotels/${formData.hotelId}/zones`);
+                    setAvailableZones(data);
+                } catch (e) {
+                    setAvailableZones([]);
+                }
+            } else {
+                setAvailableZones([]);
+            }
         }
-    }, [formData.restaurantId]);
+        fetchZones();
+    }, [formData.restaurantId, formData.hotelId]);
 
     useEffect(() => {
         loadEvents();
@@ -75,7 +88,8 @@ export default function EventsListPage() {
             ...formData,
             hotelId,
             // If hotel has a linked restaurant, auto-select it
-            restaurantId: selectedHotel?.restaurantId || formData.restaurantId
+            restaurantId: selectedHotel?.restaurantId || formData.restaurantId,
+            zoneIds: []
         });
     };
 
@@ -85,7 +99,8 @@ export default function EventsListPage() {
         setFormData({
             ...formData,
             restaurantId,
-            hotelId: linkedHotel?.id || formData.hotelId
+            hotelId: linkedHotel?.id || formData.hotelId,
+            zoneIds: []
         });
     };
 
@@ -218,7 +233,7 @@ export default function EventsListPage() {
                             <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1">
                                 <Utensils className="w-3 h-3" /> Salas / Áreas Reservadas
                             </label>
-                            {formData.restaurantId ? (
+                            {(formData.restaurantId || formData.hotelId) ? (
                                 availableZones.length > 0 ? (
                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                         {availableZones.map(zone => (
@@ -239,10 +254,10 @@ export default function EventsListPage() {
                                         ))}
                                     </div>
                                 ) : (
-                                    <p className="text-[10px] text-muted-foreground italic">Este restaurante no tiene salas configuradas.</p>
+                                    <p className="text-[10px] text-muted-foreground italic">Este establecimiento no tiene salas configuradas.</p>
                                 )
                             ) : (
-                                <p className="text-[10px] text-muted-foreground italic">Selecciona un restaurante para ver sus salas.</p>
+                                <p className="text-[10px] text-muted-foreground italic">Selecciona un hotel o restaurante para ver sus salas.</p>
                             )}
                         </div>
                         <div className="md:col-span-2 space-y-2">
@@ -311,6 +326,11 @@ export default function EventsListPage() {
                                         <Utensils className="w-3 h-3" /> {event.restaurant.name}
                                     </div>
                                 )}
+                                {event.zones?.map((zone: any) => (
+                                    <div key={zone.id} className="px-2 py-1 bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 text-[9px] font-bold uppercase rounded">
+                                        {zone.name}
+                                    </div>
+                                ))}
                             </div>
                             
                              <div className="space-y-4 mb-6 bg-secondary/50 dark:bg-zinc-900/50 p-4 rounded-2xl border border-primary/5">

@@ -10,6 +10,9 @@ import { ArrowLeft, Save, Building2, Trash2, Utensils, Sparkles, Settings, Mail,
 import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { WidgetConfigSection } from '@/components/admin/WidgetConfigSection';
+import { Switch } from '@/components/ui/switch';
+import { BellRing } from 'lucide-react';
+
 
 
 import AccessManager from '@/components/admin/AccessManager';
@@ -51,8 +54,10 @@ function HotelConfigContent() {
             port: '587',
             user: '',
             pass: '',
-            from: ''
+            from: '',
+            notificationsEnabled: true
         }
+
     });
 
     useEffect(() => {
@@ -79,8 +84,10 @@ function HotelConfigContent() {
                     port: '587',
                     user: '',
                     pass: '',
-                    from: ''
+                    from: '',
+                    notificationsEnabled: true
                 }
+
             });
         } catch (e) {
             console.error(e);
@@ -356,11 +363,31 @@ function HotelConfigContent() {
                             </div>
                             <div>
                                 <CardTitle>Notificaciones Automáticas</CardTitle>
-                                <CardDescription>Configura los correos que reciben tus huéspedes. (Nota: La gestión de correos de hoteles se centralizará en el futuro).</CardDescription>
+                                <CardDescription>Configura los correos que reciben tus huéspedes.</CardDescription>
                             </div>
                         </div>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="space-y-6">
+                        <div className="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-blue-500 text-white rounded-full">
+                                    <BellRing className="w-4 h-4" />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-semibold">Notificaciones por Email</p>
+                                    <p className="text-xs text-muted-foreground italic">Activa o desactiva el envío de correos automáticos.</p>
+                                </div>
+                            </div>
+                            <Switch 
+                                checked={formData.mailConfig.notificationsEnabled !== false}
+                                onCheckedChange={(checked) => setFormData({
+                                    ...formData, 
+                                    mailConfig: { ...formData.mailConfig, notificationsEnabled: checked }
+                                })}
+                            />
+
+                        </div>
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label>Servidor SMTP (ej: smtp.office365.com)</Label>

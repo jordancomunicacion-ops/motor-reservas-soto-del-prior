@@ -47,7 +47,7 @@ function RestaurantDashboardContent() {
         try {
             // Parallel fetch
             const [tablesRes, bookingsRes, waitlistRes, restRes] = await Promise.all([
-                fetchAPI(`/restaurant/${restaurantId}/tables`), 
+                fetchAPI(`/restaurant/${restaurantId}/tables?date=${format(date, 'yyyy-MM-dd')}`), 
                 fetchAPI(`/restaurant/${restaurantId}/bookings?date=${format(date, 'yyyy-MM-dd')}`),
                 fetchAPI(`/restaurant/${restaurantId}/waitlist`),
                 fetchAPI(`/restaurant/${restaurantId}`).catch(() => ({ name: 'Restaurante' }))
@@ -187,7 +187,10 @@ function RestaurantDashboardContent() {
                                 {bookings.filter(b => !b.tableId).map(b => (
                                     <div key={b.id} className="p-3 text-sm hover:bg-gray-50 dark:hover:bg-zinc-700/50 cursor-pointer draggable transition-colors" draggable onDragStart={(e) => e.dataTransfer.setData("bookingId", b.id)}>
                                         <div className="flex justify-between">
-                                            <span className="font-bold">{format(new Date(b.date), 'HH:mm')}</span>
+                                            <span className="font-bold">
+                                                {String(new Date(b.date).getUTCHours()).padStart(2, '0')}:
+                                                {String(new Date(b.date).getUTCMinutes()).padStart(2, '0')}
+                                            </span>
                                             <span className="bg-gray-200 dark:bg-zinc-700 px-1.5 rounded text-[10px] font-bold uppercase">{b.pax} Pax</span>
                                         </div>
                                         <div className="truncate text-muted-foreground mt-1">{b.guestName}</div>
@@ -255,7 +258,9 @@ function RestaurantDashboardContent() {
                             <div className="h-full overflow-auto p-4">
                                 <ReservationList
                                     bookings={bookings}
+                                    zones={zones}
                                     onStatusChange={handleStatusChange}
+                                    onAssignTable={handleAssignTable}
                                     onSelectProfile={(b) => setSelectedBookingForProfile(b)}
                                     onEdit={(b) => console.log("Edit", b)}
                                 />

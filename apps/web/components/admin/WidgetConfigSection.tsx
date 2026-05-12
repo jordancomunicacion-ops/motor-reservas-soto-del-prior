@@ -25,7 +25,9 @@ export function WidgetConfigSection({ entityId, type }: WidgetConfigSectionProps
         noShowFeeAll: false,
         noShowFeeGroups: false,
         noShowGroupMinPax: 8,
-        noShowFeeEvents: false
+        noShowFeeEvents: false,
+        showCrmFields: true,
+        skipGuaranteeStep: false
     });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -48,7 +50,9 @@ export function WidgetConfigSection({ entityId, type }: WidgetConfigSectionProps
                     noShowFeeAll: data.noShowFeeAll || false,
                     noShowFeeGroups: data.noShowFeeGroups || false,
                     noShowGroupMinPax: data.noShowGroupMinPax || 8,
-                    noShowFeeEvents: data.noShowFeeEvents || false
+                    noShowFeeEvents: data.noShowFeeEvents || false,
+                    showCrmFields: data.showCrmFields !== undefined ? data.showCrmFields : true,
+                    skipGuaranteeStep: data.skipGuaranteeStep || false
                 });
             }
         } catch (e) {
@@ -132,6 +136,44 @@ export function WidgetConfigSection({ entityId, type }: WidgetConfigSectionProps
                                 value={config.customCss}
                                 onChange={e => setConfig({ ...config, customCss: e.target.value })}
                                 placeholder=".widget-container { ... }"
+                            />
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Paso 3 Options */}
+                <Card className="border-indigo-100 dark:border-indigo-900/30 bg-indigo-50/5 dark:bg-indigo-950/10">
+                    <CardHeader>
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg text-indigo-600">
+                                <Users className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <CardTitle>Opciones del Paso 3</CardTitle>
+                                <CardDescription>Configura la pantalla de garantía y CRM.</CardDescription>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="flex items-center justify-between p-3 bg-white dark:bg-zinc-900 rounded-lg border">
+                            <div className="space-y-0.5">
+                                <Label className="text-base">Mostrar Preguntas Opcionales</Label>
+                                <p className="text-xs text-muted-foreground">Edad, sexo, redes sociales, etc.</p>
+                            </div>
+                            <Checkbox 
+                                checked={config.showCrmFields} 
+                                onCheckedChange={(checked) => setConfig({ ...config, showCrmFields: checked === true })}
+                            />
+                        </div>
+
+                        <div className="flex items-center justify-between p-3 bg-white dark:bg-zinc-900 rounded-lg border">
+                            <div className="space-y-0.5">
+                                <Label className="text-base">Saltar Paso si no hay Pago</Label>
+                                <p className="text-xs text-muted-foreground">Si no se requiere tarjeta, va directo a confirmar.</p>
+                            </div>
+                            <Checkbox 
+                                checked={config.skipGuaranteeStep} 
+                                onCheckedChange={(checked) => setConfig({ ...config, skipGuaranteeStep: checked === true })}
                             />
                         </div>
                     </CardContent>

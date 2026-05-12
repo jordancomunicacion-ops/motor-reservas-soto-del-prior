@@ -205,7 +205,15 @@ export default function EventConfigPage() {
                                 <select
                                     className="border p-2 rounded w-full dark:bg-zinc-900 focus:ring-2 focus:ring-blue-500 outline-none"
                                     value={formData.hotelId}
-                                    onChange={e => setFormData({...formData, hotelId: e.target.value, restaurantId: e.target.value ? '' : formData.restaurantId})}
+                                    onChange={e => {
+                                        const hId = e.target.value;
+                                        const hotel = hotels.find(h => h.id === hId);
+                                        setFormData({
+                                            ...formData, 
+                                            hotelId: hId, 
+                                            restaurantId: hotel?.restaurantId || ''
+                                        });
+                                    }}
                                 >
                                     <option value="">Ninguno</option>
                                     {hotels.map(h => (
@@ -220,7 +228,15 @@ export default function EventConfigPage() {
                                 <select
                                     className="border p-2 rounded w-full dark:bg-zinc-900 focus:ring-2 focus:ring-blue-500 outline-none"
                                     value={formData.restaurantId}
-                                    onChange={e => setFormData({...formData, restaurantId: e.target.value, hotelId: e.target.value ? '' : formData.hotelId})}
+                                    onChange={e => {
+                                        const rId = e.target.value;
+                                        const linkedHotel = hotels.find(h => h.restaurantId === rId);
+                                        setFormData({
+                                            ...formData, 
+                                            restaurantId: rId, 
+                                            hotelId: linkedHotel?.id || ''
+                                        });
+                                    }}
                                 >
                                     <option value="">Ninguno</option>
                                     {restaurants.map(r => (

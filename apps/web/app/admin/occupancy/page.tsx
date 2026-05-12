@@ -65,7 +65,7 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
         setLoading(true);
         try {
             const [tablesRes, bookingsRes, waitlistRes] = await Promise.all([
-                fetchAPI(`/restaurant/${contextId}/tables`), 
+                fetchAPI(`/restaurant/${contextId}/tables?date=${format(date, 'yyyy-MM-dd')}`), 
                 fetchAPI(`/restaurant/${contextId}/bookings?date=${format(date, 'yyyy-MM-dd')}`),
                 fetchAPI(`/restaurant/${contextId}/waitlist`)
             ]);
@@ -130,7 +130,11 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
         }
     };
 
-    const totalPax = bookings.reduce((sum, b) => sum + (b.status !== 'CANCELLED' ? b.pax : 0), 0);
+    const totalPax = bookings.reduce((sum, b) => {
+        if (b.status === 'CANCELLED') return sum;
+        const paxValue = parseInt(b.pax) || 0;
+        return sum + paxValue;
+    }, 0);
     const totalBookings = bookings.filter(b => b.status !== 'CANCELLED').length;
 
     return (
@@ -183,10 +187,27 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
                             </div>
                             <div className="divide-y dark:divide-zinc-700">
                                 {bookings.filter(b => !b.tableId).map(b => (
-                                    <div key={b.id} className="p-3 text-sm hover:bg-gray-50 dark:hover:bg-zinc-700/50 cursor-pointer transition-colors">
+                                    <div 
+                                        key={b.id} 
+                                        draggable
+                                        onDragStart={(e) => {
+                                            e.dataTransfer.setData("bookingId", b.id);
+                                            e.dataTransfer.effectAllowed = "move";
+                                        }}
+                                        className="p-3 text-sm hover:bg-gray-50 dark:hover:bg-zinc-700/50 cursor-pointer transition-colors border-l-4 border-yellow-400"
+                                    >
                                         <div className="flex justify-between">
-                                            <span className="font-bold">{format(new Date(b.date), 'HH:mm')}</span>
-                                            <span className="bg-gray-200 dark:bg-zinc-700 px-1.5 rounded text-[10px] font-bold uppercase">{b.pax} Pax</span>
+                                            <span className="font-bold">
+                                                {isNaN(new Date(b.date).getTime()) ? '--:--' : (
+                                                    <>
+                                                        {String(new Date(b.date).getUTCHours()).padStart(2, '0')}:
+                                                        {String(new Date(b.date).getUTCMinutes()).padStart(2, '0')}
+                                                    </>
+                                                )}
+                                            </span>
+                                            <span className="bg-gray-200 dark:bg-zinc-700 px-1.5 rounded text-[10px] font-bold uppercase">
+                                                {parseInt(b.pax) || 0} Pax
+                                            </span>
                                         </div>
                                         <div className="truncate text-muted-foreground mt-1">{b.guestName}</div>
                                     </div>
@@ -234,8 +255,11 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
                             <div className="h-full overflow-auto p-4">
                                 <ReservationList
                                     bookings={bookings}
-                                    onStatusChange={() => {}}
+                                    zones={zones}
+                                    onStatusChange={handleStatusChange}
+                                    onAssignTable={handleAssignTable}
                                     onEdit={() => {}}
+                                    onSelectProfile={(b) => setSelectedBookingForProfile(b)}
                                 />
                             </div>
                         )}
@@ -246,7 +270,17 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
             <ReservationForm
                 isOpen={isFormOpen}
                 onClose={() => setIsFormOpen(false)}
-                onSubmit={() => loadData()}
+                onSubmit={async (data) => {
+                    try {
+                        await fetchAPI('/restaurant/bookings', {
+                            method: 'POST',
+                            body: JSON.stringify({ ...data, restaurantId: contextId })
+                        });
+                        loadData();
+                    } catch (e) {
+                        console.error("Error creating reservation", e);
+                    }
+                }}
                 initialDate={date}
                 initialTableId={selectedTableId}
             />

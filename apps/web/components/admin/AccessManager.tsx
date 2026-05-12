@@ -27,6 +27,7 @@ const DEFAULT_PROFILES = [
 
 export default function AccessManager({ contextId, contextType }: { contextId: string, contextType: string }) {
     const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
     const [selectedProfile, setSelectedProfile] = useState('STAFF');
     const [customPermissions, setCustomPermissions] = useState<string[]>(DEFAULT_PROFILES[0].permissions);
     const [isManagingProfiles, setIsManagingProfiles] = useState(false);
@@ -68,14 +69,23 @@ export default function AccessManager({ contextId, contextType }: { contextId: s
     };
 
     const handleGrantAccess = async () => {
-        if (!email) return;
+        if (!email || !password) {
+            alert('Correo y contraseña son obligatorios');
+            return;
+        }
         setSaving(true);
         try {
             await fetchAPI(`/restaurant/${contextId}/users`, {
                 method: 'POST',
-                body: JSON.stringify({ email, permissions: customPermissions })
+                body: JSON.stringify({ 
+                    email, 
+                    password,
+                    role: selectedProfile,
+                    permissions: customPermissions 
+                })
             });
             setEmail('');
+            setPassword('');
             alert('Empleado autorizado con éxito');
             loadUsers();
         } catch (e) {
@@ -145,17 +155,32 @@ export default function AccessManager({ contextId, contextType }: { contextId: s
                             </CardHeader>
                             <CardContent className="p-6 space-y-6">
                                 <div className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label className="text-xs uppercase font-bold text-zinc-500">Correo Electrónico</Label>
-                                        <div className="relative">
-                                            <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                                            <Input 
-                                                type="email" 
-                                                className="w-full h-11 pl-10 bg-white dark:bg-zinc-950 border-gray-200 dark:border-zinc-800"
-                                                placeholder="ej: nombre@sotodelprior.com"
-                                                value={email}
-                                                onChange={e => setEmail(e.target.value)}
-                                            />
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label className="text-xs uppercase font-bold text-zinc-500">Correo Electrónico</Label>
+                                            <div className="relative">
+                                                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                                <Input 
+                                                    type="email" 
+                                                    className="w-full h-11 pl-10 bg-white dark:bg-zinc-950 border-gray-200 dark:border-zinc-800"
+                                                    placeholder="ej: nombre@sotodelprior.com"
+                                                    value={email}
+                                                    onChange={e => setEmail(e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-xs uppercase font-bold text-zinc-500">Contraseña de Acceso</Label>
+                                            <div className="relative">
+                                                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                                <Input 
+                                                    type="password" 
+                                                    className="w-full h-11 pl-10 bg-white dark:bg-zinc-950 border-gray-200 dark:border-zinc-800"
+                                                    placeholder="Contraseña temporal"
+                                                    value={password}
+                                                    onChange={e => setPassword(e.target.value)}
+                                                />
+                                            </div>
                                         </div>
                                     </div>
 

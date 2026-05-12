@@ -16,6 +16,8 @@ export class GlobalController {
             })
         ]);
 
+        console.log(`[GlobalController] Fetched contexts: ${hotels.length} hotels, ${restaurants.length} restaurants`);
+
         return {
             hotels,
             restaurants

@@ -1,6 +1,16 @@
 (function () {
     const CONTAINER_ID = 'soto-widget-container';
-    const BASE_URL = 'https://reservas.sotodelprior.com';
+    
+    // Automatically determine BASE_URL from the script source
+    let BASE_URL = 'https://reservas.sotodelprior.com';
+    const scripts = document.getElementsByTagName('script');
+    for (let i = 0; i < scripts.length; i++) {
+        if (scripts[i].src.indexOf('widget.js') !== -1) {
+            const url = new URL(scripts[i].src);
+            BASE_URL = url.origin;
+            break;
+        }
+    }
 
     function init() {
         // Prevent multiple initializations
@@ -9,13 +19,39 @@
         // Find the data-restaurant attribute from the embed div
         const embedDiv = document.getElementById('soto-booking-widget');
         const restaurantId = embedDiv ? embedDiv.getAttribute('data-restaurant') : null;
+        const mode = embedDiv ? (embedDiv.getAttribute('data-mode') || 'popup') : 'popup';
 
         if (!restaurantId) {
             console.error('[SotoWidget] No se encontró data-restaurant en #soto-booking-widget');
             return;
         }
 
-        const IFRAME_URL = `${BASE_URL}/widget/restaurant?id=${restaurantId}`;
+        const IFRAME_URL = `${BASE_URL}/widget/restaurant?id=${restaurantId}&mode=${mode}`;
+
+        if (mode === 'inline') {
+            const iframe = document.createElement('iframe');
+            iframe.id = 'soto-widget-iframe-inline';
+            iframe.src = IFRAME_URL;
+            iframe.style.width = '100%';
+            iframe.style.height = '700px';
+            iframe.style.border = 'none';
+            iframe.style.borderRadius = '12px';
+            iframe.style.boxShadow = '0 4px 6px -1px rgb(0 0 0 / 0.1)';
+            
+            // Clear any existing content in the embed div
+            embedDiv.innerHTML = '';
+            embedDiv.style.display = 'block';
+            embedDiv.appendChild(iframe);
+            
+            // Mark container so we don't init again
+            const container = document.createElement('div');
+            container.id = CONTAINER_ID;
+            container.style.display = 'none';
+            document.body.appendChild(container);
+            
+            console.log('[SotoWidget] Restaurant widget initialized in inline mode for ID: ' + restaurantId);
+            return;
+        }
 
         // 1. Inject CSS
         const style = document.createElement('style');

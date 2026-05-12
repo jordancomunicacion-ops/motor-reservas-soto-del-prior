@@ -103,12 +103,7 @@ function WidgetContent() {
             <link rel="stylesheet" href="/custom-widget.css" />
             <div className="widget-container" style={{ '--primary': styles.primary } as any}>
                 <Card className="w-full max-w-lg shadow-xl overflow-hidden border-none">
-                    <CardHeader className="bg-primary text-white py-4" style={{ backgroundColor: styles.primary }}>
-                        <CardTitle className="text-lg flex justify-between items-center">
-                            <span>Reserva tu estancia</span>
-                            <span className="text-xs opacity-70">Paso {Math.min(step, 4)} de 4</span>
-                        </CardTitle>
-                    </CardHeader>
+
                     <CardContent className="p-6">
                         {/* STEP 1: SEARCH */}
                         {step === 1 && (

@@ -32,12 +32,15 @@ interface Table {
     id: string;
     name: string;
     capacity: number;
+    minPax: number;
+    maxPax: number;
     x: number;
     y: number;
     width: number;
     height: number;
     shape: 'RECTANGLE' | 'ROUND';
     rotation: number;
+    seatsLostPerJoin: number;
     contiguousTableIds?: string[]; // We'll store this in metadata or a dedicated field if we update schema
 }
 
@@ -106,12 +109,15 @@ export default function TablePlanEditor({ restaurantId }: { restaurantId: string
             id: `temp-${Date.now()}`,
             name: `M${(activeZone?.tables.length || 0) + 1}`,
             capacity: 4,
+            minPax: 1,
+            maxPax: 4,
             x: 100,
             y: 100,
             width: 60,
             height: 60,
             shape: 'RECTANGLE',
             rotation: 0,
+            seatsLostPerJoin: 1,
             contiguousTableIds: []
         };
 
@@ -292,15 +298,27 @@ export default function TablePlanEditor({ restaurantId }: { restaurantId: string
                                         />
                                     </div>
 
-                                    <div className="space-y-2">
-                                        <Label className="flex items-center gap-2">
-                                            <Users className="w-3.5 h-3.5" /> Capacidad Máxima
-                                        </Label>
-                                        <Input 
-                                            type="number" 
-                                            value={selectedTable.capacity} 
-                                            onChange={e => handleUpdateTable(selectedTable.id, { capacity: parseInt(e.target.value) })}
-                                        />
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label className="flex items-center gap-2">
+                                                <Users className="w-3.5 h-3.5" /> Mín. Pax
+                                            </Label>
+                                            <Input 
+                                                type="number" 
+                                                value={selectedTable.minPax || 1} 
+                                                onChange={e => handleUpdateTable(selectedTable.id, { minPax: parseInt(e.target.value) || 1 })}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="flex items-center gap-2">
+                                                <Users className="w-3.5 h-3.5" /> Máx. Pax
+                                            </Label>
+                                            <Input 
+                                                type="number" 
+                                                value={selectedTable.maxPax || selectedTable.capacity} 
+                                                onChange={e => handleUpdateTable(selectedTable.id, { maxPax: parseInt(e.target.value) || selectedTable.capacity })}
+                                            />
+                                        </div>
                                     </div>
 
                                     <div className="pt-4 border-t">

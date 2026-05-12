@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import GuestProfileSheet from '@/components/restaurant/GuestProfileSheet';
 
 interface Booking {
     id: string;
@@ -59,6 +60,9 @@ function CalendarReservationsContent() {
         time: '14:00',
         notes: ''
     });
+
+    const [selectedBookingForProfile, setSelectedBookingForProfile] = useState<any>(null);
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
 
     useEffect(() => {
         if (contextId && date) {
@@ -320,6 +324,10 @@ function CalendarReservationsContent() {
                                 bookings.map((booking) => (
                                     <div 
                                         key={booking.id} 
+                                        onClick={() => {
+                                            setSelectedBookingForProfile(booking);
+                                            setIsProfileOpen(true);
+                                        }}
                                         className="group relative bg-card hover:bg-accent/50 border rounded-xl p-4 transition-all duration-200 hover:shadow-md cursor-pointer border-zinc-100 dark:border-zinc-800"
                                     >
                                         <div className="flex flex-col md:flex-row md:items-center gap-4">
@@ -329,7 +337,9 @@ function CalendarReservationsContent() {
                                                     const dateVal = booking.checkInDate || booking.date;
                                                     if (dateVal) {
                                                         const d = new Date(dateVal);
-                                                        if (!isNaN(d.getTime())) return format(d, 'HH:mm');
+                                                        if (!isNaN(d.getTime())) {
+                                                            return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+                                                        }
                                                     }
                                                     return '--:--';
                                                 })()}
@@ -343,7 +353,9 @@ function CalendarReservationsContent() {
                                                                 const dateVal = booking.checkInDate || booking.date;
                                                                 if (dateVal) {
                                                                     const d = new Date(dateVal);
-                                                                    if (!isNaN(d.getTime())) return format(d, "dd/MM");
+                                                                    if (!isNaN(d.getTime())) {
+                                                                        return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+                                                                    }
                                                                 }
                                                                 return '--/--';
                                                             })()}
@@ -527,6 +539,12 @@ function CalendarReservationsContent() {
                     </div>
                 </Card>
             </div>
+
+            <GuestProfileSheet 
+                booking={selectedBookingForProfile}
+                isOpen={isProfileOpen}
+                onClose={() => setIsProfileOpen(false)}
+            />
         </div>
     );
 }

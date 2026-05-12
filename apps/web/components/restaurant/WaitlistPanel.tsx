@@ -49,7 +49,7 @@ export default function WaitlistPanel({ entries, onAdd, onSeat }: WaitlistProps)
                                 type="number"
                                 className="w-16 bg-white h-8 text-sm"
                                 value={formData.pax}
-                                onChange={e => setFormData({ ...formData, pax: parseInt(e.target.value) })}
+                                onChange={e => setFormData({ ...formData, pax: parseInt(e.target.value) || 0 })}
                             />
                             <Input
                                 placeholder="Teléfono"

@@ -102,7 +102,7 @@ export default function RestaurantListPage() {
                                 </div>
                                 <div>
                                     <h3 className="text-lg font-bold tracking-tight">{rest.name}</h3>
-                                    <p className="text-[10px] text-muted-foreground font-mono mt-0.5">#{rest.id.substring(0, 8)}</p>
+                                    <p className="text-[10px] text-muted-foreground font-mono mt-0.5">#{rest.id.substring(0, 8).toUpperCase()}</p>
                                 </div>
                             </div>
                             
@@ -111,7 +111,7 @@ export default function RestaurantListPage() {
                                     variant="outline" 
                                     size="sm"
                                     className="rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-secondary" 
-                                    onClick={() => window.location.href = `/admin/restaurant/${rest.id}`}
+                                    onClick={() => window.location.href = `/admin/restaurant/${rest.id}?context=restaurant&id=${rest.id}`}
                                 >
                                     <LayoutDashboard className="w-3.5 h-3.5 mr-2" /> Dashboard
                                 </Button>
@@ -119,7 +119,7 @@ export default function RestaurantListPage() {
                                     variant="outline" 
                                     size="sm"
                                     className="rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-secondary" 
-                                    onClick={() => window.location.href = `/admin/restaurant/${rest.id}/config?tab=general`}
+                                    onClick={() => window.location.href = `/admin/restaurant/${rest.id}/config?tab=general&context=restaurant&id=${rest.id}`}
                                 >
                                     <Settings className="w-3.5 h-3.5 mr-2" /> Ajustes
                                 </Button>
@@ -127,7 +127,7 @@ export default function RestaurantListPage() {
                                     variant="outline" 
                                     size="sm"
                                     className="rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-secondary" 
-                                    onClick={() => window.location.href = `/admin/restaurant/${rest.id}/connections`}
+                                    onClick={() => window.location.href = `/admin/restaurant/${rest.id}/connections?context=restaurant&id=${rest.id}`}
                                 >
                                     <Share2 className="w-3.5 h-3.5 mr-2" /> Conexiones
                                 </Button>
@@ -135,7 +135,7 @@ export default function RestaurantListPage() {
                                     variant="outline" 
                                     size="sm"
                                     className="rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-secondary" 
-                                    onClick={() => window.location.href = `/admin/restaurant/${rest.id}/config?tab=access`}
+                                    onClick={() => window.location.href = `/admin/restaurant/${rest.id}/config?tab=access&context=restaurant&id=${rest.id}`}
                                 >
                                     <Users className="w-3.5 h-3.5 mr-2" /> Accesos
                                 </Button>

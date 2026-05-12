@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, isBefore, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Play, Check, Calendar, Users, MapPin } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Play, Check, Calendar, Users, MapPin, PartyPopper, Info, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { fetchAPI } from '@/lib/api';
@@ -111,9 +111,11 @@ export function RestaurantWidget() {
 
 function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
     const searchParams = useSearchParams();
-    const restaurantId = searchParams.get('id') || '';
+    const restaurantId = searchParams.get('id') || searchParams.get('hotelId') || '';
+    const mode = searchParams.get('mode') || 'popup';
 
     const [currentStep, setCurrentStep] = useState(1);
+    
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [timeSlots, setTimeSlots] = useState<{ lunch: string[], dinner: string[] } | null>(null);
@@ -128,7 +130,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
     const [acceptMarketing, setAcceptMarketing] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [loadingSlots, setLoadingSlots] = useState(false);
-    const [closures, setClosures] = useState<string[]>([]);
+    const [closures, setClosures] = useState<any[]>([]);
     const [restaurantName, setRestaurantName] = useState('');
     const [createdBooking, setCreatedBooking] = useState<any>(null);
     const [selectedEvent, setSelectedEvent] = useState<any>(null);
@@ -147,27 +149,82 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
         xTwitter: ''
     });
 
-    // Inject Fonts
+    // Granular No-Show Logic
+    const shouldRequireStripe = () => {
+        if (!widgetConfig?.stripeEnabled) return false;
+        
+        // 1. All reservations
+        if (widgetConfig.noShowFeeAll) return true;
+        
+        // 2. Groups
+        if (widgetConfig.noShowFeeGroups && pax >= widgetConfig.noShowGroupMinPax) return true;
+        
+        // 3. Events
+        if (widgetConfig.noShowFeeEvents && selectedEvent) return true;
+        
+        return false;
+    };
+
+    const isStep3Skipped = widgetConfig?.skipGuaranteeStep && !shouldRequireStripe();
+    
+    const baseSteps = [
+        { id: 1, label: 'Encontrar' },
+        { id: 2, label: 'Información' },
+        { id: 3, label: 'Garantía' },
+        { id: 4, label: 'Confirmación' }
+    ];
+
+    const displaySteps = isStep3Skipped ? baseSteps.filter(s => s.id !== 3) : baseSteps;
+
+    const handleBack = () => {
+        if (currentStep === 5) {
+            setCurrentStep(1);
+            return;
+        }
+
+        const currentIndex = displaySteps.findIndex(s => s.id === currentStep);
+        if (currentIndex > 0) {
+            setCurrentStep(displaySteps[currentIndex - 1].id);
+        } else {
+            setCurrentStep(1);
+        }
+    };
+
+    // Inject Fonts and Custom CSS
     useEffect(() => {
         const link = document.createElement('link');
         link.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&family=Oswald:wght@300;400;500;700&display=swap";
         link.rel = "stylesheet";
         document.head.appendChild(link);
-        return () => { if (document.head.contains(link)) document.head.removeChild(link); }
-    }, []);
+        
+        let styleTag: HTMLStyleElement | null = null;
+        if (widgetConfig?.customCss) {
+            styleTag = document.createElement('style');
+            styleTag.innerHTML = widgetConfig.customCss;
+            document.head.appendChild(styleTag);
+        }
 
+        return () => { 
+            if (document.head.contains(link)) document.head.removeChild(link); 
+            if (styleTag && document.head.contains(styleTag)) document.head.removeChild(styleTag);
+        }
+    }, [widgetConfig?.customCss]);
+
+    const [restaurantShifts, setRestaurantShifts] = useState<any[]>([]);
+    
     // Load restaurant info and closures
     useEffect(() => {
         if (!restaurantId) return;
         fetchAPI(`/restaurant/${restaurantId}`)
             .then(data => { 
                 if (data?.name) setRestaurantName(data.name); 
+                if (data?.shifts) setRestaurantShifts(data.shifts);
             })
             .catch(() => {});
         fetchAPI(`/restaurant/${restaurantId}/closures`)
             .then(data => {
                 if (Array.isArray(data)) {
-                    setClosures(data.map((c: any) => format(new Date(c.date), 'yyyy-MM-dd')));
+                    setClosures(data);
                 }
             })
             .catch(() => {});
@@ -182,11 +239,38 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
             .catch(() => {});
     }, [restaurantId]);
 
+    // Refresh slots when pax changes
+    useEffect(() => {
+        if (selectedDate) {
+            handleDateSelect(selectedDate);
+        }
+    }, [pax]);
+
     const getDayStatus = (date: Date) => {
         const dateStr = format(date, 'yyyy-MM-dd');
-        if (closures.includes(dateStr)) return 'closed';
+        const dayOfWeek = date.getDay(); // 0=Sun, 1=Mon, etc.
+
+        // 1. Check if it's a past date
         if (isBefore(date, startOfDay(new Date()))) return 'closed';
+        
+        // 2. Check closures
+        const isClosed = closures.some(c => {
+            const startStr = format(new Date(c.date), 'yyyy-MM-dd');
+            const endStr = c.endDate ? format(new Date(c.endDate), 'yyyy-MM-dd') : startStr;
+            return dateStr >= startStr && dateStr <= endStr;
+        });
+        if (isClosed) return 'closed';
+
+        // 3. Check if any shift is active for this day of week
+        const hasShift = restaurantShifts.some(s => {
+            const days = s.daysOfWeek.split(',').map((d: string) => d.trim());
+            return days.includes(dayOfWeek.toString());
+        });
+        if (!hasShift) return 'closed';
+
+        // 4. Check for events
         if (eventDates.includes(dateStr)) return 'event';
+
         return 'available';
     };
 
@@ -293,21 +377,6 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
         }
     };
 
-    // --- Granular No-Show Logic ---
-    const shouldRequireStripe = () => {
-        if (!widgetConfig?.stripeEnabled) return false;
-        
-        // 1. All reservations
-        if (widgetConfig.noShowFeeAll) return true;
-        
-        // 2. Groups
-        if (widgetConfig.noShowFeeGroups && pax >= widgetConfig.noShowGroupMinPax) return true;
-        
-        // 3. Events
-        if (widgetConfig.noShowFeeEvents && selectedEvent) return true;
-        
-        return false;
-    };
 
     const handleMainSubmit = () => {
         if (shouldRequireStripe()) {
@@ -327,7 +396,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
     const weekDays = ['L', 'M', 'Mi', 'J', 'V', 'S', 'D'];
 
     const colors = {
-        accent: widgetConfig?.primaryColor || '#C59D5F',
+        accent: widgetConfig?.primaryColor === '#3b82f6' ? '#C59D5F' : (widgetConfig?.primaryColor || '#C59D5F'),
         bg: '#F4F4F4',
         text: '#0A0A0A',
         white: '#FFFFFF'
@@ -337,10 +406,10 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
         <div className="max-w-4xl mx-auto px-4 pb-4 pt-0 text-[#0A0A0A] bg-white" style={{ fontFamily: "'Lato', sans-serif" }}>
 
             {/* Header / Back Button */}
-            {currentStep > 1 && (
+            {currentStep > 1 && currentStep < 4 && (
                 <div className="flex justify-between items-center mb-4 px-1 pt-4">
                     <button
-                        onClick={() => setCurrentStep(currentStep - 1)}
+                        onClick={handleBack}
                         className="text-xs font-bold uppercase tracking-wider flex items-center gap-1 hover:text-[#C59D5F] transition-colors"
                         style={{ backgroundColor: 'transparent', color: colors.text, fontFamily: "'Oswald', sans-serif" }}
                     >
@@ -355,13 +424,17 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
                 <div className="absolute top-4 left-10 right-10 h-0.5 bg-gray-200 -z-10">
                     <div
                         className="h-full bg-[#0A0A0A] transition-all duration-500"
-                        style={{ width: `${((currentStep - 1) / (STEPS.length - 1)) * 100}%` }}
+                        style={{ 
+                            width: `${((displaySteps.findIndex(s => s.id === currentStep)) / (displaySteps.length - 1)) * 100}%` 
+                        }}
                     ></div>
                 </div>
 
-                {STEPS.map((step) => {
+                {displaySteps.map((step, index) => {
                     const isActive = currentStep === step.id;
-                    const isCompleted = currentStep > step.id;
+                    const stepIndex = displaySteps.findIndex(s => s.id === step.id);
+                    const currentStepIndex = displaySteps.findIndex(s => s.id === currentStep);
+                    const isCompleted = currentStepIndex > stepIndex;
 
                     return (
                         <div key={step.id} className="flex flex-col items-center gap-1 bg-white px-2">
@@ -374,7 +447,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
                                     fontFamily: "'Oswald', sans-serif"
                                 }}
                             >
-                                {isCompleted ? <Check className="w-4 h-4" /> : step.id}
+                                {isCompleted ? <Check className="w-4 h-4" /> : index + 1}
                             </div>
                             <span
                                 className="text-[10px] font-bold uppercase tracking-widest"
@@ -395,9 +468,32 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
 
                     {/* STEP 1: FIND (Calendar + Times) */}
                     {currentStep === 1 && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
+                        <div className={`grid grid-cols-1 ${mode === 'inline' ? 'min-[600px]:grid-cols-2' : 'sm:grid-cols-2'} gap-4 h-full`}>
                             <div className="flex flex-col">
                                 <div className="max-w-[280px] mx-auto w-full">
+                                    {/* Pax Selector */}
+                                    <div className="mb-6 bg-gray-50 p-3 rounded-none border-l-4 border-[#C59D5F]">
+                                        <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2 block" style={{ fontFamily: "'Oswald', sans-serif" }}>¿Cuántos sois?</label>
+                                        <div className="flex items-center justify-between">
+                                            <button 
+                                                onClick={() => setPax(Math.max(1, pax - 1))}
+                                                className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center hover:bg-white transition-colors"
+                                            >
+                                                -
+                                            </button>
+                                            <div className="flex items-center gap-2">
+                                                <Users className="w-4 h-4 text-[#C59D5F]" />
+                                                <span className="text-xl font-black italic tracking-tighter" style={{ fontFamily: "'Oswald', sans-serif" }}>{pax} PERSONAS</span>
+                                            </div>
+                                            <button 
+                                                onClick={() => setPax(pax + 1)}
+                                                className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center hover:bg-white transition-colors"
+                                            >
+                                                +
+                                            </button>
+                                        </div>
+                                    </div>
+
                                     <div className="flex justify-between items-center mb-2">
                                         <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-1 hover:bg-gray-100 rounded-full transition-colors">
                                             <ChevronLeft className="w-4 h-4 text-gray-400" />
@@ -427,7 +523,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
                                                 style = { backgroundColor: colors.accent, color: 'white', boxShadow: '0 2px 6px rgba(197, 157, 95, 0.4)' };
                                                 className += "cursor-pointer transform scale-105";
                                             } else if (status === 'closed' || isPast) {
-                                                style = { backgroundColor: '#FEE2E2', color: '#EF4444' };
+                                                style = { backgroundColor: '#F3F4F6', color: '#9CA3AF' };
                                                 className += "cursor-not-allowed";
                                             } else if (status === 'event') {
                                                 style = { backgroundColor: '#EEF2FF', color: '#4F46E5', border: '1px solid #C7D2FE' };
@@ -436,7 +532,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
                                                 className += "bg-white text-gray-700 hover:bg-[#F9F9F9] hover:text-[#C59D5F] cursor-pointer border border-transparent hover:border-[#C59D5F]";
                                             }
                                             return (
-                                                <div key={date.toString()} onClick={() => !isPast && handleDateSelect(date)} className={className} style={style}>
+                                                <div key={date.toString()} onClick={() => !isPast && status !== 'closed' && handleDateSelect(date)} className={className} style={style}>
                                                     {format(date, 'd')}
                                                 </div>
                                             );
@@ -447,6 +543,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
                             <div className="flex flex-col border-l pl-0 md:pl-8 border-gray-100">
                                 <div className="flex flex-wrap gap-x-4 gap-y-2 mb-4 text-[10px] uppercase font-bold tracking-wider text-gray-500">
                                     <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded" style={{ backgroundColor: colors.white, border: '1px solid #CCC' }}></div> Disponible</div>
+                                    <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-gray-100 border border-gray-200"></div> Cerrado</div>
                                     <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-red-100 border border-red-200"></div> Completo</div>
                                     <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-indigo-50 border border-indigo-100"></div> Evento</div>
                                     <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded flex justify-center items-center text-white" style={{ backgroundColor: colors.accent }}></div> Seleccionado</div>
@@ -503,6 +600,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
                                             )}
                                         </div>
                                         <div>
+                                            <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3 border-b pb-1">Cena</h4>
                                             {timeSlots.dinner.length > 0 ? (
                                                 <div className="grid grid-cols-3 gap-2">
                                                     {timeSlots.dinner.map(t => (
@@ -558,7 +656,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
                                 </div>
                             </div>
                             <div className="grid gap-4">
-                                <div className="grid grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                     <div className="grid gap-1">
                                         <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Nombre</label>
                                         <input className="border p-3 text-sm rounded-none focus:outline-none focus:border-[#C59D5F] transition-colors bg-white" placeholder="Nombre" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
@@ -576,7 +674,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
                                     <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Email</label>
                                     <input className="border p-3 text-sm rounded-none focus:outline-none focus:border-[#C59D5F] transition-colors bg-white" placeholder="ejemplo@email.com" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
                                 </div>
-                                <div className="grid grid-cols-4 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                                     <div className="grid gap-1 col-span-1">
                                         <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Prefijo</label>
                                         <select className="border p-3 text-sm rounded-none bg-white focus:outline-none focus:border-[#C59D5F]">
@@ -590,10 +688,6 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
                                         <input className="border p-3 text-sm rounded-none focus:outline-none focus:border-[#C59D5F] transition-colors bg-white" placeholder="000 000 000" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
                                     </div>
                                 </div>
-                                <div className="grid gap-1">
-                                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Introduce un comentario</label>
-                                    <textarea className="border p-3 text-sm rounded-none focus:outline-none focus:border-[#C59D5F] transition-colors bg-white resize-none" rows={2} value={comment} onChange={e => setComment(e.target.value)}></textarea>
-                                </div>
                                 <div className="grid gap-2">
                                     <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">¿Alergias?</label>
                                     <div className="flex gap-4">
@@ -601,13 +695,27 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
                                         <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" className="accent-[#C59D5F] w-4 h-4 cursor-pointer" checked={hasAllergy === false} onChange={() => setHasAllergy(false)} /><span className="text-sm">No</span></label>
                                     </div>
                                 </div>
+                                <div className="grid gap-1">
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Introduce un comentario</label>
+                                    <textarea className="border p-3 text-sm rounded-none focus:outline-none focus:border-[#C59D5F] transition-colors bg-white resize-none" rows={2} value={comment} onChange={e => setComment(e.target.value)}></textarea>
+                                </div>
                                 <div className="grid gap-2 mt-2">
                                     <label className="flex items-start gap-2 cursor-pointer"><input type="checkbox" className="accent-[#C59D5F] w-4 h-4 mt-0.5 cursor-pointer" checked={acceptTerms} onChange={e => setAcceptTerms(e.target.checked)} /><span className="text-xs text-gray-600">Acepto condiciones</span></label>
                                     <label className="flex items-start gap-2 cursor-pointer"><input type="checkbox" className="accent-[#C59D5F] w-4 h-4 mt-0.5 cursor-pointer" checked={acceptData} onChange={e => setAcceptData(e.target.checked)} /><span className="text-xs text-gray-600">Consiento tratamiento</span></label>
                                 </div>
                             </div>
                             <div className="mt-8">
-                                <Button className="w-full py-4 text-base font-bold uppercase tracking-widest text-white hover:bg-black transition-colors shadow-lg" style={{ backgroundColor: colors.accent, fontFamily: "'Oswald', sans-serif" }} onClick={() => setCurrentStep(3)}>Continuar</Button>
+                                <Button className="w-full py-4 text-base font-bold uppercase tracking-widest text-white hover:bg-black transition-colors shadow-lg" 
+                                    style={{ backgroundColor: colors.accent, fontFamily: "'Oswald', sans-serif" }} 
+                                    onClick={() => {
+                                        if (isStep3Skipped) {
+                                            handleSubmitReservation();
+                                        } else {
+                                            setCurrentStep(3);
+                                        }
+                                    }}>
+                                    Continuar
+                                </Button>
                             </div>
                         </div>
                     )}
@@ -617,17 +725,22 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
                         <div className="animate-in fade-in slide-in-from-right-8 duration-500 max-w-2xl mx-auto pt-6 pb-8">
                             <h3 className="text-xl font-bold mb-2 text-center" style={{ fontFamily: "'Oswald', sans-serif" }}>GARANTÍA DE RESERVA</h3>
                             <div className="text-left max-w-lg mx-auto space-y-5">
-                                {/* Additional CRM Fields */}
-                                <div className="border-b border-gray-100 pb-4">
-                                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#C59D5F] mb-3" style={{ fontFamily: "'Oswald', sans-serif" }}>Datos opcionales</h4>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <input type="number" className="border p-2.5 text-sm rounded-none focus:outline-none" placeholder="Edad" value={additionalData.age} onChange={e => setAdditionalData({...additionalData, age: e.target.value})} />
-                                        <select className="border p-2.5 text-sm rounded-none focus:outline-none" value={additionalData.gender} onChange={e => setAdditionalData({...additionalData, gender: e.target.value})}>
-                                            <option value="">Sexo</option>
-                                            <option value="M">M</option><option value="F">F</option>
-                                        </select>
+                                {widgetConfig?.showCrmFields !== false && (
+                                    <div className="border-b border-gray-100 pb-4">
+                                        <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#C59D5F] mb-3" style={{ fontFamily: "'Oswald', sans-serif" }}>Datos opcionales</h4>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <input type="number" className="border p-2.5 text-sm rounded-none focus:outline-none" placeholder="Edad" value={additionalData.age} onChange={e => setAdditionalData({...additionalData, age: e.target.value})} />
+                                            <select className="border p-2.5 text-sm rounded-none focus:outline-none" value={additionalData.gender} onChange={e => setAdditionalData({...additionalData, gender: e.target.value})}>
+                                                <option value="">Sexo</option>
+                                                <option value="M">M</option><option value="F">F</option>
+                                            </select>
+                                            <input className="border p-2.5 text-sm rounded-none focus:outline-none" placeholder="WhatsApp" value={additionalData.whatsapp} onChange={e => setAdditionalData({...additionalData, whatsapp: e.target.value})} />
+                                            <input className="border p-2.5 text-sm rounded-none focus:outline-none" placeholder="Instagram" value={additionalData.instagram} onChange={e => setAdditionalData({...additionalData, instagram: e.target.value})} />
+                                            <input className="border p-2.5 text-sm rounded-none focus:outline-none" placeholder="TikTok" value={additionalData.tiktok} onChange={e => setAdditionalData({...additionalData, tiktok: e.target.value})} />
+                                            <input className="border p-2.5 text-sm rounded-none focus:outline-none" placeholder="Facebook" value={additionalData.facebook} onChange={e => setAdditionalData({...additionalData, facebook: e.target.value})} />
+                                        </div>
                                     </div>
-                                </div>
+                                )}
 
                                 {/* Stripe Form */}
                                 <div className="mt-6">

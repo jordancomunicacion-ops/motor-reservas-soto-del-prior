@@ -44,6 +44,7 @@ model Hotel {
   mailConfig     Json?
 
   events      Event[]
+  zones       Zone[]
 }
 
 model WidgetConfig {
@@ -61,6 +62,14 @@ model WidgetConfig {
   
   showLogo       Boolean @default(true)
   title          String? // Override default title
+
+  // Stripe & No-Show Fee Strategy
+  stripeEnabled      Boolean @default(false)
+  noShowFeeAmount    Decimal @default(0)
+  noShowFeeAll       Boolean @default(false)
+  noShowFeeGroups    Boolean @default(false)
+  noShowGroupMinPax  Int     @default(8)
+  noShowFeeEvents    Boolean @default(false)
 }
 
 model RoomType {
@@ -320,13 +329,16 @@ model Payment {
 }
 
 model User {
-  id          String   @id @default(uuid())
-  hotelId     String?
-  hotel       Hotel?   @relation(fields: [hotelId], references: [id])
-  email       String   @unique
-  name        String?
+  id           String   @id @default(uuid())
+  hotelId      String?
+  hotel        Hotel?   @relation(fields: [hotelId], references: [id])
+  restaurantId String?
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
+  email        String   @unique
+  name         String?
   password     String   
-  role        String   @default("ADMIN")
+  role         String   @default("ADMIN")
+  permissions  String?  // Stored as comma-separated string or JSON
 }
 
 // --- Restaurant Models (Preserved) ---
@@ -352,6 +364,7 @@ model Restaurant {
   contactEmail   String?
   emailTemplates Json? @default("{\"created\": \"\", \"confirmed\": \"\", \"cancelled\": \"\", \"modified\": \"\", \"reminder\": \"\", \"waitlist_join\": \"\", \"waitlist_available\": \"\"}")
   mailConfig     Json?
+  users          User[]
 
   events    Event[]
 }
@@ -378,18 +391,22 @@ model RestaurantClosure {
   restaurantId String
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
   date         DateTime
+  endDate      DateTime?
   reason       String?
   createdAt    DateTime   @default(now())
 }
 
 model Zone {
   id           String   @id @default(uuid())
-  restaurantId String
-  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  restaurantId String?
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
+  hotelId      String?
+  hotel        Hotel?      @relation(fields: [hotelId], references: [id])
   name         String   // "Interior", "Terraza"
   index        Int      @default(0) // Sorting order
   isActive     Boolean  @default(true)
   tables       Table[]
+  events       Event[]
 }
 
 model Table {
@@ -636,6 +653,7 @@ model Event {
   integrations Json? @default("{}")
   
   bookings    EventBooking[]
+  zones       Zone[]
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

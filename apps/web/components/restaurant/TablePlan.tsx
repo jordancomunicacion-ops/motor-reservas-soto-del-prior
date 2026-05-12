@@ -108,8 +108,17 @@ function TableNode({ data, onUpdate, onDropReservation, onSelect, onSelectProfil
             ref={tableRef}
             draggable={mode === 'EDIT'}
             onDragStart={handleDragStart}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={handleDrop}
+            onDragOver={(e) => {
+                e.preventDefault();
+                e.currentTarget.classList.add('brightness-125', 'ring-2', 'ring-white');
+            }}
+            onDragLeave={(e) => {
+                e.currentTarget.classList.remove('brightness-125', 'ring-2', 'ring-white');
+            }}
+            onDrop={(e) => {
+                e.currentTarget.classList.remove('brightness-125', 'ring-2', 'ring-white');
+                handleDrop(e);
+            }}
             className={cn(
                 "absolute border flex flex-col items-center justify-center shadow-sm transition-all",
                 !isSelected && "overflow-hidden",
@@ -137,12 +146,25 @@ function TableNode({ data, onUpdate, onDropReservation, onSelect, onSelectProfil
             <span className="font-bold text-[8px] uppercase tracking-tighter opacity-70 absolute top-1 pointer-events-none">{data.name} · {data.capacity}p</span>
             
             {activeBooking && (
-                <div className="flex flex-col items-center justify-center px-1 w-full text-center pointer-events-none">
+                <div 
+                    draggable
+                    onDragStart={(e) => {
+                        e.stopPropagation();
+                        e.dataTransfer.setData("bookingId", activeBooking.id);
+                        e.dataTransfer.effectAllowed = "move";
+                    }}
+                    className="flex flex-col items-center justify-center px-1 w-full text-center cursor-move"
+                >
                     <span className="font-black text-[9px] leading-tight uppercase truncate w-full">
                         {activeBooking.guestName.split(' ')[0]}
                     </span>
                     <span className="text-[8px] font-bold opacity-90 mt-0.5">
-                        {new Date(activeBooking.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {isNaN(new Date(activeBooking.date).getTime()) ? '--:--' : (
+                            <>
+                                {String(new Date(activeBooking.date).getUTCHours()).padStart(2, '0')}:
+                                {String(new Date(activeBooking.date).getUTCMinutes()).padStart(2, '0')}
+                            </>
+                        )}
                     </span>
                 </div>
             )}

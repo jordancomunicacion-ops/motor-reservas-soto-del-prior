@@ -1,0 +1,10 @@
+{
+  "restaurantId": "edee3086-71d8-43d4-938d-f6baf643ace4",
+  "guestName": "Maria Montagu",
+  "guestEmail": "maria.montagu.test@example.com",
+  "guestPhone": "600222222",
+  "pax": 2,
+  "date": "2026-06-15T20:00:00.000Z",
+  "time": "20:00",
+  "origin": "WEB"
+}

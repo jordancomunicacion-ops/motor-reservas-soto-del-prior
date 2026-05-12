@@ -3,14 +3,19 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { BookingStatus, BookingSource } from '../../common/constants';
 import { RatesService } from '../rates/rates.service';
 import { AvailabilityService } from '../rates/availability.service';
+import { CrmIntegrationService } from '../crm/crm-integration.service';
+import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class BookingService {
     constructor(
         private prisma: PrismaService,
         private ratesService: RatesService,
-        private availabilityService: AvailabilityService
+        private availabilityService: AvailabilityService,
+        private crmIntegrationService: CrmIntegrationService,
+        private mailService: MailService
     ) { }
+
 
     async createBooking(data: {
         hotelId: string;
@@ -94,9 +99,21 @@ export class BookingService {
             include: { bookingRooms: true }
         });
 
-        // Sync with CRM removed
+        // Sync with CRM
+        this.crmIntegrationService.syncHotelBooking(booking.id).catch(err => {
+            console.error(`Error syncing hotel booking ${booking.id} to CRM:`, err);
+        });
+
+        // NEW: Send Confirmation Email (If guest has email)
+        const guestEmail = data.guestEmail;
+        if (guestEmail) {
+            this.mailService.sendHotelNotification(booking, 'created').catch(err => {
+                console.error(`Error sending confirmation email for hotel booking ${booking.id}:`, err);
+            });
+        }
         
         return booking;
+
     }
 
 
@@ -114,9 +131,20 @@ export class BookingService {
             data: { status: BookingStatus.CANCELLED }
         });
 
-        // Sync with CRM removed
+        // Sync with CRM
+        this.crmIntegrationService.syncHotelBooking(booking.id, 'CANCELLED').catch(err => {
+            console.error(`Error syncing cancelled hotel booking ${booking.id} to CRM:`, err);
+        });
+
+        // NEW: Send Cancellation Email
+        if (booking.guestEmail) {
+            this.mailService.sendHotelNotification(booking, 'cancelled').catch(err => {
+                console.error(`Error sending cancellation email for hotel booking ${booking.id}:`, err);
+            });
+        }
         
         return booking;
+
     }
 
     // PUBLIC AVAILABILITY

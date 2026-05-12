@@ -19,6 +19,7 @@ export default function ReservationForm({ isOpen, onClose, onSubmit, initialDate
     const [time, setTime] = useState("20:00");
     const [pax, setPax] = useState("2");
     const [name, setName] = useState("");
+    const [email, setEmail] = useState("");
     const [phone, setPhone] = useState("");
     const [notes, setNotes] = useState("");
 
@@ -27,12 +28,13 @@ export default function ReservationForm({ isOpen, onClose, onSubmit, initialDate
         // Combine date and time
         const [hours, minutes] = time.split(':').map(Number);
         const bookingDate = new Date(dateStr);
-        bookingDate.setHours(hours, minutes);
+        bookingDate.setUTCHours(hours, minutes, 0, 0);
 
         onSubmit({
             guestName: name,
+            guestEmail: email,
             guestPhone: phone,
-            pax: parseInt(pax),
+            pax: parseInt(pax) || 0,
             date: bookingDate,
             notes,
             status: "CONFIRMED",
@@ -79,6 +81,10 @@ export default function ReservationForm({ isOpen, onClose, onSubmit, initialDate
                     <div className="grid grid-cols-4 gap-4 items-center">
                         <Label className="col-span-1 text-right">Cliente</Label>
                         <Input className="col-span-3" value={name} onChange={e => setName(e.target.value)} placeholder="Nombre y Apellidos" />
+                    </div>
+                    <div className="grid grid-cols-4 gap-4 items-center">
+                        <Label className="col-span-1 text-right">Email</Label>
+                        <Input className="col-span-3" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="email@ejemplo.com" />
                     </div>
                     <div className="grid grid-cols-4 gap-4 items-center">
                         <Label className="col-span-1 text-right">Teléfono</Label>

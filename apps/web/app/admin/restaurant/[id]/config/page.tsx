@@ -6,11 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Save, Building2, Trash2, Hotel, Users, Sparkles, Mail, CreditCard, Key } from 'lucide-react';
+import { ArrowLeft, Save, Building2, Trash2, Hotel, Users, Sparkles, Mail, CreditCard, Key, BellRing } from 'lucide-react';
 import Link from 'next/link';
 import { ShiftsManager } from '@/components/admin/ShiftsManager';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { WidgetConfigSection } from '@/components/admin/WidgetConfigSection';
+import { Switch } from '@/components/ui/switch';
+
 
 
 
@@ -51,8 +53,10 @@ function RestaurantConfigContent() {
             port: '587',
             user: '',
             pass: '',
-            from: ''
+            from: '',
+            notificationsEnabled: true
         }
+
     });
 
     useEffect(() => {
@@ -76,8 +80,10 @@ function RestaurantConfigContent() {
                     port: '587',
                     user: '',
                     pass: '',
-                    from: ''
+                    from: '',
+                    notificationsEnabled: true
                 }
+
             });
         } catch (e) {
             console.error(e);
@@ -289,7 +295,27 @@ function RestaurantConfigContent() {
                         </div>
                     </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-6">
+                    <div className="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-blue-500 text-white rounded-full">
+                                <BellRing className="w-4 h-4" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-semibold">Notificaciones por Email</p>
+                                <p className="text-xs text-muted-foreground italic">Activa o desactiva el envío de correos automáticos.</p>
+                            </div>
+                        </div>
+                        <Switch 
+                            checked={formData.mailConfig.notificationsEnabled !== false}
+                            onCheckedChange={(checked) => setFormData({
+                                ...formData, 
+                                mailConfig: { ...formData.mailConfig, notificationsEnabled: checked }
+                            })}
+                        />
+
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label>Servidor SMTP (ej: smtp.office365.com)</Label>

@@ -40,10 +40,14 @@ model Hotel {
 
   // Notifications
   contactEmail   String?
+
   emailTemplates Json? @default("{\"created\": \"\", \"confirmed\": \"\", \"cancelled\": \"\", \"modified\": \"\", \"reminder\": \"\", \"waitlist_join\": \"\", \"waitlist_available\": \"\"}")
   mailConfig     Json?
 
+
+
   events      Event[]
+  zones       Zone[]
 }
 
 model WidgetConfig {
@@ -55,7 +59,7 @@ model WidgetConfig {
   restaurantId String? @unique
   restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
   
-  primaryColor   String  @default("#3b82f6") // Blue-500
+  primaryColor   String  @default("#C59D5F") // Ocre
   secondaryColor String  @default("#1e40af") // Blue-800
   customCss      String? 
   
@@ -69,6 +73,9 @@ model WidgetConfig {
   noShowFeeGroups    Boolean @default(false)
   noShowGroupMinPax  Int     @default(8)
   noShowFeeEvents    Boolean @default(false)
+  
+  showCrmFields      Boolean @default(true)
+  skipGuaranteeStep  Boolean @default(false)
 }
 
 model RoomType {
@@ -361,8 +368,11 @@ model Restaurant {
 
   // Notifications
   contactEmail   String?
+
   emailTemplates Json? @default("{\"created\": \"\", \"confirmed\": \"\", \"cancelled\": \"\", \"modified\": \"\", \"reminder\": \"\", \"waitlist_join\": \"\", \"waitlist_available\": \"\"}")
   mailConfig     Json?
+
+
   users          User[]
 
   events    Event[]
@@ -390,14 +400,17 @@ model RestaurantClosure {
   restaurantId String
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
   date         DateTime
+  endDate      DateTime?
   reason       String?
   createdAt    DateTime   @default(now())
 }
 
 model Zone {
   id           String   @id @default(uuid())
-  restaurantId String
-  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  restaurantId String?
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
+  hotelId      String?
+  hotel        Hotel?      @relation(fields: [hotelId], references: [id])
   name         String   // "Interior", "Terraza"
   index        Int      @default(0) // Sorting order
   isActive     Boolean  @default(true)

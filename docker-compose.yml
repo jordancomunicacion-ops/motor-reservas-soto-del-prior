@@ -25,7 +25,7 @@ services:
     ports:
       - "5442:5432"
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:-reservas_user}" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:-reservas_user} -d ${DB_NAME:-reservas}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -72,7 +72,7 @@ services:
       - "traefik.http.routers.sotoreservas-api.rule=Host(`api.reservas.sotodelprior.com`)"
       - "traefik.http.routers.sotoreservas-api.entrypoints=web,websecure"
       - "traefik.http.routers.sotoreservas-api.tls=true"
-      - "traefik.http.routers.sotoreservas-api.tls.certresolver=myresolver"
+      - "traefik.http.routers.sotoreservas-api.tls.certresolver=le"
       - "traefik.http.routers.sotoreservas-api.middlewares=sotoreservas-headers"
       - "traefik.http.middlewares.sotoreservas-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
       - "traefik.http.middlewares.sotoreservas-headers.headers.customrequestheaders.X-Forwarded-Scheme=https"
@@ -84,18 +84,18 @@ services:
       context: ./apps/web
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: http://api.reservas.sotodelprior.com
+        NEXT_PUBLIC_API_URL: https://api.reservas.sotodelprior.com
     container_name: sotoreservas-web
     restart: unless-stopped
     environment:
-      NEXT_PUBLIC_API_URL: http://api.reservas.sotodelprior.com
+      NEXT_PUBLIC_API_URL: https://api.reservas.sotodelprior.com
       AUTH_TRUST_HOST: "true"
-      AUTH_URL: "http://reservas.sotodelprior.com"
-      NEXTAUTH_URL: "http://reservas.sotodelprior.com"
+      AUTH_URL: "https://reservas.sotodelprior.com"
+      NEXTAUTH_URL: "https://reservas.sotodelprior.com"
       NEXTAUTH_TRUST_HOST: "true"
       NEXTAUTH_URL_INTERNAL: "http://localhost:3000"
       NEXTAUTH_SKIP_ENV_VALIDATION: "true"
-      NODE_ENV: "development"
+      NODE_ENV: "production"
       AUTH_SECRET: "${AUTH_SECRET:-supersecretkeyreservas123}"
       DATABASE_URL: postgresql://${DB_USER:-reservas_user}:${DB_PASS:-reservas_pass}@sotoreservas-db:5432/${DB_NAME:-reservas}
     networks:
@@ -110,7 +110,7 @@ services:
       - "traefik.http.routers.sotoreservas-web.rule=Host(`reservas.sotodelprior.com`)"
       - "traefik.http.routers.sotoreservas-web.entrypoints=web,websecure"
       - "traefik.http.routers.sotoreservas-web.tls=true"
-      - "traefik.http.routers.sotoreservas-web.tls.certresolver=myresolver"
+      - "traefik.http.routers.sotoreservas-web.tls.certresolver=le"
       - "traefik.http.routers.sotoreservas-web.middlewares=sotoreservas-web-headers"
       - "traefik.http.middlewares.sotoreservas-web-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
       - "traefik.http.middlewares.sotoreservas-web-headers.headers.customrequestheaders.X-Forwarded-Scheme=https"

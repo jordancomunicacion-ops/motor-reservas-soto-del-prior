@@ -9,12 +9,14 @@ import { format } from "date-fns";
 
 interface ReservationListProps {
     bookings: any[];
+    zones?: any[];
     onStatusChange: (id: string, status: string) => void;
+    onAssignTable?: (bookingId: string, tableId: string) => void;
     onEdit: (booking: any) => void;
     onSelectProfile?: (booking: any) => void;
 }
 
-export default function ReservationList({ bookings, onStatusChange, onEdit, onSelectProfile }: ReservationListProps) {
+export default function ReservationList({ bookings, zones = [], onStatusChange, onAssignTable, onEdit, onSelectProfile }: ReservationListProps) {
 
     const statusColors: any = {
         NO_SHOW: "bg-red-100 text-red-800",
@@ -69,14 +71,17 @@ export default function ReservationList({ bookings, onStatusChange, onEdit, onSe
                         bookings.map((booking) => (
                             <TableRow key={booking.id} className="hover:bg-gray-50">
                                 <TableCell className="font-medium">
-                                    {format(new Date(booking.date), 'HH:mm')}
+                                    {String(new Date(booking.date).getUTCHours()).padStart(2, '0')}:
+                                    {String(new Date(booking.date).getUTCMinutes()).padStart(2, '0')}
                                 </TableCell>
                                 <TableCell>
-                                    {booking.table ? (
-                                        <Badge variant="outline">{booking.table.name}</Badge>
-                                    ) : (
-                                        <Badge variant="secondary" className="text-gray-500">Sin Mesa</Badge>
-                                    )}
+                                    {(() => {
+                                        const table = booking.table || zones.flatMap(z => z.tables).find(t => t.id === booking.tableId);
+                                        if (table) {
+                                            return <Badge variant="outline">{table.name}</Badge>;
+                                        }
+                                        return <Badge variant="secondary" className="text-gray-500">Sin Mesa</Badge>;
+                                    })()}
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex flex-col">
@@ -145,14 +150,29 @@ export default function ReservationList({ bookings, onStatusChange, onEdit, onSe
                                                 </Button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
-                                                <DropdownMenuItem onClick={() => onSelectProfile?.(booking)}>
+                                                <DropdownMenuItem onSelect={() => onSelectProfile?.(booking)}>
                                                     <UserCircle className="w-4 h-4 mr-2" /> Ficha de Cliente
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => onEdit(booking)}>
+                                                <DropdownMenuItem onSelect={() => onEdit(booking)}>
                                                     <Edit2 className="w-4 h-4 mr-2" /> Editar Reserva
                                                 </DropdownMenuItem>
                                                 <DropdownMenuSeparator />
-                                                <DropdownMenuItem className="text-red-600" onClick={() => onStatusChange(booking.id, 'CANCELLED')}>
+                                                <div className="px-2 py-1.5 text-[10px] font-bold text-gray-400 uppercase">Mesa</div>
+                                                {zones.map(zone => (
+                                                    <div key={zone.id} className="border-t first:border-t-0">
+                                                        {zone.tables.map((table: any) => (
+                                                            <DropdownMenuItem 
+                                                                key={table.id} 
+                                                                onSelect={() => onAssignTable?.(booking.id, table.id)}
+                                                                className={cn("text-xs pl-4", booking.tableId === table.id && "bg-gray-100 font-bold")}
+                                                            >
+                                                                {table.name} ({table.capacity}p)
+                                                            </DropdownMenuItem>
+                                                        ))}
+                                                    </div>
+                                                ))}
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem className="text-red-600" onSelect={() => onStatusChange(booking.id, 'CANCELLED')}>
                                                     <XCircle className="w-4 h-4 mr-2" /> Cancelar
                                                 </DropdownMenuItem>
                                             </DropdownMenuContent>

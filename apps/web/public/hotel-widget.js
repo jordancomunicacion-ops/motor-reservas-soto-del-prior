@@ -1,6 +1,16 @@
 (function () {
     const CONTAINER_ID = 'soto-hotel-widget-container';
-    const BASE_URL = 'https://reservas.sotodelprior.com';
+    
+    // Automatically determine BASE_URL from the script source
+    let BASE_URL = 'https://reservas.sotodelprior.com';
+    const scripts = document.getElementsByTagName('script');
+    for (let i = 0; i < scripts.length; i++) {
+        if (scripts[i].src.indexOf('hotel-widget.js') !== -1) {
+            const url = new URL(scripts[i].src);
+            BASE_URL = url.origin;
+            break;
+        }
+    }
 
     function init() {
         // Prevent multiple initializations
@@ -16,6 +26,28 @@
         }
 
         const IFRAME_URL = `${BASE_URL}/widget?hotelId=${hotelId}`;
+        const mode = embedDiv ? (embedDiv.getAttribute('data-mode') || 'popup') : 'popup';
+
+        if (mode === 'inline') {
+            const iframe = document.createElement('iframe');
+            iframe.id = 'soto-hotel-widget-iframe-inline';
+            iframe.src = IFRAME_URL;
+            iframe.style.width = '100%';
+            iframe.style.height = '750px';
+            iframe.style.border = 'none';
+            iframe.style.borderRadius = '12px';
+            
+            embedDiv.style.display = 'block';
+            embedDiv.appendChild(iframe);
+            
+            const container = document.createElement('div');
+            container.id = CONTAINER_ID;
+            container.style.display = 'none';
+            document.body.appendChild(container);
+            
+            console.log('[SotoHotelWidget] Hotel widget initialized in inline mode for ID: ' + hotelId);
+            return;
+        }
 
         // 1. Inject CSS
         const style = document.createElement('style');

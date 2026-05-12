@@ -63,26 +63,94 @@ export class CrmIntegrationService {
         }
     }
 
+    private async getGuestStats(email?: string | null, phone?: string | null) {
+        if (!email && !phone) return { visitCount: 0, firstVisit: null, cancelledCount: 0, totalBookings: 0, cancellationRate: 0 };
+        
+        const bookings = await this.prisma.resBooking.findMany({
+            where: {
+                OR: [
+                    email ? { guestEmail: email } : null,
+                    phone ? { guestPhone: phone } : null
+                ].filter(Boolean) as any
+            },
+            select: {
+                status: true,
+                date: true
+            }
+        });
+
+        const totalBookings = bookings.length;
+        const visitCount = bookings.filter(b => b.status === 'SEATED').length;
+        const cancelledCount = bookings.filter(b => b.status === 'CANCELLED' || b.status === 'NO_SHOW').length;
+        
+        let firstVisit: Date | null = null;
+        if (bookings.length > 0) {
+            firstVisit = bookings.reduce((prev, curr) => 
+                (curr.date < prev.date) ? curr : prev
+            ).date;
+        }
+
+        return {
+            visitCount,
+            firstVisit,
+            cancelledCount,
+            totalBookings,
+            cancellationRate: totalBookings > 0 ? Math.round((cancelledCount / totalBookings) * 100) : 0
+        };
+    }
+
     async syncRestaurantBooking(bookingId: string, event: 'CREATED' | 'UPDATED' | 'CANCELLED' = 'CREATED') {
+        this.logger.log(`[CRM-DEBUG] syncRestaurantBooking started for ID: ${bookingId}, Event: ${event}`);
         try {
             const booking = await this.prisma.resBooking.findUnique({
                 where: { id: bookingId },
                 include: { restaurant: { include: { hotel: true } } }
             });
 
-            if (!booking || !booking.restaurant) return;
+            if (!booking) {
+                this.logger.warn(`[CRM-DEBUG] Booking ${bookingId} not found`);
+                return;
+            }
+            if (!booking.restaurant) {
+                this.logger.warn(`[CRM-DEBUG] Booking ${bookingId} has no restaurant`);
+                return;
+            }
 
             const restIntegrations = (booking.restaurant.integrations as any) || {};
             let crm = restIntegrations.crm;
 
+            this.logger.log(`[CRM-DEBUG] Restaurant integrations: ${JSON.stringify(restIntegrations)}`);
+
             if ((!crm || !crm.enabled) && booking.restaurant.hotel) {
+                this.logger.log(`[CRM-DEBUG] CRM not enabled on restaurant, checking hotel...`);
                 const hotelIntegrations = (booking.restaurant.hotel.integrations as any) || {};
                 if (hotelIntegrations.crm?.enabled) {
                     crm = hotelIntegrations.crm;
                 }
             }
 
-            if (!crm || !crm.enabled || !crm.url) return;
+            if (!crm) {
+                this.logger.warn(`[CRM-DEBUG] CRM configuration NOT FOUND for booking ${bookingId}`);
+                return;
+            }
+            if (!crm.enabled) {
+                this.logger.warn(`[CRM-DEBUG] CRM is DISABLED for booking ${bookingId}`);
+                return;
+            }
+            if (!crm.url) {
+                this.logger.warn(`[CRM-DEBUG] CRM URL is MISSING for booking ${bookingId}`);
+                return;
+            }
+
+            this.logger.log(`[CRM-DEBUG] Syncing to CRM URL: ${crm.url}`);
+
+            if (!booking.guestEmail && !booking.guestPhone) {
+                this.logger.warn(`[CRM-DEBUG] Skipping CRM sync for booking ${bookingId}: Both guest email and phone are missing.`);
+                return;
+            }
+
+            // Calculate actual guest stats for CRM
+            const stats = await this.getGuestStats(booking.guestEmail, booking.guestPhone);
 
             const [firstName, ...rest] = booking.guestName.split(' ');
             const lastName = rest.join(' ') || '';
@@ -96,8 +164,17 @@ export class CrmIntegrationService {
                     name: booking.guestName,
                     firstName,
                     lastName,
+                    surname2: booking.guestSurname2,
+                    age: booking.guestAge,
+                    gender: booking.guestGender,
+                    whatsapp: booking.guestWhatsapp,
                     notes: booking.notes,
-                    tags: booking.tags // "VIP", "ALLERGIES", etc.
+                    tags: booking.tags ? JSON.parse(booking.tags.startsWith('[') ? booking.tags : '[]') : [],
+                    instagram: (booking as any).instagram,
+                    facebook: (booking as any).facebook,
+                    tiktok: (booking as any).tiktok,
+                    linkedin: (booking as any).linkedin,
+                    xTwitter: (booking as any).xTwitter
                 },
                 data: {
                     id: booking.id,
@@ -108,13 +185,24 @@ export class CrmIntegrationService {
                     tags: booking.tags,
                     origin: booking.origin,
                     restaurantId: booking.restaurantId,
-                    restaurantName: booking.restaurant.name
+                    restaurantName: booking.restaurant.name,
+                    isMealPlan: booking.isMealPlan,
+                    hotelBookingId: booking.hotelBookingId,
+                    // New fields for the "cell" in CRM
+                    seatedAt: booking.status === 'SEATED' ? booking.updatedAt : null,
+                    visitCount: stats.visitCount,
+                    totalBookings: stats.totalBookings,
+                    cancelledCount: stats.cancelledCount,
+                    cancellationRate: stats.cancellationRate,
+                    firstReservationDate: stats.firstVisit
                 }
             };
 
+            this.logger.log(`[CRM-DEBUG] Sending payload: ${JSON.stringify(payload)}`);
             await this.sendToCrm(crm.url, payload, crm.token);
+            this.logger.log(`[CRM-DEBUG] syncRestaurantBooking completed for ID: ${bookingId}`);
         } catch (error) {
-            this.logger.error(`Failed to sync restaurant booking ${bookingId}:`, error);
+            this.logger.error(`[CRM-DEBUG] Failed to sync restaurant booking ${bookingId}:`, error);
         }
     }
 
@@ -198,7 +286,8 @@ export class CrmIntegrationService {
             });
 
             if (!response.ok) {
-                throw new Error(`CRM responded with ${response.status}`);
+                const errorText = await response.text();
+                throw new Error(`CRM responded with ${response.status}: ${errorText}`);
             }
 
             this.logger.log(`Successfully synced to CRM: ${payload.event} (${payload.source})`);
