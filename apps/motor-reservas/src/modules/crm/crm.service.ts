@@ -56,7 +56,15 @@ export class CrmService {
         });
     }
 
-    async trackVisit(data: { sessionId: string; url: string; visitorId?: string; email?: string }) {
+    async trackVisit(data: {
+        sessionId: string;
+        url: string;
+        visitorId?: string;
+        email?: string;
+        referrer?: string;
+        userAgent?: string;
+        duration?: number;
+    }) {
         let customerProfileId: string | undefined;
 
         if (data.email) {
@@ -64,14 +72,30 @@ export class CrmService {
             customerProfileId = profile.id;
         }
 
-        return (this.prisma as any).webVisit.create({
+        const webVisit = await (this.prisma as any).webVisit.create({
             data: {
                 sessionId: data.sessionId,
                 url: data.url,
                 visitorId: data.visitorId,
+                referrer: data.referrer,
+                userAgent: data.userAgent,
+                duration: data.duration || 0,
                 customerProfileId,
             }
         });
+
+        // Update customer profile stats
+        if (customerProfileId) {
+            await (this.prisma as any).customerProfile.update({
+                where: { id: customerProfileId },
+                data: {
+                    visitCount: { increment: 1 },
+                    lastInteraction: new Date()
+                }
+            });
+        }
+
+        return webVisit;
     }
 
     async getProfiles(page = 1, limit = 50) {

@@ -11,19 +11,18 @@ export class CrmIntegrationService {
         try {
             const booking = await this.prisma.booking.findUnique({
                 where: { id: bookingId },
-                include: { hotel: { include: { restaurant: true } }, guest: true }
+                include: { hotel: { include: { restaurant: true, crmIntegration: true } }, guest: true }
             });
 
             if (!booking || !booking.hotel) return;
 
-            const hotelIntegrations = (booking.hotel.integrations as any) || {};
-            let crm = hotelIntegrations.crm;
+            let crm = booking.hotel.crmIntegration;
 
             if ((!crm || !crm.enabled) && booking.hotel.restaurant) {
-                const restIntegrations = (booking.hotel.restaurant.integrations as any) || {};
-                if (restIntegrations.crm?.enabled) {
-                    crm = restIntegrations.crm;
-                }
+                crm = await (this.prisma as any).crmIntegration.findUnique({
+                    where: { restaurantId: booking.hotel.restaurant.id }
+                });
+                if (crm && !crm.enabled) crm = null;
             }
 
             if (!crm || !crm.enabled || !crm.url) return;
@@ -33,6 +32,7 @@ export class CrmIntegrationService {
 
             const payload = {
                 source: 'HOTEL_RESERVATIONS',
+                sourceLabel: crm.sourceLabel,
                 event: `BOOKING_${event}`,
                 guest: {
                     email: booking.guestEmail || booking.guest?.email,
@@ -54,10 +54,16 @@ export class CrmIntegrationService {
                     source: booking.source,
                     hotelId: booking.hotelId,
                     hotelName: booking.hotel.name
+                },
+                tracking: {
+                    trackingId: crm.trackingId,
+                    campaignSource: crm.campaignSource,
+                    campaignMedium: crm.campaignMedium,
+                    campaignName: crm.campaignName
                 }
             };
 
-            await this.sendToCrm(crm.url, payload, crm.token);
+            await this.sendToCrm(crm.url, payload, crm.token, crm);
         } catch (error) {
             this.logger.error(`Failed to sync hotel booking ${bookingId}:`, error);
         }
@@ -104,7 +110,7 @@ export class CrmIntegrationService {
         try {
             const booking = await this.prisma.resBooking.findUnique({
                 where: { id: bookingId },
-                include: { restaurant: { include: { hotel: true } } }
+                include: { restaurant: { include: { hotel: true, crmIntegration: true } } }
             });
 
             if (!booking) {
@@ -116,17 +122,15 @@ export class CrmIntegrationService {
                 return;
             }
 
-            const restIntegrations = (booking.restaurant.integrations as any) || {};
-            let crm = restIntegrations.crm;
+            let crm = booking.restaurant.crmIntegration;
 
-            this.logger.log(`[CRM-DEBUG] Restaurant integrations: ${JSON.stringify(restIntegrations)}`);
+            this.logger.log(`[CRM-DEBUG] Restaurant CRM config: ${JSON.stringify(crm)}`);
 
             if ((!crm || !crm.enabled) && booking.restaurant.hotel) {
                 this.logger.log(`[CRM-DEBUG] CRM not enabled on restaurant, checking hotel...`);
-                const hotelIntegrations = (booking.restaurant.hotel.integrations as any) || {};
-                if (hotelIntegrations.crm?.enabled) {
-                    crm = hotelIntegrations.crm;
-                }
+                crm = await (this.prisma as any).crmIntegration.findUnique({
+                    where: { hotelId: booking.restaurant.hotel.id }
+                });
             }
 
             if (!crm) {
@@ -157,6 +161,7 @@ export class CrmIntegrationService {
 
             const payload = {
                 source: 'RESTAURANT_RESERVATIONS',
+                sourceLabel: crm.sourceLabel,
                 event: `RESERVATION_${event}`,
                 guest: {
                     email: booking.guestEmail,
@@ -188,18 +193,23 @@ export class CrmIntegrationService {
                     restaurantName: booking.restaurant.name,
                     isMealPlan: booking.isMealPlan,
                     hotelBookingId: booking.hotelBookingId,
-                    // New fields for the "cell" in CRM
                     seatedAt: booking.status === 'SEATED' ? booking.updatedAt : null,
                     visitCount: stats.visitCount,
                     totalBookings: stats.totalBookings,
                     cancelledCount: stats.cancelledCount,
                     cancellationRate: stats.cancellationRate,
                     firstReservationDate: stats.firstVisit
+                },
+                tracking: {
+                    trackingId: crm.trackingId,
+                    campaignSource: crm.campaignSource,
+                    campaignMedium: crm.campaignMedium,
+                    campaignName: crm.campaignName
                 }
             };
 
             this.logger.log(`[CRM-DEBUG] Sending payload: ${JSON.stringify(payload)}`);
-            await this.sendToCrm(crm.url, payload, crm.token);
+            await this.sendToCrm(crm.url, payload, crm.token, crm);
             this.logger.log(`[CRM-DEBUG] syncRestaurantBooking completed for ID: ${bookingId}`);
         } catch (error) {
             this.logger.error(`[CRM-DEBUG] Failed to sync restaurant booking ${bookingId}:`, error);
@@ -210,13 +220,13 @@ export class CrmIntegrationService {
         try {
             const booking = await this.prisma.eventBooking.findUnique({
                 where: { id: bookingId },
-                include: { 
-                    event: { 
-                        include: { 
-                            hotel: { include: { restaurant: true } }, 
-                            restaurant: { include: { hotel: true } } 
-                        } 
-                    } 
+                include: {
+                    event: {
+                        include: {
+                            hotel: { include: { restaurant: true, crmIntegration: true } },
+                            restaurant: { include: { hotel: true, crmIntegration: true } }
+                        }
+                    }
                 }
             });
 
@@ -225,16 +235,12 @@ export class CrmIntegrationService {
             const primaryEntity = booking.event.hotel || booking.event.restaurant;
             if (!primaryEntity) return;
 
-            let integrations = (primaryEntity.integrations as any) || {};
-            let crm = integrations.crm;
+            let crm = (primaryEntity as any).crmIntegration;
 
             if (!crm || !crm.enabled) {
-                const linkedEntity = (primaryEntity as any).hotel || (primaryEntity as any).restaurant;
+                const linkedEntity = booking.event.hotel?.restaurant || booking.event.restaurant?.hotel;
                 if (linkedEntity) {
-                    const linkedIntegrations = (linkedEntity.integrations as any) || {};
-                    if (linkedIntegrations.crm?.enabled) {
-                        crm = linkedIntegrations.crm;
-                    }
+                    crm = (linkedEntity as any).crmIntegration;
                 }
             }
 
@@ -245,6 +251,7 @@ export class CrmIntegrationService {
 
             const payload = {
                 source: 'EVENT_RESERVATIONS',
+                sourceLabel: crm.sourceLabel,
                 event: `EVENT_BOOKING_${event}`,
                 guest: {
                     email: booking.guestEmail,
@@ -261,16 +268,22 @@ export class CrmIntegrationService {
                     pax: booking.pax,
                     total: Number(booking.totalPrice),
                     status: booking.status
+                },
+                tracking: {
+                    trackingId: crm.trackingId,
+                    campaignSource: crm.campaignSource,
+                    campaignMedium: crm.campaignMedium,
+                    campaignName: crm.campaignName
                 }
             };
 
-            await this.sendToCrm(crm.url, payload, crm.token);
+            await this.sendToCrm(crm.url, payload, crm.token, crm);
         } catch (error) {
             this.logger.error(`Failed to sync event booking ${bookingId}:`, error);
         }
     }
 
-    private async sendToCrm(url: string, payload: any, token?: string) {
+    private async sendToCrm(url: string, payload: any, token?: string, crmConfig?: any) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 8000);
 
@@ -290,7 +303,31 @@ export class CrmIntegrationService {
                 throw new Error(`CRM responded with ${response.status}: ${errorText}`);
             }
 
+            // Register successful sync
+            if (crmConfig?.id) {
+                await (this.prisma as any).crmIntegration.update({
+                    where: { id: crmConfig.id },
+                    data: {
+                        lastSync: new Date(),
+                        syncCount: { increment: 1 },
+                        lastError: null
+                    }
+                });
+            }
+
             this.logger.log(`Successfully synced to CRM: ${payload.event} (${payload.source})`);
+        } catch (error) {
+            // Register failed sync
+            if (crmConfig?.id) {
+                await (this.prisma as any).crmIntegration.update({
+                    where: { id: crmConfig.id },
+                    data: {
+                        failureCount: { increment: 1 },
+                        lastError: error instanceof Error ? error.message : String(error)
+                    }
+                });
+            }
+            throw error;
         } finally {
             clearTimeout(timeoutId);
         }
