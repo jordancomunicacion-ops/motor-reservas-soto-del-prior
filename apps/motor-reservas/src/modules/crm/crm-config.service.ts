@@ -105,16 +105,32 @@ export class CrmConfigService {
     async disableCrm(hotelId?: string, restaurantId?: string) {
         try {
             if (hotelId) {
-                return await (this.prisma as any).crmIntegration.update({
-                    where: { hotelId },
-                    data: { enabled: false }
+                const hotel = await this.prisma.hotel.findUnique({
+                    where: { id: hotelId }
+                });
+                if (!hotel) return null;
+                const integrations = (hotel.integrations as any) || {};
+                if (integrations.crm) {
+                    integrations.crm.enabled = false;
+                }
+                return await this.prisma.hotel.update({
+                    where: { id: hotelId },
+                    data: { integrations }
                 });
             }
 
             if (restaurantId) {
-                return await (this.prisma as any).crmIntegration.update({
-                    where: { restaurantId },
-                    data: { enabled: false }
+                const restaurant = await this.prisma.restaurant.findUnique({
+                    where: { id: restaurantId }
+                });
+                if (!restaurant) return null;
+                const integrations = (restaurant.integrations as any) || {};
+                if (integrations.crm) {
+                    integrations.crm.enabled = false;
+                }
+                return await this.prisma.restaurant.update({
+                    where: { id: restaurantId },
+                    data: { integrations }
                 });
             }
         } catch (error) {

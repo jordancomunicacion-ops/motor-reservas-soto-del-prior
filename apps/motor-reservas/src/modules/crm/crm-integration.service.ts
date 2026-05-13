@@ -16,13 +16,26 @@ export class CrmIntegrationService {
 
             if (!booking || !booking.hotel) return;
 
-            let crm = booking.hotel.crmIntegration;
+            let crm: any = booking.hotel.crmIntegration;
+
+            if (!crm || !crm.enabled) {
+                const hotelIntegrations = (booking.hotel.integrations as any) || {};
+                if (hotelIntegrations.crm?.enabled && hotelIntegrations.crm?.url) {
+                    crm = hotelIntegrations.crm;
+                }
+            }
 
             if ((!crm || !crm.enabled) && booking.hotel.restaurant) {
                 crm = await (this.prisma as any).crmIntegration.findUnique({
                     where: { restaurantId: booking.hotel.restaurant.id }
                 });
                 if (crm && !crm.enabled) crm = null;
+                if (!crm) {
+                    const restIntegrations = (booking.hotel.restaurant.integrations as any) || {};
+                    if (restIntegrations.crm?.enabled && restIntegrations.crm?.url) {
+                        crm = restIntegrations.crm;
+                    }
+                }
             }
 
             if (!crm || !crm.enabled || !crm.url) return;
@@ -122,15 +135,30 @@ export class CrmIntegrationService {
                 return;
             }
 
-            let crm = booking.restaurant.crmIntegration;
+            let crm: any = booking.restaurant.crmIntegration;
 
-            this.logger.log(`[CRM-DEBUG] Restaurant CRM config: ${JSON.stringify(crm)}`);
+            this.logger.log(`[CRM-DEBUG] Restaurant CRM table config: ${JSON.stringify(crm)}`);
+
+            if (!crm || !crm.enabled) {
+                const restIntegrations = (booking.restaurant.integrations as any) || {};
+                if (restIntegrations.crm?.enabled && restIntegrations.crm?.url) {
+                    this.logger.log(`[CRM-DEBUG] Using restaurant.integrations.crm JSON fallback`);
+                    crm = restIntegrations.crm;
+                }
+            }
 
             if ((!crm || !crm.enabled) && booking.restaurant.hotel) {
                 this.logger.log(`[CRM-DEBUG] CRM not enabled on restaurant, checking hotel...`);
                 crm = await (this.prisma as any).crmIntegration.findUnique({
                     where: { hotelId: booking.restaurant.hotel.id }
                 });
+                if (!crm || !crm.enabled) {
+                    const hotelIntegrations = (booking.restaurant.hotel.integrations as any) || {};
+                    if (hotelIntegrations.crm?.enabled && hotelIntegrations.crm?.url) {
+                        this.logger.log(`[CRM-DEBUG] Using hotel.integrations.crm JSON fallback`);
+                        crm = hotelIntegrations.crm;
+                    }
+                }
             }
 
             if (!crm) {
