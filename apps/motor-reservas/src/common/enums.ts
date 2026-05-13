@@ -15,6 +15,7 @@ export enum BookingStatus {
 
 export enum BookingSource {
   DIRECT = 'DIRECT',
+  MANUAL = 'MANUAL',
   BOOKING_COM = 'BOOKING_COM',
   AIRBNB = 'AIRBNB',
   WALK_IN = 'WALK_IN',

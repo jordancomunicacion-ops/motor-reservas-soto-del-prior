@@ -26,6 +26,7 @@ enum BookingStatus {
 
 enum BookingSource {
   DIRECT
+  MANUAL
   BOOKING_COM
   AIRBNB
   WALK_IN
