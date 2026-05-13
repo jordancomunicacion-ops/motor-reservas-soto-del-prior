@@ -10,9 +10,8 @@ export const authConfig = {
             const isOnAdmin = nextUrl.pathname.startsWith('/admin');
             if (isOnAdmin) {
                 if (isLoggedIn) return true;
-                return false; // Redirect unauthenticated users to login page
+                return false;
             } else if (isLoggedIn) {
-                // Redirect logged-in users away from public pages e.g. login
                 if (nextUrl.pathname === '/login') {
                     return Response.redirect(new URL('/admin', nextUrl));
                 }
@@ -20,23 +19,20 @@ export const authConfig = {
             return true;
         },
         async session({ session, token }) {
-            console.log('[AUTH SESSION] Token:', token);
             if (token.sub && session.user) {
                 session.user.id = token.sub;
             }
             if (token.role && session.user) {
                 session.user.role = token.role as string;
             }
-            console.log('[AUTH SESSION] Final session user:', session.user);
             return session;
         },
         async jwt({ token, user }) {
             if (user) {
-                console.log('[AUTH JWT] User:', user);
                 token.role = user.role;
             }
             return token;
         },
     },
-    providers: [], // Providers added in auth.ts
+    providers: [],
 } satisfies NextAuthConfig;

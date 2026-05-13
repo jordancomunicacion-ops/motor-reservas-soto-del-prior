@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ShiftType } from '../../common/enums';
 
 @Injectable()
 export class PropertyService {
@@ -78,9 +79,9 @@ export class PropertyService {
 
                 if (restaurant && restaurant.shifts.length === 0) {
                     const shiftsData = [
-                        { name: 'Desayuno', type: 'BREAKFAST', startTime: '08:00', endTime: '11:00' },
-                        { name: 'Comida', type: 'LUNCH', startTime: '13:00', endTime: '16:00' },
-                        { name: 'Cena', type: 'DINNER', startTime: '20:00', endTime: '23:00' }
+                        { name: 'Desayuno', type: ShiftType.BREAKFAST, startTime: '08:00', endTime: '11:00' },
+                        { name: 'Comida', type: ShiftType.LUNCH, startTime: '13:00', endTime: '16:00' },
+                        { name: 'Cena', type: ShiftType.DINNER, startTime: '20:00', endTime: '23:00' }
                     ];
 
                     for (const s of shiftsData) {

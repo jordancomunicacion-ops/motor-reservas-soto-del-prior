@@ -2,18 +2,29 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { auth } from '@/auth';
 
 const execAsync = promisify(exec);
 
 export async function deployApp() {
-    try {
-        // The command opens a new cmd window, changes directory to Infrastructure, runs the bat file, and pauses so the user can see output/errors
-        const command = `start cmd.exe /c "cd /d c:\\Users\\Carlos\\SOTOdelPRIOR\\Infraestructure && DESPLEGAR.bat && pause"`;
+    const session = await auth();
+    if (!session?.user) {
+        return { success: false, message: 'No autenticado' };
+    }
+    if (session.user.role !== 'ADMIN') {
+        return { success: false, message: 'Acción reservada al administrador' };
+    }
 
+    if (process.platform !== 'win32') {
+        return { success: false, message: 'Solo disponible en el equipo de despliegue (Windows)' };
+    }
+
+    try {
+        const command = `start cmd.exe /c "cd /d c:\\Users\\Carlos\\SOTOdelPRIOR\\Infraestructure && DESPLEGAR.bat && pause"`;
         await execAsync(command);
-        return { success: true, message: 'Deployment process started in a new window' };
+        return { success: true, message: 'Despliegue lanzado en una nueva ventana' };
     } catch (error) {
         console.error('Deployment error:', error);
-        return { success: false, message: 'Failed to start deployment process' };
+        return { success: false, message: 'Error al lanzar el despliegue' };
     }
 }

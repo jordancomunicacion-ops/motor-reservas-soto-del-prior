@@ -1,0 +1,74 @@
+export enum UserRole {
+  ADMIN = 'ADMIN',
+  MANAGER = 'MANAGER',
+  RECEPTIONIST = 'RECEPTIONIST',
+  STAFF = 'STAFF',
+}
+
+export enum BookingStatus {
+  PENDING = 'PENDING',
+  CONFIRMED = 'CONFIRMED',
+  CHECKED_IN = 'CHECKED_IN',
+  CHECKED_OUT = 'CHECKED_OUT',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum BookingSource {
+  DIRECT = 'DIRECT',
+  BOOKING_COM = 'BOOKING_COM',
+  AIRBNB = 'AIRBNB',
+  WALK_IN = 'WALK_IN',
+  PHONE = 'PHONE',
+  EMAIL = 'EMAIL',
+  WHATSAPP = 'WHATSAPP',
+}
+
+export enum ResBookingStatus {
+  PENDING = 'PENDING',
+  PENDING_CONFIRMATION = 'PENDING_CONFIRMATION',
+  CONFIRMED = 'CONFIRMED',
+  RELEASED = 'RELEASED',
+  SEATED = 'SEATED',
+  FINISHED = 'FINISHED',
+  CANCELLED = 'CANCELLED',
+  NO_SHOW = 'NO_SHOW',
+}
+
+export enum ResBookingOrigin {
+  MANUAL = 'MANUAL',
+  GOOGLE = 'GOOGLE',
+  WEB = 'WEB',
+  PHONE = 'PHONE',
+  WALK_IN = 'WALK_IN',
+  THEFORK = 'THEFORK',
+  RESY = 'RESY',
+  WIDGET = 'WIDGET',
+}
+
+export enum PaymentStatus {
+  PENDING = 'PENDING',
+  SUCCEEDED = 'SUCCEEDED',
+  FAILED = 'FAILED',
+  REFUNDED = 'REFUNDED',
+}
+
+export enum ShiftType {
+  BREAKFAST = 'BREAKFAST',
+  LUNCH = 'LUNCH',
+  DINNER = 'DINNER',
+  DRINKS = 'DRINKS',
+}
+
+export enum RestaurantWaitlistStatus {
+  WAITING = 'WAITING',
+  NOTIFIED = 'NOTIFIED',
+  CONFIRMED = 'CONFIRMED',
+  EXPIRED = 'EXPIRED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum EventBookingStatus {
+  PENDING = 'PENDING',
+  CONFIRMED = 'CONFIRMED',
+  CANCELLED = 'CANCELLED',
+}

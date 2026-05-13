@@ -1,10 +1,12 @@
 import { Controller, Get } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { Roles } from '../../auth/roles.decorator';
 
 @Controller('global')
 export class GlobalController {
     constructor(private prisma: PrismaService) { }
 
+    @Roles('ADMIN')
     @Get('contexts')
     async getContexts() {
         const [hotels, restaurants] = await Promise.all([
@@ -24,6 +26,7 @@ export class GlobalController {
         };
     }
 
+    @Roles('ADMIN')
     @Get('stats')
     async getStats() {
         const now = new Date();

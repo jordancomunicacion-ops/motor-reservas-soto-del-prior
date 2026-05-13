@@ -9,9 +9,13 @@
   "scripts": {
     "dev": "concurrently \"npm run dev -w web\" \"npm run dev -w motor-reservas\"",
     "build": "npm run build --workspaces",
-    "lint": "npm run lint --workspaces"
+    "lint": "npm run lint --workspaces",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "concurrently": "^8.0.0"
   }
 }

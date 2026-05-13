@@ -43,6 +43,7 @@ export default function InstallPage() {
 
     async function handleSetup() {
         if (!hotelName || !adminEmail || !adminPassword) return alert('Por favor, rellena todos los campos obligatorios');
+        if (adminPassword.length < 8) return alert('La contraseña del administrador debe tener al menos 8 caracteres');
         setLoading(true);
 
         try {
@@ -117,8 +118,8 @@ export default function InstallPage() {
                                         <input className="w-full border p-2 rounded" value={adminEmail} onChange={e => setAdminEmail(e.target.value)} placeholder="admin@ejemplo.com" />
                                     </div>
                                     <div>
-                                        <label className="text-sm font-medium">Contraseña</label>
-                                        <input type="password" className="w-full border p-2 rounded" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} placeholder="AguyStrongPassword123" />
+                                        <label className="text-sm font-medium">Contraseña (mín. 8 caracteres)</label>
+                                        <input type="password" minLength={8} required className="w-full border p-2 rounded" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} placeholder="Mínimo 8 caracteres" />
                                     </div>
                                 </div>
                             </div>

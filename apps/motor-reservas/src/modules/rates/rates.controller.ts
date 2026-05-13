@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Param, Query, HttpCode, Patch, Delete } fr
 import { RatesService } from './rates.service';
 import { AvailabilityService } from './availability.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { Roles } from '../../auth/roles.decorator';
 
 @Controller('rates')
 export class RatesController {
@@ -11,6 +12,7 @@ export class RatesController {
         private readonly prisma: PrismaService
     ) { }
 
+    @Roles('ADMIN')
     @Get('plans/:hotelId')
     async getRatePlans(@Param('hotelId') hotelId: string) {
         const plans = await this.prisma.ratePlan.findMany({
@@ -32,11 +34,13 @@ export class RatesController {
         return plans;
     }
 
+    @Roles('ADMIN')
     @Post('plans')
     async createRatePlan(@Body() body: any) {
         return this.prisma.ratePlan.create({ data: body });
     }
 
+    @Roles('ADMIN')
     @Patch('plans/:id')
     async updateRatePlan(@Param('id') id: string, @Body() body: any) {
         const { id: _, ...data } = body;
@@ -46,6 +50,7 @@ export class RatesController {
         });
     }
 
+    @Roles('ADMIN')
     @Delete('plans/:id')
     async deleteRatePlan(@Param('id') id: string) {
         return this.prisma.ratePlan.delete({
@@ -54,6 +59,7 @@ export class RatesController {
     }
 
     // Bulk Update Prices
+    @Roles('ADMIN')
     @Post('prices/bulk')
     @HttpCode(200)
     async updatePrices(@Body() body: {
