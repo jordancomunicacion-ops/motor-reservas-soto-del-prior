@@ -32,21 +32,75 @@ export class RestaurantService {
         });
     }
 
+    /**
+     * Sanitiza datos sensibles del mailConfig antes de devolverlos en respuestas.
+     * Quita contraseñas SMTP, Client Secrets, etc.
+     * Mantiene la presencia de los campos (true/false) para que el admin sepa si está configurado.
+     */
+    private sanitizeMailConfig(restaurant: any): any {
+        if (!restaurant) return restaurant;
+        const cfg = restaurant.mailConfig;
+        if (!cfg) return restaurant;
+        const sanitized: any = {
+            host: cfg.host || '',
+            port: cfg.port || '',
+            user: cfg.user || '',
+            from: cfg.from || '',
+            notificationsEnabled: cfg.notificationsEnabled !== false,
+            // No exponer la contraseña; solo si está configurada
+            passConfigured: !!(cfg.pass && cfg.pass.length > 0),
+        };
+        if (cfg.graph) {
+            sanitized.graph = {
+                tenantId: cfg.graph.tenantId || '',
+                clientId: cfg.graph.clientId || '',
+                senderEmail: cfg.graph.senderEmail || '',
+                clientSecretConfigured: !!(cfg.graph.clientSecret && cfg.graph.clientSecret.length > 0),
+            };
+        }
+        return { ...restaurant, mailConfig: sanitized };
+    }
+
     async getRestaurants() {
-        return this.prisma.restaurant.findMany({ include: { zones: true } });
+        const restaurants = await this.prisma.restaurant.findMany({ include: { zones: true } });
+        return restaurants.map(r => this.sanitizeMailConfig(r));
     }
 
     async getRestaurant(id: string) {
-        return this.prisma.restaurant.findUnique({ 
+        const restaurant = await this.prisma.restaurant.findUnique({
             where: { id },
             include: { hotel: true, widgetConfig: true, shifts: true }
         });
+        return this.sanitizeMailConfig(restaurant);
     }
 
 
     async updateRestaurant(id: string, data: any) {
         const { hotelId, ...rest } = data;
-        
+
+        // Si llega mailConfig sanitizado (sin pass o clientSecret), preservar los del actual
+        if (rest.mailConfig) {
+            const existing = await this.prisma.restaurant.findUnique({ where: { id }, select: { mailConfig: true } });
+            const currentCfg: any = existing?.mailConfig || {};
+            const incoming: any = rest.mailConfig || {};
+            // Pass SMTP: si no llega o llega vacío, mantener el actual
+            if (!incoming.pass) {
+                incoming.pass = currentCfg.pass;
+            }
+            // Graph clientSecret: si no llega o no se incluye el objeto graph entero, mantener
+            if (incoming.graph) {
+                if (!incoming.graph.clientSecret) {
+                    incoming.graph.clientSecret = currentCfg.graph?.clientSecret;
+                }
+            } else if (currentCfg.graph) {
+                incoming.graph = currentCfg.graph;
+            }
+            // Eliminar campos solo-lectura que vienen del sanitizer
+            delete incoming.passConfigured;
+            if (incoming.graph) delete incoming.graph.clientSecretConfigured;
+            rest.mailConfig = incoming;
+        }
+
         return this.prisma.$transaction(async (tx) => {
             // Update restaurant basic info
             const restaurant = await tx.restaurant.update({
