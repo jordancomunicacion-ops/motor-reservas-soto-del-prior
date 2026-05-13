@@ -35,6 +35,7 @@ function RestaurantDashboardContent() {
 
     // UI State
     const [isFormOpen, setIsFormOpen] = useState(false);
+    const [editingBooking, setEditingBooking] = useState<any>(null);
     const [selectedBookingForProfile, setSelectedBookingForProfile] = useState<any>(null);
 
     useEffect(() => {
@@ -68,11 +69,26 @@ function RestaurantDashboardContent() {
 
     const handleCreateBooking = async (data: any) => {
         try {
-            await fetchAPI(`/restaurant/bookings`, { method: 'POST', body: JSON.stringify({ ...data, restaurantId }) });
+            if (editingBooking?.id) {
+                await fetchAPI(`/restaurant/bookings/${editingBooking.id}`, { method: 'PATCH', body: JSON.stringify(data) });
+            } else {
+                await fetchAPI(`/restaurant/bookings`, { method: 'POST', body: JSON.stringify({ ...data, restaurantId }) });
+            }
+            setEditingBooking(null);
             loadData();
         } catch (e) {
-            alert("Error creando reserva");
+            alert(editingBooking ? "Error guardando cambios" : "Error creando reserva");
         }
+    };
+
+    const openEditBooking = (booking: any) => {
+        setEditingBooking(booking);
+        setIsFormOpen(true);
+    };
+
+    const closeForm = () => {
+        setIsFormOpen(false);
+        setEditingBooking(null);
     };
 
     const handleUpdateTable = async (tableId: string, updates: any) => {
@@ -262,7 +278,7 @@ function RestaurantDashboardContent() {
                                     onStatusChange={handleStatusChange}
                                     onAssignTable={handleAssignTable}
                                     onSelectProfile={(b) => setSelectedBookingForProfile(b)}
-                                    onEdit={(b) => console.log("Edit", b)}
+                                    onEdit={openEditBooking}
                                 />
                             </div>
                         )}
@@ -272,9 +288,10 @@ function RestaurantDashboardContent() {
 
             <ReservationForm
                 isOpen={isFormOpen}
-                onClose={() => setIsFormOpen(false)}
+                onClose={closeForm}
                 onSubmit={handleCreateBooking}
                 initialDate={date}
+                initialBooking={editingBooking}
             />
 
             <GuestProfileSheet
