@@ -2,10 +2,32 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, MessageCircle, Phone, CheckCircle, XCircle, UserCircle, Edit2 } from "lucide-react";
+import { MoreHorizontal, XCircle, UserCircle, Edit2, Mail, MessageSquare, Utensils, Star, AlertTriangle, Clock } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+
+function formatRelativeTime(dateInput: string | Date): string {
+    const date = new Date(dateInput);
+    const diffMs = Date.now() - date.getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return "ahora mismo";
+    if (diffMin < 60) return `hace ${diffMin}m`;
+    const diffH = Math.floor(diffMin / 60);
+    if (diffH < 24) return `hace ${diffH}h`;
+    const diffD = Math.floor(diffH / 24);
+    if (diffD < 7) return `hace ${diffD}d`;
+    return date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' });
+}
+
+function parseTags(tags: string | null | undefined): string[] {
+    if (!tags) return [];
+    try {
+        const parsed = JSON.parse(tags);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch {
+        return tags.split(',').map(t => t.trim()).filter(Boolean);
+    }
+}
 
 interface ReservationListProps {
     bookings: any[];
@@ -51,24 +73,31 @@ export default function ReservationList({ bookings, zones = [], onStatusChange, 
             <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableHead>Hora</TableHead>
+                        <TableHead className="w-[60px]">Hora</TableHead>
                         <TableHead>Mesa</TableHead>
                         <TableHead>Cliente</TableHead>
-                        <TableHead>Pax</TableHead>
+                        <TableHead className="w-[60px]">Pax</TableHead>
                         <TableHead>Estado</TableHead>
                         <TableHead>Origen</TableHead>
+                        <TableHead>Comunicación</TableHead>
+                        <TableHead className="whitespace-nowrap">Recibida</TableHead>
                         <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     {bookings.length === 0 ? (
                         <TableRow>
-                            <TableCell colSpan={7} className="text-center h-24 text-gray-500">
+                            <TableCell colSpan={9} className="text-center h-24 text-gray-500">
                                 No hay reservas para este turno.
                             </TableCell>
                         </TableRow>
                     ) : (
-                        bookings.map((booking) => (
+                        bookings.map((booking) => {
+                            const fullName = [booking.guestName, booking.guestSurname2].filter(Boolean).join(' ');
+                            const bookingTags = parseTags(booking.tags);
+                            const hasAllergies = bookingTags.some(t => /alerg/i.test(t)) || /alerg|intoler/i.test(booking.notes || '');
+                            const isVip = bookingTags.some(t => /vip/i.test(t));
+                            return (
                             <TableRow key={booking.id} className="hover:bg-gray-50">
                                 <TableCell className="font-medium">
                                     {String(new Date(booking.date).getUTCHours()).padStart(2, '0')}:
@@ -85,15 +114,33 @@ export default function ReservationList({ bookings, zones = [], onStatusChange, 
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex flex-col">
-                                        <div className="flex items-center gap-1">
-                                            <span className="font-semibold">{booking.guestName}</span>
+                                        <div className="flex items-center gap-1 flex-wrap">
+                                            <span className="font-semibold">{fullName}</span>
                                             {booking.visitCount > 1 && (
                                                 <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 text-[9px] h-4 px-1">
                                                     {booking.visitCount}v
                                                 </Badge>
                                             )}
+                                            {isVip && (
+                                                <Badge className="bg-amber-100 text-amber-800 border border-amber-200 text-[9px] h-4 px-1 gap-0.5">
+                                                    <Star className="w-2.5 h-2.5" /> VIP
+                                                </Badge>
+                                            )}
+                                            {hasAllergies && (
+                                                <Badge className="bg-red-100 text-red-800 border border-red-200 text-[9px] h-4 px-1 gap-0.5" title="Tiene alergias o intolerancias">
+                                                    <AlertTriangle className="w-2.5 h-2.5" /> Alergias
+                                                </Badge>
+                                            )}
+                                            {booking.isMealPlan && (
+                                                <Badge className="bg-indigo-100 text-indigo-800 border border-indigo-200 text-[9px] h-4 px-1 gap-0.5" title="Reserva en media pensión / pensión completa">
+                                                    <Utensils className="w-2.5 h-2.5" /> MP
+                                                </Badge>
+                                            )}
                                         </div>
-                                        <span className="text-xs text-gray-500">{booking.guestPhone}</span>
+                                        <div className="flex flex-col gap-0">
+                                            {booking.guestPhone && <span className="text-xs text-gray-500">{booking.guestPhone}</span>}
+                                            {booking.guestEmail && <span className="text-[10px] text-gray-400 truncate max-w-[180px]">{booking.guestEmail}</span>}
+                                        </div>
                                     </div>
                                 </TableCell>
                                 <TableCell>
@@ -107,7 +154,26 @@ export default function ReservationList({ bookings, zones = [], onStatusChange, 
                                     </Badge>
                                 </TableCell>
                                 <TableCell>
-                                    <span className="text-xs text-gray-400 capitalize">{booking.source?.toLowerCase()}</span>
+                                    <span className="text-xs text-gray-400 capitalize">{(booking.origin || booking.source || '').toLowerCase()}</span>
+                                </TableCell>
+                                <TableCell>
+                                    <div className="flex items-center gap-1">
+                                        <span title={booking.emailSent ? 'Email enviado' : 'Email pendiente'}>
+                                            <Mail className={cn("w-3.5 h-3.5", booking.emailSent ? "text-emerald-600" : "text-gray-300")} />
+                                        </span>
+                                        <span title={booking.smsSent ? 'SMS enviado' : 'SMS no enviado'}>
+                                            <MessageSquare className={cn("w-3.5 h-3.5", booking.smsSent ? "text-emerald-600" : "text-gray-300")} />
+                                        </span>
+                                    </div>
+                                </TableCell>
+                                <TableCell>
+                                    <span
+                                        className="inline-flex items-center gap-1 text-[10px] text-gray-500 whitespace-nowrap"
+                                        title={`Reserva creada: ${new Date(booking.createdAt).toLocaleString('es-ES')}`}
+                                    >
+                                        <Clock className="w-3 h-3" />
+                                        {formatRelativeTime(booking.createdAt)}
+                                    </span>
                                 </TableCell>
                                 <TableCell className="text-right">
                                     <div className="flex justify-end gap-1">
@@ -180,7 +246,8 @@ export default function ReservationList({ bookings, zones = [], onStatusChange, 
                                     </div>
                                 </TableCell>
                             </TableRow>
-                        )))}
+                        );
+                        }))}
                 </TableBody>
             </Table>
         </div>
