@@ -17,26 +17,23 @@ export class CrmConfigService {
         campaignName?: string;
     }) {
         try {
-            const existing = await (this.prisma as any).crmIntegration.findUnique({
-                where: { hotelId }
+            const hotel = await this.prisma.hotel.findUnique({
+                where: { id: hotelId }
             });
 
-            if (existing) {
-                return await (this.prisma as any).crmIntegration.update({
-                    where: { id: existing.id },
-                    data: {
-                        ...config,
-                        enabled: true
-                    }
-                });
+            if (!hotel) {
+                throw new Error(`Hotel ${hotelId} not found`);
             }
 
-            return await (this.prisma as any).crmIntegration.create({
-                data: {
-                    hotelId,
-                    ...config,
-                    enabled: true
-                }
+            const integrations = (hotel.integrations as any) || {};
+            integrations.crm = {
+                ...config,
+                enabled: true
+            };
+
+            return await this.prisma.hotel.update({
+                where: { id: hotelId },
+                data: { integrations }
             });
         } catch (error) {
             this.logger.error(`Failed to setup CRM for hotel ${hotelId}:`, error);
@@ -54,26 +51,23 @@ export class CrmConfigService {
         campaignName?: string;
     }) {
         try {
-            const existing = await (this.prisma as any).crmIntegration.findUnique({
-                where: { restaurantId }
+            const restaurant = await this.prisma.restaurant.findUnique({
+                where: { id: restaurantId }
             });
 
-            if (existing) {
-                return await (this.prisma as any).crmIntegration.update({
-                    where: { id: existing.id },
-                    data: {
-                        ...config,
-                        enabled: true
-                    }
-                });
+            if (!restaurant) {
+                throw new Error(`Restaurant ${restaurantId} not found`);
             }
 
-            return await (this.prisma as any).crmIntegration.create({
-                data: {
-                    restaurantId,
-                    ...config,
-                    enabled: true
-                }
+            const integrations = (restaurant.integrations as any) || {};
+            integrations.crm = {
+                ...config,
+                enabled: true
+            };
+
+            return await this.prisma.restaurant.update({
+                where: { id: restaurantId },
+                data: { integrations }
             });
         } catch (error) {
             this.logger.error(`Failed to setup CRM for restaurant ${restaurantId}:`, error);
@@ -83,16 +77,22 @@ export class CrmConfigService {
 
     async getCrmConfig(hotelId?: string, restaurantId?: string) {
         try {
-            if (hotelId) {
-                return await (this.prisma as any).crmIntegration.findUnique({
-                    where: { hotelId }
+            if (restaurantId) {
+                const restaurant = await this.prisma.restaurant.findUnique({
+                    where: { id: restaurantId }
                 });
+                if (!restaurant) return null;
+                const integrations = (restaurant.integrations as any) || {};
+                return integrations.crm || null;
             }
 
-            if (restaurantId) {
-                return await (this.prisma as any).crmIntegration.findUnique({
-                    where: { restaurantId }
+            if (hotelId) {
+                const hotel = await this.prisma.hotel.findUnique({
+                    where: { id: hotelId }
                 });
+                if (!hotel) return null;
+                const integrations = (hotel.integrations as any) || {};
+                return integrations.crm || null;
             }
 
             return null;

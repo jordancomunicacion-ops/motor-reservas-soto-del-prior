@@ -283,7 +283,7 @@ export class CrmIntegrationService {
         }
     }
 
-    private async sendToCrm(url: string, payload: any, token?: string, crmConfig?: any) {
+    private async sendToCrm(url: string, payload: any, token?: string | null, crmConfig?: any) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 8000);
 

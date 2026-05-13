@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Query, Param, Put } from '@nestjs/common';
+import { Controller, Post, Body, Get, Query, Param, Put, Logger } from '@nestjs/common';
 import { CrmService } from './crm.service';
 import { CrmConfigService } from './crm-config.service';
 import { Public } from '../../auth/public.decorator';
@@ -6,6 +6,8 @@ import { Roles } from '../../auth/roles.decorator';
 
 @Controller('crm')
 export class CrmController {
+    private readonly logger = new Logger(CrmController.name);
+
     constructor(
         private readonly crmService: CrmService,
         private readonly crmConfigService: CrmConfigService
