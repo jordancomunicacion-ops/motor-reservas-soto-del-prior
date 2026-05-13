@@ -5,22 +5,24 @@ const prisma = new PrismaClient();
 
 async function main() {
     const email = 'gerencia@sotodelprior.com';
-    const password = '123456';
-    const passwordHash = await bcrypt.hash(password, 10);
 
-    // Upsert to handle both creation and update
-    const user = await prisma.user.upsert({
-        where: { email },
-        update: { password: passwordHash },
-        create: {
-            email,
-            name: 'Gerencia',
-            password: passwordHash,
-            role: 'ADMIN',
-        },
-    });
-
-    console.log(`✅ User created/updated: ${user.email} (id: ${user.id})`);
+    // Only create user if it doesn't exist — never reset password of existing admin
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (!existing) {
+        const password = '123456';
+        const passwordHash = await bcrypt.hash(password, 10);
+        const user = await prisma.user.create({
+            data: {
+                email,
+                name: 'Gerencia',
+                password: passwordHash,
+                role: 'ADMIN',
+            },
+        });
+        console.log(`✅ Admin user CREATED: ${user.email} (default password: 123456 — change it!)`);
+    } else {
+        console.log(`ℹ️ Admin user ${email} already exists. Skipping (password preserved).`);
+    }
 
     // Create Restaurants
     const restaurants = [

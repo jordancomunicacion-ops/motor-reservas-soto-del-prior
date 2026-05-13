@@ -1,17 +1,20 @@
 import { Controller, Get, Post, Param, Body, Res } from '@nestjs/common';
 import { ChannelManagerService } from './channel-manager.service';
+import { Roles } from '../../auth/roles.decorator';
 import type { Response } from 'express';
 
 @Controller('channels')
 export class ChannelManagerController {
     constructor(private readonly channelService: ChannelManagerService) { }
 
+    @Roles('ADMIN')
     @Post('sync')
     async forceSync() {
         await this.channelService.syncAllFeeds();
         return { status: 'Sync started' };
     }
 
+    @Roles('ADMIN')
     @Get('export/:roomTypeId/calendar.ics')
     async exportICal(@Param('roomTypeId') mk: string, @Res() res: Response) {
         const ics = await this.channelService.generateICal(mk);
@@ -20,11 +23,13 @@ export class ChannelManagerController {
         res.send(ics);
     }
 
+    @Roles('ADMIN')
     @Get('feeds')
     async getFeeds() {
         return this.channelService.getFeeds();
     }
 
+    @Roles('ADMIN')
     @Post('feeds')
     async createFeed(@Body() body: { roomTypeId: string; url: string; name: string; source: string }) {
         return this.channelService.createFeed(body);

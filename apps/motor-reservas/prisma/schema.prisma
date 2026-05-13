@@ -7,6 +7,83 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// --- Enums ---
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  RECEPTIONIST
+  STAFF
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELLED
+}
+
+enum BookingSource {
+  DIRECT
+  BOOKING_COM
+  AIRBNB
+  WALK_IN
+  PHONE
+  EMAIL
+  WHATSAPP
+}
+
+enum ResBookingStatus {
+  PENDING
+  PENDING_CONFIRMATION
+  CONFIRMED
+  RELEASED
+  SEATED
+  FINISHED
+  CANCELLED
+  NO_SHOW
+}
+
+enum ResBookingOrigin {
+  MANUAL
+  GOOGLE
+  WEB
+  PHONE
+  WALK_IN
+  THEFORK
+  RESY
+  WIDGET
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+enum ShiftType {
+  BREAKFAST
+  LUNCH
+  DINNER
+  DRINKS
+}
+
+enum RestaurantWaitlistStatus {
+  WAITING
+  NOTIFIED
+  CONFIRMED
+  EXPIRED
+  CANCELLED
+}
+
+enum EventBookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
 // --- Core Hospitality Models ---
 
 model Hotel {
@@ -23,239 +100,242 @@ model Hotel {
   ratePlans RatePlan[]
   seasons   Season[]
   users     User[]
-  
+
   // Widget Config
   widgetConfig WidgetConfig?
-  
+
   // Restrictions Global
   restrictions Restriction[]
-  
+
   // Synergy
   waitlistEntries HotelWaitlist[]
-  restaurantId    String? @unique
-  restaurant      Restaurant? @relation(fields: [restaurantId], references: [id])
-  
+  restaurantId    String?         @unique
+  restaurant      Restaurant?     @relation(fields: [restaurantId], references: [id])
+
   // Integrations (JSON)
   integrations Json? @default("{}")
 
   // Notifications
-  contactEmail   String?
+  contactEmail String?
 
   emailTemplates Json? @default("{\"created\": \"\", \"confirmed\": \"\", \"cancelled\": \"\", \"modified\": \"\", \"reminder\": \"\", \"waitlist_join\": \"\", \"waitlist_available\": \"\"}")
   mailConfig     Json?
 
-
-
-  events      Event[]
-  zones       Zone[]
+  events Event[]
+  zones  Zone[]
 }
 
 model WidgetConfig {
-  id          String   @id @default(uuid())
-  
-  hotelId     String?  @unique
-  hotel       Hotel?   @relation(fields: [hotelId], references: [id])
-  
-  restaurantId String? @unique
+  id String @id @default(uuid())
+
+  hotelId String? @unique
+  hotel   Hotel?  @relation(fields: [hotelId], references: [id])
+
+  restaurantId String?     @unique
   restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
-  
+
   primaryColor   String  @default("#C59D5F") // Ocre
   secondaryColor String  @default("#1e40af") // Blue-800
-  customCss      String? 
-  
-  showLogo       Boolean @default(true)
-  title          String? // Override default title
+  customCss      String?
+
+  showLogo Boolean @default(true)
+  title    String? // Override default title
 
   // Stripe & No-Show Fee Strategy
-  stripeEnabled      Boolean @default(false)
-  noShowFeeAmount    Decimal @default(0)
-  noShowFeeAll       Boolean @default(false)
-  noShowFeeGroups    Boolean @default(false)
-  noShowGroupMinPax  Int     @default(8)
-  noShowFeeEvents    Boolean @default(false)
-  
-  showCrmFields      Boolean @default(true)
-  skipGuaranteeStep  Boolean @default(false)
+  stripeEnabled     Boolean @default(false)
+  noShowFeeAmount   Decimal @default(0)
+  noShowFeeAll      Boolean @default(false)
+  noShowFeeGroups   Boolean @default(false)
+  noShowGroupMinPax Int     @default(8)
+  noShowFeeEvents   Boolean @default(false)
+
+  showCrmFields     Boolean @default(true)
+  skipGuaranteeStep Boolean @default(false)
 }
 
 model RoomType {
-  id          String   @id @default(uuid())
+  id          String  @id @default(uuid())
   hotelId     String
-  hotel       Hotel    @relation(fields: [hotelId], references: [id])
+  hotel       Hotel   @relation(fields: [hotelId], references: [id])
   name        String
   description String?
-  basePrice   Decimal  @default(0)
-  capacity    Int      @default(2)
-  amenities   String?    // Stored as JSON string
-  
-  rooms       Room[]
-  icalFeeds   ICalFeed[]
-  
+  basePrice   Decimal @default(0)
+  capacity    Int     @default(2)
+  amenities   String? // Stored as JSON string
+
+  rooms     Room[]
+  icalFeeds ICalFeed[]
+
   // Relations for Rates & Channels
-  dailyPrices      DailyPrice[]
-  restrictions     Restriction[]
-  channelMappings  ChannelMapping[]
-  waitlistEntries  HotelWaitlist[] // Synergy
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  dailyPrices     DailyPrice[]
+  restrictions    Restriction[]
+  channelMappings ChannelMapping[]
+  waitlistEntries HotelWaitlist[] // Synergy
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Room {
-  id          String   @id @default(uuid())
-  roomTypeId  String
-  roomType    RoomType @relation(fields: [roomTypeId], references: [id])
-  name        String   // "101", "Villa A"
-  isActive    Boolean  @default(true)
-  
+  id         String   @id @default(uuid())
+  roomTypeId String
+  roomType   RoomType @relation(fields: [roomTypeId], references: [id])
+  name       String // "101", "Villa A"
+  isActive   Boolean  @default(true)
+
   bookingRooms BookingRoom[]
 }
 
 // --- Guests & CRM (NEW) ---
 model Guest {
-  id          String   @id @default(uuid())
-  firstName   String
-  lastName    String?
-  email       String?  @unique // Optional unique, some guests might not have email or share
-  phone       String?
-  docType     String?  // DNI, PASSPORT
-  docNumber   String?
-  country     String?
-  notes       String?
-  score       Int      @default(0) // 0-100 (Synergy)
-  tags        String?  // JSON/CSV (Synergy)
-  
-  bookings    Booking[]
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String  @id @default(uuid())
+  firstName String
+  lastName  String?
+  email     String? @unique // Optional unique, some guests might not have email or share
+  phone     String?
+  docType   String? // DNI, PASSPORT
+  docNumber String?
+  country   String?
+  notes     String?
+  score     Int     @default(0) // 0-100 (Synergy)
+  tags      String? // JSON/CSV (Synergy)
+
+  bookings Booking[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // --- Rates & Availability Engines (ADVANCED) ---
 
 model RatePlan {
-  id          String   @id @default(uuid())
+  id          String  @id @default(uuid())
   hotelId     String
-  hotel       Hotel    @relation(fields: [hotelId], references: [id])
-  name        String   // "Standard", "Non-Refundable", "Long Stay"
+  hotel       Hotel   @relation(fields: [hotelId], references: [id])
+  name        String // "Standard", "Non-Refundable", "Long Stay"
   description String?
-  isDefault   Boolean  @default(false)
-  
+  isDefault   Boolean @default(false)
+
   cancellationPolicy String? // "Free up to 7 days..."
   mealsIncluded      String? // "None", "Breakfast"
 
   // Payment Policy
-  requireCreditCard  Boolean @default(false)
-  noShowFee          Decimal @default(0)
+  requireCreditCard Boolean @default(false)
+  noShowFee         Decimal @default(0)
 
-  dailyPrices      DailyPrice[]
-  restrictions     Restriction[]
-  channelMappings  ChannelMapping[]
+  dailyPrices     DailyPrice[]
+  restrictions    Restriction[]
+  channelMappings ChannelMapping[]
 }
 
 model Season {
-  id          String   @id @default(uuid())
-  hotelId     String
-  hotel       Hotel    @relation(fields: [hotelId], references: [id])
-  name        String   // "High Season"
-  startDate   DateTime
-  endDate     DateTime
-  priceMultiplier Decimal @default(1.0)
+  id              String   @id @default(uuid())
+  hotelId         String
+  hotel           Hotel    @relation(fields: [hotelId], references: [id])
+  name            String // "High Season"
+  startDate       DateTime
+  endDate         DateTime
+  priceMultiplier Decimal  @default(1.0)
 }
 
 // Granular Pricing: Price per RoomType per Date per RatePlan
 model DailyPrice {
-  id          String   @id @default(uuid())
-  roomTypeId  String
-  roomType    RoomType @relation(fields: [roomTypeId], references: [id])
-  
-  ratePlanId  String
-  ratePlan    RatePlan @relation(fields: [ratePlanId], references: [id])
-  
-  date        DateTime // YYYY-MM-DD
-  price       Decimal 
-  
+  id         String   @id @default(uuid())
+  roomTypeId String
+  roomType   RoomType @relation(fields: [roomTypeId], references: [id])
+
+  ratePlanId String
+  ratePlan   RatePlan @relation(fields: [ratePlanId], references: [id])
+
+  date  DateTime // YYYY-MM-DD
+  price Decimal
+
   @@unique([roomTypeId, ratePlanId, date])
 }
 
 // Avirato-Style Restrictions
 // Priority: Specific (Rate+Room+Date) > Room+Date > Hotel+Date
 model Restriction {
-  id          String   @id @default(uuid())
-  hotelId     String
-  hotel       Hotel    @relation(fields: [hotelId], references: [id])
+  id      String @id @default(uuid())
+  hotelId String
+  hotel   Hotel  @relation(fields: [hotelId], references: [id])
 
-  roomTypeId  String?
-  roomType    RoomType? @relation(fields: [roomTypeId], references: [id])
-  
-  ratePlanId  String?
-  ratePlan    RatePlan? @relation(fields: [ratePlanId], references: [id])
-  
-  date        DateTime // YYYY-MM-DD
-  
+  roomTypeId String?
+  roomType   RoomType? @relation(fields: [roomTypeId], references: [id])
+
+  ratePlanId String?
+  ratePlan   RatePlan? @relation(fields: [ratePlanId], references: [id])
+
+  date DateTime // YYYY-MM-DD
+
   // Controls
-  minStay     Int?
-  maxStay     Int?
-  closedToArrival Boolean @default(false) // CTA
+  minStay           Int?
+  maxStay           Int?
+  closedToArrival   Boolean @default(false) // CTA
   closedToDeparture Boolean @default(false) // CTD
-  stopSell    Boolean @default(false)     // Close sales entirely
-  
+  stopSell          Boolean @default(false) // Close sales entirely
+
   @@index([hotelId, date])
 }
 
 // --- Booking Module ---
 
 model Booking {
-  id            String   @id @default(uuid())
-  hotelId       String
-  hotel         Hotel    @relation(fields: [hotelId], references: [id])
-  
-  referenceCode String   @unique // "RES-XXXX"
-  
+  id      String @id @default(uuid())
+  hotelId String
+  hotel   Hotel  @relation(fields: [hotelId], references: [id])
+
+  referenceCode String @unique // "RES-XXXX"
+
   // Linked Guest Profile
-  guestId       String?
-  guest         Guest?   @relation(fields: [guestId], references: [id])
+  guestId String?
+  guest   Guest?  @relation(fields: [guestId], references: [id])
 
   // Fallback if no guest profile created yet (API/Widget entry)
-  guestName     String
-  guestEmail    String?
-  guestPhone    String?
-  
-  status        String @default("PENDING") // PENDING, CONFIRMED, CHECKED_IN, CHECKED_OUT, CANCELLED
-  source        String @default("DIRECT") // DIRECT, BOOKING_COM, AIRBNB, WALK_IN
-  
-  totalPrice    Decimal
-  currency      String   @default("EUR")
-  isPaid        Boolean  @default(false)
-  
+  guestName  String
+  guestEmail String?
+  guestPhone String?
+
+  status BookingStatus @default(PENDING)
+  source BookingSource @default(DIRECT)
+
+  totalPrice Decimal
+  currency   String  @default("EUR")
+  isPaid     Boolean @default(false)
+
   // Stripe Integration
   stripeCustomerId      String?
-  stripePaymentMethodId String? 
+  stripePaymentMethodId String?
   stripePaymentIntentId String?
-  
-  checkInDate   DateTime
-  checkOutDate  DateTime
-  nights        Int
-  
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  bookingRooms  BookingRoom[]
-  payments      Payment[]
-  
+
+  checkInDate  DateTime
+  checkOutDate DateTime
+  nights       Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bookingRooms BookingRoom[]
+  payments     Payment[]
+
   // External OTA Info
-  otaId         String?  // Booking.com ID
-  otaRawData    String?  // JSON debug
+  otaId      String? // Booking.com ID
+  otaRawData String? // JSON debug
+
+  @@index([hotelId, status])
+  @@index([hotelId, checkInDate, checkOutDate])
+  @@index([status])
+  @@index([source])
 }
 
 // Specific Unit Assignment
 model BookingRoom {
-  id          String   @id @default(uuid())
-  bookingId   String
-  booking     Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  roomId      String
-  room        Room     @relation(fields: [roomId], references: [id])
-  
+  id        String  @id @default(uuid())
+  bookingId String
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  roomId    String
+  room      Room    @relation(fields: [roomId], references: [id])
+
   priceSnapshot Decimal // Price recorded for this specific room/night calc
   date          DateTime // Specific date for this room assignment
 }
@@ -263,103 +343,110 @@ model BookingRoom {
 // --- Channel Manager (Level 2: Bidirectional) ---
 
 model Channel {
-  id          String   @id @default(uuid())
-  name        String   // "Booking.com", "Airbnb"
-  type        String   // "API", "ICAL"
-  isEnabled   Boolean  @default(true)
-  
-  mappings    ChannelMapping[]
+  id        String  @id @default(uuid())
+  name      String // "Booking.com", "Airbnb"
+  type      String // "API", "ICAL"
+  isEnabled Boolean @default(true)
+
+  mappings ChannelMapping[]
 }
 
 model ChannelMapping {
-  id          String   @id @default(uuid())
-  channelId   String
-  channel     Channel  @relation(fields: [channelId], references: [id])
-  
-  roomTypeId  String
-  roomType    RoomType @relation(fields: [roomTypeId], references: [id])
-  
-  ratePlanId  String?
-  ratePlan    RatePlan? @relation(fields: [ratePlanId], references: [id])
-  
-  externalId  String   // The ID on Booking.com (e.g. "4829102")
+  id        String  @id @default(uuid())
+  channelId String
+  channel   Channel @relation(fields: [channelId], references: [id])
+
+  roomTypeId String
+  roomType   RoomType @relation(fields: [roomTypeId], references: [id])
+
+  ratePlanId String?
+  ratePlan   RatePlan? @relation(fields: [ratePlanId], references: [id])
+
+  externalId   String // The ID on Booking.com (e.g. "4829102")
   externalName String? // Helper name
-  
-  syncEnabled Boolean  @default(true)
+
+  syncEnabled Boolean @default(true)
 }
 
 model SyncLog {
-  id          String   @id @default(uuid())
-  channel     String
-  action      String   // "PUSH_RATE", "PULL_BOOKING"
-  status      String   // "SUCCESS", "ERROR"
-  details     String?
-  timestamp   DateTime @default(now())
+  id        String   @id @default(uuid())
+  channel   String
+  action    String // "PUSH_RATE", "PULL_BOOKING"
+  status    String // "SUCCESS", "ERROR"
+  details   String?
+  timestamp DateTime @default(now())
 }
 
 model AuditLog {
   id        String   @id @default(uuid())
-  domain    String   // "HOTEL", "RESTAURANT"
-  entity    String   // "Booking", "ResBooking", "RatePlan"
+  domain    String // "HOTEL", "RESTAURANT"
+  entity    String // "Booking", "ResBooking", "RatePlan"
   entityId  String
-  action    String   // "CREATE", "UPDATE", "CANCEL", "SYNC"
-  actor     String   // "User:admin", "System:Cron", "OTA:Booking.com"
-  metadata  String?  // JSON details
+  action    String // "CREATE", "UPDATE", "CANCEL", "SYNC"
+  actor     String // "User:admin", "System:Cron", "OTA:Booking.com"
+  metadata  String? // JSON details
   timestamp DateTime @default(now())
 }
 
 model ICalFeed {
-  id          String   @id @default(uuid())
-  roomTypeId  String
-  roomType    RoomType @relation(fields: [roomTypeId], references: [id])
-  
-  url         String
-  name        String?
-  source      String
-  
-  lastSync    DateTime?
-  isActive    Boolean  @default(true)
+  id         String   @id @default(uuid())
+  roomTypeId String
+  roomType   RoomType @relation(fields: [roomTypeId], references: [id])
+
+  url    String
+  name   String?
+  source String
+
+  lastSync DateTime?
+  isActive Boolean   @default(true)
 }
 
 // --- CRM & Finance ---
 
 model Payment {
-  id          String   @id @default(uuid())
-  bookingId   String
-  booking     Booking  @relation(fields: [bookingId], references: [id])
-  amount      Decimal
-  gateway     String   // "stripe"
+  id            String        @id @default(uuid())
+  bookingId     String
+  booking       Booking       @relation(fields: [bookingId], references: [id])
+  amount        Decimal
+  gateway       String // "stripe"
   transactionId String?
-  status      String   // "succeeded"
-  createdAt   DateTime @default(now())
+  status        PaymentStatus @default(PENDING)
+  createdAt     DateTime      @default(now())
+
+  @@index([bookingId, status])
+  @@index([status])
 }
 
 model User {
-  id           String   @id @default(uuid())
+  id           String      @id @default(uuid())
   hotelId      String?
-  hotel        Hotel?   @relation(fields: [hotelId], references: [id])
+  hotel        Hotel?      @relation(fields: [hotelId], references: [id])
   restaurantId String?
   restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
-  email        String   @unique
+  email        String      @unique
   name         String?
-  password     String   
-  role         String   @default("ADMIN")
-  permissions  String?  // Stored as comma-separated string or JSON
+  password     String
+  role         UserRole    @default(ADMIN)
+  permissions  String? // Stored as comma-separated string or JSON
+
+  @@index([hotelId, email])
+  @@index([restaurantId, email])
+  @@index([role])
 }
 
 // --- Restaurant Models (Preserved) ---
 model Restaurant {
-  id        String   @id @default(uuid())
-  name      String
-  currency  String   @default("EUR")
-  defaultDuration Int @default(90)
-  zones     Zone[]
-  bookings  ResBooking[]
-  waitlist  RestaurantWaitlist[]
-  hotel     Hotel?
-  shifts    Shift[]
-  closures  RestaurantClosure[]
-  
+  id              String               @id @default(uuid())
+  name            String
+  currency        String               @default("EUR")
+  defaultDuration Int                  @default(90)
+  zones           Zone[]
+  bookings        ResBooking[]
+  waitlist        RestaurantWaitlist[]
+  hotel           Hotel?
+  shifts          Shift[]
+  closures        RestaurantClosure[]
+
   // Widget Config
   widgetConfig WidgetConfig?
 
@@ -367,32 +454,31 @@ model Restaurant {
   integrations Json? @default("{}")
 
   // Notifications
-  contactEmail   String?
+  contactEmail String?
 
   emailTemplates Json? @default("{\"created\": \"\", \"confirmed\": \"\", \"cancelled\": \"\", \"modified\": \"\", \"reminder\": \"\", \"waitlist_join\": \"\", \"waitlist_available\": \"\"}")
   mailConfig     Json?
 
+  users User[]
 
-  users          User[]
-
-  events    Event[]
+  events Event[]
 }
 
 model Shift {
   id           String     @id @default(uuid())
   restaurantId String
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
-  
+
   name         String
-  type         String     @default("LUNCH") // BREAKFAST, LUNCH, DINNER
-  startTime    String     // "13:00"
-  endTime      String     // "16:00"
-  slotInterval Int        @default(30)
-  daysOfWeek   String     @default("1,2,3,4,5,6,0")
-  isActive     Boolean    @default(true)
-  
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  type         ShiftType @default(LUNCH)
+  startTime    String // "13:00"
+  endTime      String // "16:00"
+  slotInterval Int       @default(30)
+  daysOfWeek   String    @default("1,2,3,4,5,6,0")
+  isActive     Boolean   @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model RestaurantClosure {
@@ -406,110 +492,115 @@ model RestaurantClosure {
 }
 
 model Zone {
-  id           String   @id @default(uuid())
+  id           String      @id @default(uuid())
   restaurantId String?
   restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
   hotelId      String?
   hotel        Hotel?      @relation(fields: [hotelId], references: [id])
-  name         String   // "Interior", "Terraza"
-  index        Int      @default(0) // Sorting order
-  isActive     Boolean  @default(true)
+  name         String // "Interior", "Terraza"
+  index        Int         @default(0) // Sorting order
+  isActive     Boolean     @default(true)
   tables       Table[]
   events       Event[]
 }
 
 model Table {
-  id        String   @id @default(uuid())
-  zoneId    String
-  zone      Zone     @relation(fields: [zoneId], references: [id])
-  name      String   // "Mesa 1"
-  capacity  Int      @default(4)
-  
+  id       String @id @default(uuid())
+  zoneId   String
+  zone     Zone   @relation(fields: [zoneId], references: [id])
+  name     String // "Mesa 1"
+  capacity Int    @default(4)
+
   // Visual Plan Coords
-  x         Int      @default(0)
-  y         Int      @default(0)
-  width     Int      @default(60) // px or grid units
-  height    Int      @default(60)
-  shape     String   @default("RECTANGLE") // RECTANGLE, ROUND
-  rotation  Int      @default(0)
-  
-  isActive  Boolean  @default(true)
-  minPax           Int      @default(1)
-  maxPax           Int      @default(4)
-  seatsLostPerJoin Int      @default(1)
-  
-  metadata  Json?    @default("{}")
+  x        Int    @default(0)
+  y        Int    @default(0)
+  width    Int    @default(60) // px or grid units
+  height   Int    @default(60)
+  shape    String @default("RECTANGLE") // RECTANGLE, ROUND
+  rotation Int    @default(0)
+
+  isActive         Boolean @default(true)
+  minPax           Int     @default(1)
+  maxPax           Int     @default(4)
+  seatsLostPerJoin Int     @default(1)
+
+  metadata Json? @default("{}")
 
   resBookings ResBooking[]
-  tableHolds  TableHold[] 
+  tableHolds  TableHold[]
 }
 
 model ResBooking {
-   id           String   @id @default(uuid())
-   restaurantId String
-   restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
-   
-   tableId      String?
-   table        Table?   @relation(fields: [tableId], references: [id])
-   
-   // Guest Info
-   guestName    String
-   guestSurname2 String?  // Segundo apellido
-   guestPhone   String?
-   guestEmail   String?
-   guestAge     Int?
-   guestGender  String?   // M, F, OTHER
-   guestWhatsapp String?
-   pax          Int
-   
-   // Social Media (CRM)
-   instagram    String?
-   facebook     String?
-   tiktok       String?
-   linkedin     String?
-   xTwitter     String?
-   
-   date         DateTime // Date + Time
-   duration     Int      @default(90) // Minutes
+  id           String     @id @default(uuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
 
-   status       String   @default("CONFIRMED") // PENDING, CONFIRMED, SEATED, FINISHED, CANCELLED, NO_SHOW
-   
-   // CRM & Metadata
-   hotelBookingId String?
-   isMealPlan     Boolean  @default(false)
-   tags         String?  // JSON array ["VIP", "ALLERGIES"]
-   notes        String?
-   origin       String   @default("MANUAL") // GOOGLE, WEB, PHONE, WALK_IN
-      // Stripe Integration
-    stripeCustomerId      String?
-    stripePaymentMethodId String?
-    
-    smsSent      Boolean  @default(false)
-   emailSent    Boolean  @default(false)
+  tableId String?
+  table   Table?  @relation(fields: [tableId], references: [id])
 
-   createdAt    DateTime @default(now())
-   updatedAt    DateTime @updatedAt // Added
-   
-   // Synergy: Architectural Upgrades
-   idempotencyKey String? @unique
-   channelId      String?
-   channel        RestaurantChannel? @relation(fields: [channelId], references: [id])
+  // Guest Info
+  guestName     String
+  guestSurname2 String? // Segundo apellido
+  guestPhone    String?
+  guestEmail    String?
+  guestAge      Int?
+  guestGender   String? // M, F, OTHER
+  guestWhatsapp String?
+  pax           Int
+
+  // Social Media (CRM)
+  instagram String?
+  facebook  String?
+  tiktok    String?
+  linkedin  String?
+  xTwitter  String?
+
+  date     DateTime // Date + Time
+  duration Int      @default(90) // Minutes
+
+  status ResBookingStatus @default(CONFIRMED)
+
+  // CRM & Metadata
+  hotelBookingId        String?
+  isMealPlan            Boolean          @default(false)
+  tags                  String? // JSON array ["VIP", "ALLERGIES"]
+  notes                 String?
+  origin                ResBookingOrigin @default(MANUAL)
+  // Stripe Integration
+  stripeCustomerId      String?
+  stripePaymentMethodId String?
+
+  smsSent   Boolean @default(false)
+  emailSent Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt // Added
+
+  // Synergy: Architectural Upgrades
+  idempotencyKey String?            @unique
+  channelId      String?
+  channel        RestaurantChannel? @relation(fields: [channelId], references: [id])
+
+  @@index([restaurantId, status])
+  @@index([restaurantId, date])
+  @@index([tableId])
+  @@index([status])
 }
 
 model RestaurantChannel {
-  id        String   @id @default(uuid())
-  name      String   // Google, TheFork, Direct
-  commission Decimal @default(0)
+  id          String       @id @default(uuid())
+  name        String // Google, TheFork, Direct
+  commission  Decimal      @default(0)
   resBookings ResBooking[]
 }
 
 model ResPolicy {
-  id          String @id @default(uuid())
-  name        String // "Standard", "Strict"
-  cancelHours Int    // 24
-  noShowFee   Decimal @default(0)
-  requireCreditCard Boolean @default(true) 
-  isActive    Boolean @default(true)
+  id                String  @id @default(uuid())
+  name              String // "Standard", "Strict"
+  cancelHours       Int // 24
+  noShowFee         Decimal @default(0)
+  requireCreditCard Boolean @default(true)
+  isActive          Boolean @default(true)
 }
 
 model TableHold {
@@ -522,24 +613,28 @@ model TableHold {
 }
 
 model RestaurantWaitlist {
-  id           String   @id @default(uuid())
+  id           String     @id @default(uuid())
   restaurantId String
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
-  
-  date         DateTime
-  shiftId      String?
-  pax          Int
-  
-  name         String
-  email        String
-  phone        String?
-  notes        String?
-  
-  status       String   @default("WAITING") // WAITING, NOTIFIED, CONFIRMED, EXPIRED, CANCELLED
-  
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  notifiedAt   DateTime?
+
+  date    DateTime
+  shiftId String?
+  pax     Int
+
+  name  String
+  email String
+  phone String?
+  notes String?
+
+  status RestaurantWaitlistStatus @default(WAITING)
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  notifiedAt DateTime?
+
+  @@index([restaurantId, status])
+  @@index([restaurantId, date])
+  @@index([status])
 }
 
 // Reuse HotelWaitlist for consistency or keep separate? 
@@ -560,85 +655,85 @@ model HotelWaitlist {
 // --- CRM & Marketing Verticals (Phase 7) ---
 
 model CustomerProfile {
-  id        String   @id @default(uuid())
-  email     String?  @unique
-  phone     String?  // E.164
+  id        String  @id @default(uuid())
+  email     String? @unique
+  phone     String? // E.164
   firstName String?
   lastName  String?
-  
+
   // Segmentation
-  lifecycleStage String  @default("LEAD") // LEAD, CUSTOMER, VIP, CHURNED
-  totalSpend     Decimal @default(0)
-  visitCount     Int     @default(0)
+  lifecycleStage  String    @default("LEAD") // LEAD, CUSTOMER, VIP, CHURNED
+  totalSpend      Decimal   @default(0)
+  visitCount      Int       @default(0)
   lastInteraction DateTime?
-  tags           String? // JSON array
-  
+  tags            String? // JSON array
+
   // Consent
   consentEmail    Boolean @default(false)
   consentWhatsApp Boolean @default(false)
-  
+
   // Relations
   identityLinks IdentityLink[]
   webVisits     WebVisit[]
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model IdentityLink {
-  id              String          @id @default(uuid())
+  id                String          @id @default(uuid())
   customerProfileId String
-  customerProfile CustomerProfile @relation(fields: [customerProfileId], references: [id])
-  
+  customerProfile   CustomerProfile @relation(fields: [customerProfileId], references: [id])
+
   // Source
-  sourceType      String          // "GUEST", "USER", "RES_BOOKING"
-  sourceId        String
-  mergedAt        DateTime        @default(now())
+  sourceType String // "GUEST", "USER", "RES_BOOKING"
+  sourceId   String
+  mergedAt   DateTime @default(now())
 }
 
 model WebVisit {
-  id              String          @id @default(uuid())
-  sessionId       String
-  visitorId       String?         // Cookie ID
+  id                String           @id @default(uuid())
+  sessionId         String
+  visitorId         String? // Cookie ID
   customerProfileId String?
-  customerProfile CustomerProfile? @relation(fields: [customerProfileId], references: [id])
-  
-  url             String
-  referrer        String?
-  userAgent       String?
-  duration        Int             @default(0)
-  timestamp       DateTime        @default(now())
+  customerProfile   CustomerProfile? @relation(fields: [customerProfileId], references: [id])
+
+  url       String
+  referrer  String?
+  userAgent String?
+  duration  Int      @default(0)
+  timestamp DateTime @default(now())
 }
 
 model Campaign {
-  id          String   @id @default(uuid())
-  name        String
-  type        String   // "EMAIL", "WHATSAPP"
-  status      String   // "DRAFT", "SCHEDULED", "SENT"
-  
-  subject     String?
-  content     String   // HTML or Template Name
-  
+  id     String @id @default(uuid())
+  name   String
+  type   String // "EMAIL", "WHATSAPP"
+  status String // "DRAFT", "SCHEDULED", "SENT"
+
+  subject String?
+  content String // HTML or Template Name
+
   segmentConfig String? // JSON filter rules
-  
-  sentCount   Int      @default(0)
-  openCount   Int      @default(0)
-  clickCount  Int      @default(0)
-  
+
+  sentCount  Int @default(0)
+  openCount  Int @default(0)
+  clickCount Int @default(0)
+
   scheduledAt DateTime?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
 }
 
 model Workflow {
-  id          String   @id @default(uuid())
-  name        String
-  triggerType String   // "EVENT", "DATE"
+  id            String  @id @default(uuid())
+  name          String
+  triggerType   String // "EVENT", "DATE"
   triggerConfig String // JSON details
-  steps       String   // JSON structure of actions
-  isActive    Boolean  @default(false)
-  
-  runCount    Int      @default(0)
-  createdAt   DateTime @default(now())
+  steps         String // JSON structure of actions
+  isActive      Boolean @default(false)
+
+  runCount  Int      @default(0)
+  createdAt DateTime @default(now())
 }
 
 // --- Events Module (NEW) ---
@@ -651,36 +746,39 @@ model Event {
   price       Decimal  @default(0)
   capacity    Int
   isActive    Boolean  @default(true)
-  
+
   // Relations
-  hotelId     String?
-  hotel       Hotel?    @relation(fields: [hotelId], references: [id])
+  hotelId      String?
+  hotel        Hotel?      @relation(fields: [hotelId], references: [id])
   restaurantId String?
   restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
-  
+
   // Integrations (JSON)
   integrations Json? @default("{}")
-  
-  bookings    EventBooking[]
-  zones       Zone[]
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+
+  bookings EventBooking[]
+  zones    Zone[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model EventBooking {
-  id          String   @id @default(uuid())
-  eventId     String
-  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  
-  guestName   String
-  guestEmail  String?
-  guestPhone  String?
-  pax         Int      @default(1)
-  
-  totalPrice  Decimal
-  status      String   @default("CONFIRMED") // PENDING, CONFIRMED, CANCELLED
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id      String @id @default(uuid())
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  guestName  String
+  guestEmail String?
+  guestPhone String?
+  pax        Int     @default(1)
+
+  totalPrice Decimal
+  status     EventBookingStatus @default(CONFIRMED)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([eventId, status])
+  @@index([status])
 }

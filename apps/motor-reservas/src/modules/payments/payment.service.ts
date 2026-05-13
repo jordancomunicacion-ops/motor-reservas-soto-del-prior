@@ -93,7 +93,7 @@ export class PaymentService {
             eType = 'restaurant';
         }
 
-        const stripe = await this.getStripeClient(eId, eType);
+        const stripe = await this.getStripeClient(eId!, eType!);
         
         const booking = eType === 'restaurant' 
             ? await this.prisma.resBooking.findUnique({ where: { id: bookingId } })
@@ -131,9 +131,9 @@ export class PaymentService {
             eType = 'restaurant';
         }
 
-        const stripe = await this.getStripeClient(eId, eType);
+        const stripe = await this.getStripeClient(eId!, eType!);
 
-        const booking = entityType === 'restaurant' 
+        const booking = eType === 'restaurant'
             ? await this.prisma.resBooking.findUnique({ where: { id: bookingId } })
             : null;
 
@@ -141,17 +141,17 @@ export class PaymentService {
             throw new BadRequestException('No hay tarjeta guardada para esta reserva.');
         }
 
-        // Get fee from config
         let amount = 0;
-        let currency = 'eur';
-        
-        if (entityType === 'restaurant') {
-            const restaurant = await this.prisma.restaurant.findUnique({ 
-                where: { id: entityId },
-                include: { widgetConfig: true } 
+        const currency = 'eur';
+
+        if (eType === 'restaurant') {
+            const restaurant = await this.prisma.restaurant.findUnique({
+                where: { id: eId },
+                include: { widgetConfig: true }
             });
-            // We store fee in EUR units (e.g. 20.00), Stripe wants cents
-            amount = (restaurant?.widgetConfig as any)?.noShowFee * 100 || 2000;
+            const fee = Number((restaurant?.widgetConfig as any)?.noShowFeeAmount);
+            // Stripe espera céntimos enteros: redondeamos para evitar errores de coma flotante.
+            amount = Number.isFinite(fee) && fee > 0 ? Math.round(fee * 100) : 2000;
         }
 
         try {

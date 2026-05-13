@@ -1,9 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
+import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { WaitlistService } from './waitlist.service';
 import { CrmService } from '../crm/crm.service';
 import { CrmIntegrationService } from '../crm/crm-integration.service';
 import { MailService } from '../mail/mail.service';
+import { ShiftType, ResBookingOrigin, UserRole, ResBookingStatus } from '../../common/enums';
+import { $Enums } from '@prisma/client';
 
 @Injectable()
 export class RestaurantService {
@@ -207,7 +210,7 @@ export class RestaurantService {
 
     async getGuestStats(email?: string | null, phone?: string | null) {
         if (!email && !phone) return { visitCount: 0, firstVisit: null, cancelledCount: 0, totalBookings: 0, cancellationRate: 0 };
-        
+
         const bookings = await this.prisma.resBooking.findMany({
             where: {
                 OR: [
@@ -224,11 +227,11 @@ export class RestaurantService {
         const totalBookings = bookings.length;
         const visitCount = bookings.filter(b => b.status === 'SEATED').length;
         const cancelledCount = bookings.filter(b => b.status === 'CANCELLED' || b.status === 'NO_SHOW').length;
-        
+
         // Find first reservation date
         let firstVisit: Date | null = null;
         if (bookings.length > 0) {
-            firstVisit = bookings.reduce((prev, curr) => 
+            firstVisit = bookings.reduce((prev, curr) =>
                 (curr.date < prev.date) ? curr : prev
             ).date;
         }
@@ -240,6 +243,66 @@ export class RestaurantService {
             totalBookings,
             cancellationRate: totalBookings > 0 ? Math.round((cancelledCount / totalBookings) * 100) : 0
         };
+    }
+
+    private async getBatchGuestStats(guests: Array<{ email?: string | null; phone?: string | null }>) {
+        if (guests.length === 0) return new Map();
+
+        // Get all unique email and phone combinations
+        const emails = [...new Set(guests.map(g => g.email).filter(Boolean))];
+        const phones = [...new Set(guests.map(g => g.phone).filter(Boolean))];
+
+        // Single query to get all bookings for all guests
+        const allBookings = await this.prisma.resBooking.findMany({
+            where: {
+                OR: [
+                    ...emails.map(email => ({ guestEmail: email })),
+                    ...phones.map(phone => ({ guestPhone: phone }))
+                ]
+            },
+            select: {
+                guestEmail: true,
+                guestPhone: true,
+                status: true,
+                date: true
+            }
+        });
+
+        // Calculate stats for each guest
+        const statsMap = new Map<string, any>();
+        for (const guest of guests) {
+            const key = guest.email || guest.phone || '';
+            if (!key) {
+                statsMap.set(key, { visitCount: 0, firstVisit: null, cancelledCount: 0, totalBookings: 0, cancellationRate: 0 });
+                continue;
+            }
+
+            const guestBookings = allBookings.filter(b =>
+                (guest.email && b.guestEmail === guest.email) ||
+                (guest.phone && b.guestPhone === guest.phone)
+            );
+
+            const totalBookings = guestBookings.length;
+            const visitCount = guestBookings.filter(b => b.status === 'SEATED').length;
+            const cancelledCount = guestBookings.filter(b => b.status === 'CANCELLED' || b.status === 'NO_SHOW').length;
+
+            let firstVisit: Date | null = null;
+            if (guestBookings.length > 0) {
+                firstVisit = guestBookings.reduce((prev, curr) =>
+                    (curr.date < prev.date) ? curr : prev
+                ).date;
+            }
+
+            statsMap.set(key, {
+                visitCount,
+                firstVisit,
+                cancelledCount,
+                totalBookings,
+                cancellationRate: totalBookings > 0 ? Math.round((cancelledCount / totalBookings) * 100) : 0
+            });
+        }
+
+        return statsMap;
     }
 
     async getTables(restaurantId: string, dateStr?: string) {
@@ -271,22 +334,20 @@ export class RestaurantService {
             where: {
                 restaurantId,
                 date: { gte: start, lte: end },
-                status: { notIn: ['CANCELLED', 'RELEASED', 'NO_SHOW'] }
+                status: { notIn: [ResBookingStatus.CANCELLED, ResBookingStatus.RELEASED, ResBookingStatus.NO_SHOW] }
             },
             orderBy: { date: 'asc' }
         });
 
-        // Cache for guest stats to avoid redundant queries for the same guest
-        const guestStatsCache: Record<string, any> = {};
+        // Batch load all guest stats in a single query
+        const guestStatsMap = await this.getBatchGuestStats(
+            bookings.map(b => ({ email: b.guestEmail, phone: b.guestPhone }))
+        );
 
-        // Process bookings: calculate guest stats and distribute to tables
+        // Attach stats to bookings
         for (const booking of bookings) {
-            const cacheKey = booking.guestEmail || booking.guestPhone || booking.id;
-            if (guestStatsCache[cacheKey] === undefined) {
-                guestStatsCache[cacheKey] = await this.getGuestStats(booking.guestEmail, booking.guestPhone);
-            }
-            
-            const stats = guestStatsCache[cacheKey];
+            const key = booking.guestEmail || booking.guestPhone || '';
+            const stats = guestStatsMap.get(key) || { visitCount: 0, firstVisit: null, cancelledCount: 0, totalBookings: 0, cancellationRate: 0 };
             (booking as any).visitCount = stats.visitCount;
             (booking as any).guestStats = stats;
         }
@@ -373,7 +434,7 @@ export class RestaurantService {
             where: {
                 restaurantId,
                 date: { gte: startOfDay, lte: endOfDay },
-                status: { notIn: ['CANCELLED', 'RELEASED', 'NO_SHOW'] }
+                status: { notIn: [ResBookingStatus.CANCELLED, ResBookingStatus.RELEASED, ResBookingStatus.NO_SHOW] }
             },
             select: { id: true, date: true, duration: true, tableId: true }
         });
@@ -494,9 +555,15 @@ export class RestaurantService {
             orderBy: { date: 'asc' }
         });
 
-        // Add guest stats
+        // Batch load all guest stats in a single query
+        const guestStatsMap = await this.getBatchGuestStats(
+            bookings.map(b => ({ email: b.guestEmail, phone: b.guestPhone }))
+        );
+
+        // Attach stats to bookings
         for (const booking of bookings) {
-            const stats = await this.getGuestStats(booking.guestEmail, booking.guestPhone);
+            const key = booking.guestEmail || booking.guestPhone || '';
+            const stats = guestStatsMap.get(key) || { visitCount: 0, firstVisit: null, cancelledCount: 0, totalBookings: 0, cancellationRate: 0 };
             (booking as any).visitCount = stats.visitCount;
             (booking as any).guestStats = stats;
         }
@@ -562,7 +629,7 @@ export class RestaurantService {
             where: {
                 restaurantId,
                 isActive: true,
-                ...(type ? { type } : {})
+                ...(type ? { type: type as ShiftType } : {})
             }
         });
 
@@ -615,7 +682,7 @@ export class RestaurantService {
             where: {
                 restaurantId,
                 date: { gte: startOfDay, lte: endOfDay },
-                status: { notIn: ['CANCELLED', 'RELEASED', 'NO_SHOW'] }
+                status: { notIn: [ResBookingStatus.CANCELLED, ResBookingStatus.RELEASED, ResBookingStatus.NO_SHOW] }
             },
             select: { id: true, date: true, duration: true, tableId: true }
         });
@@ -771,7 +838,7 @@ export class RestaurantService {
                 guestEmail: data.email,
                 isMealPlan: true,
                 status: 'CONFIRMED',
-                origin: 'HOTEL_SYNERGY'
+                origin: ResBookingOrigin.MANUAL
             }
         });
 
@@ -800,9 +867,14 @@ export class RestaurantService {
     }
 
     async createPublicReservation(data: any) {
-        const [hours, minutes] = data.time.split(':').map(Number);
         const start = new Date(data.date);
-        start.setUTCHours(hours, minutes, 0, 0);
+        // Si proporciona time, usarlo; sino usar 19:00 (hora de cena por defecto)
+        if (data.time) {
+            const [hours, minutes] = data.time.split(':').map(Number);
+            start.setUTCHours(hours, minutes, 0, 0);
+        } else {
+            start.setUTCHours(19, 0, 0, 0);
+        }
 
         const booking = await this.prisma.resBooking.create({
             data: {
@@ -822,8 +894,8 @@ export class RestaurantService {
                 linkedin: data.linkedin,
                 xTwitter: data.xTwitter,
                 notes: data.notes,
-                status: 'PENDING_CONFIRMATION',
-                origin: 'WEB',
+                status: $Enums.ResBookingStatus.PENDING_CONFIRMATION,
+                origin: ResBookingOrigin.WEB,
                 stripePaymentMethodId: data.paymentMethodId
             }
         });
@@ -902,32 +974,46 @@ export class RestaurantService {
         });
     }
 
-    async authorizeUser(restaurantId: string, data: { email: string, password?: string, role?: string, permissions: string[] }) {
-        const { email, password, role, permissions } = data;
-        
+    async authorizeUser(restaurantId: string, data: { email: string, password?: string, role?: string, permissions?: string[] }) {
+        const { password, role, permissions } = data;
+        const email = data.email?.trim().toLowerCase();
+        if (!email) {
+            throw new Error('Email obligatorio');
+        }
+
+        // Hash password if provided. If absent on create, store a placeholder that no bcrypt.compare can match
+        // (bcrypt.compare requires a $2a/$2b/$2y$ hash; an empty placeholder will always fail safely).
+        const hashedPassword = password && password.length > 0
+            ? await bcrypt.hash(password, 10)
+            : undefined;
+
         const user = await this.prisma.user.findUnique({ where: { email } });
-        
+
         if (user) {
             return this.prisma.user.update({
                 where: { email },
                 data: {
                     restaurantId,
-                    role: role || user.role,
-                    password: password || user.password,
-                    permissions: permissions.join(',')
-                }
-            });
-        } else {
-            return this.prisma.user.create({
-                data: {
-                    email,
-                    restaurantId,
-                    password: password || 'INVITED',
-                    role: role || 'STAFF',
-                    permissions: permissions.join(','),
+                    role: (role as UserRole) || user.role,
+                    ...(hashedPassword ? { password: hashedPassword } : {}),
+                    permissions: permissions?.join(',') || user.permissions
                 }
             });
         }
+
+        if (!hashedPassword) {
+            throw new Error('Se requiere contraseña para crear un nuevo usuario');
+        }
+
+        return this.prisma.user.create({
+            data: {
+                email,
+                restaurantId,
+                password: hashedPassword,
+                role: (role as UserRole) || UserRole.STAFF,
+                permissions: permissions?.join(','),
+            }
+        });
     }
 
     async deauthorizeUser(restaurantId: string, userId: string) {
@@ -951,7 +1037,7 @@ export class RestaurantService {
                 restaurantId,
                 date: { gte: startOfDay, lte: endOfDay },
                 tableId: null,
-                status: { notIn: ['CANCELLED', 'NO_SHOW'] }
+                status: { notIn: [ResBookingStatus.CANCELLED, ResBookingStatus.NO_SHOW] }
             },
             orderBy: { pax: 'desc' } // Assign larger groups first for better optimization
         });

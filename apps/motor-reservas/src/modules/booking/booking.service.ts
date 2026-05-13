@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { BookingStatus, BookingSource } from '../../common/constants';
+import { BookingStatus, BookingSource } from '../../common/enums';
 import { RatesService } from '../rates/rates.service';
 import { AvailabilityService } from '../rates/availability.service';
 import { CrmIntegrationService } from '../crm/crm-integration.service';
@@ -53,7 +53,7 @@ export class BookingService {
             await this.availabilityService.checkAvailability(
                 data.hotelId,
                 data.roomTypeId,
-                ratePlanId,
+                ratePlanId!,
                 checkIn,
                 checkOut,
                 1 // units
@@ -66,7 +66,7 @@ export class BookingService {
         const priceInfo = await this.ratesService.calculatePrice(
             data.hotelId,
             data.roomTypeId,
-            ratePlanId,
+            ratePlanId!,
             checkIn,
             checkOut,
             data.pax
@@ -87,7 +87,7 @@ export class BookingService {
                 nights: this.calculateNights(checkIn, checkOut),
                 referenceCode: `RES-${Date.now()}`,
                 status: BookingStatus.CONFIRMED,
-                source: BookingSource.MANUAL,
+                source: BookingSource.DIRECT,
                 bookingRooms: {
                     create: [{
                         roomId: room.id,

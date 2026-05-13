@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
+import { ResBookingOrigin } from '../../common/enums';
 
 @Injectable()
 export class WaitlistService {
@@ -145,7 +146,7 @@ export class WaitlistService {
                 guestEmail: entry.email,
                 guestPhone: entry.phone,
                 status: 'CONFIRMED',
-                origin: 'WAITLIST'
+                origin: ResBookingOrigin.MANUAL
             }
         });
 
