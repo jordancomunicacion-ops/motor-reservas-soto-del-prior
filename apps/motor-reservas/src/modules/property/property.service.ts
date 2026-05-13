@@ -11,24 +11,69 @@ export class PropertyService {
         return this.prisma.hotel.create({ data });
     }
 
+    private sanitizeMailConfig(entity: any): any {
+        if (!entity) return entity;
+        const cfg = entity.mailConfig;
+        if (!cfg) return entity;
+        const sanitized: any = {
+            host: cfg.host || '',
+            port: cfg.port || '',
+            user: cfg.user || '',
+            from: cfg.from || '',
+            notificationsEnabled: cfg.notificationsEnabled !== false,
+            passConfigured: !!(cfg.pass && cfg.pass.length > 0),
+        };
+        if (cfg.graph) {
+            sanitized.graph = {
+                tenantId: cfg.graph.tenantId || '',
+                clientId: cfg.graph.clientId || '',
+                senderEmail: cfg.graph.senderEmail || '',
+                clientSecretConfigured: !!(cfg.graph.clientSecret && cfg.graph.clientSecret.length > 0),
+            };
+        }
+        return { ...entity, mailConfig: sanitized };
+    }
+
     async getHotels() {
-        return this.prisma.hotel.findMany({ include: { restaurant: true } });
+        const hotels = await this.prisma.hotel.findMany({ include: { restaurant: true } });
+        return hotels.map(h => this.sanitizeMailConfig(h));
     }
 
     async getHotel(id: string) {
-        return this.prisma.hotel.findUnique({
+        const hotel = await this.prisma.hotel.findUnique({
             where: { id },
-            include: { 
+            include: {
                 roomTypes: true,
                 restaurant: true
             },
         });
+        return this.sanitizeMailConfig(hotel);
     }
 
     async updateHotel(id: string, data: any) {
         const { restaurantId: rawRestaurantId, ...rest } = data;
         const restaurantId = (rawRestaurantId === 'none' || rawRestaurantId === '') ? null : rawRestaurantId;
-        
+
+        // Si llega mailConfig sanitizado (sin pass o clientSecret), preservar los del actual
+        if (rest.mailConfig) {
+            const existing = await this.prisma.hotel.findUnique({ where: { id }, select: { mailConfig: true } });
+            const currentCfg: any = existing?.mailConfig || {};
+            const incoming: any = rest.mailConfig || {};
+            if (!incoming.pass) {
+                incoming.pass = currentCfg.pass;
+            }
+            if (incoming.graph) {
+                if (!incoming.graph.clientSecret) {
+                    incoming.graph.clientSecret = currentCfg.graph?.clientSecret;
+                }
+            } else if (currentCfg.graph) {
+                incoming.graph = currentCfg.graph;
+            }
+            delete incoming.passConfigured;
+            if (incoming.graph) delete incoming.graph.clientSecretConfigured;
+            rest.mailConfig = incoming;
+        }
+
         return this.prisma.$transaction(async (tx) => {
             // 1. If we are linking a restaurant, clear it from any other hotel first
             if (restaurantId) {
