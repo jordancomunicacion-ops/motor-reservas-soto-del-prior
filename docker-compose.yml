@@ -57,6 +57,7 @@ services:
       DATABASE_URL: postgresql://${DB_USER:-reservas_user}:${DB_PASS:-reservas_pass}@sotoreservas-db:5432/${DB_NAME:-reservas}
       ENGINE_URL: http://sotoreservas-engine:3000
       PORT: 3000
+      CORS_ORIGIN: "https://reservas.sotodelprior.com,https://www.reservas.sotodelprior.com"
     networks:
       - reservas-internal-net
       - proxy-net
