@@ -1,28 +1,21 @@
 'use client';
 
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 export function GoogleAnalytics() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const [gaId, setGaId] = useState<string | null>(null);
 
-  // Load GA ID from DB connection
   useEffect(() => {
     fetch('/api/ga-config')
       .then((res) => res.json())
       .then((data) => {
-        if (data?.propertyId) {
-          setGaId(data.propertyId);
-        } else {
-          console.warn('Google Analytics no configurado. Verifica IntegrationConnection en BD.');
-        }
+        if (data?.propertyId) setGaId(data.propertyId);
       })
-      .catch((err) => console.warn('Failed to load GA config:', err));
+      .catch(() => { });
   }, []);
 
-  // Inject GA script when ID is available
   useEffect(() => {
     if (!gaId) return;
     if (document.getElementById('ga-script')) return;
@@ -45,12 +38,10 @@ export function GoogleAnalytics() {
     });
   }, [gaId]);
 
-  // Track page changes
   useEffect(() => {
     if (!gaId || !window.gtag) return;
-    const url = pathname + (searchParams.toString() ? `?${searchParams.toString()}` : '');
-    window.gtag('config', gaId, { page_path: url });
-  }, [pathname, searchParams, gaId]);
+    window.gtag('config', gaId, { page_path: pathname });
+  }, [pathname, gaId]);
 
   return null;
 }
