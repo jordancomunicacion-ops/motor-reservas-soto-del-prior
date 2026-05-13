@@ -113,7 +113,9 @@ model Hotel {
   restaurantId    String?         @unique
   restaurant      Restaurant?     @relation(fields: [restaurantId], references: [id])
 
-  // Integrations (JSON)
+  // Integrations
+  crmIntegration CrmIntegration?
+  connections IntegrationConnection[]
   integrations Json? @default("{}")
 
   // Notifications
@@ -402,6 +404,72 @@ model ICalFeed {
   isActive Boolean   @default(true)
 }
 
+// --- Integration Connections ---
+
+model IntegrationConnection {
+  id                String   @id @default(uuid())
+
+  // Connection Type
+  type              String   // "GOOGLE_ANALYTICS", "CRM", "MAIL", "STRIPE", etc.
+  name              String   // "Soto del Prior - GA", "CRM Principal", etc.
+
+  // Entity Association
+  hotelId           String?
+  hotel             Hotel?   @relation(fields: [hotelId], references: [id])
+  restaurantId      String?
+  restaurant        Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  // Credentials (encrypted in production)
+  credentials       Json     // Almacena: { propertyId, apiKey, token, etc. }
+
+  // Status
+  enabled           Boolean  @default(true)
+  isActive          Boolean  @default(false)  // Último test exitoso
+  lastTestedAt      DateTime?
+  testError         String?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([type, hotelId, restaurantId])
+  @@index([type, enabled])
+}
+
+// --- CRM Integration ---
+
+model CrmIntegration {
+  id                String   @id @default(uuid())
+
+  // Target
+  hotelId           String?  @unique
+  hotel             Hotel?   @relation(fields: [hotelId], references: [id])
+  restaurantId      String?  @unique
+  restaurant        Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  // Connection Details
+  enabled           Boolean  @default(false)
+  url               String
+  token             String?
+
+  // Naming & Tracking
+  sourceLabel       String   @default("Direct") // "Web Soto del Prior", "Widget Google", etc.
+  trackingId        String?  // Para correlacionar con Google Analytics
+  campaignSource    String?  // UTM source
+  campaignMedium    String?  // UTM medium
+  campaignName      String?  // UTM campaign
+
+  // Activity
+  lastSync          DateTime?
+  syncCount         Int      @default(0)
+  failureCount      Int      @default(0)
+  lastError         String?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([hotelId, restaurantId]) // Solo uno puede estar presente
+}
+
 // --- CRM & Finance ---
 
 model Payment {
@@ -451,7 +519,9 @@ model Restaurant {
   // Widget Config
   widgetConfig WidgetConfig?
 
-  // Integrations (JSON)
+  // Integrations
+  crmIntegration CrmIntegration?
+  connections IntegrationConnection[]
   integrations Json? @default("{}")
 
   // Notifications
