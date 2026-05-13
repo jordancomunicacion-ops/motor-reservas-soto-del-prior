@@ -54,14 +54,12 @@ import { EventModule } from './modules/event/event.module';
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
-    {
-      provide: APP_GUARD,
-      useClass: JwtAuthGuard,
-    },
-    {
-      provide: APP_GUARD,
-      useClass: RolesGuard,
-    },
+    // NOTE: Sprint 2 - JwtAuthGuard / RolesGuard estaban registrados globalmente
+    // pero rompen el panel admin de Next.js (cross-domain cookies no funcionan).
+    // Provisional hasta Sprint 3 (proxy serverside o JWT en headers desde la web):
+    // los endpoints quedan abiertos como antes; las mutaciones criticas que se
+    // quieran proteger se deben envolver con @UseGuards(JwtAuthGuard, RolesGuard).
+    // Los decoradores @Public() y @Roles() se conservan para compatibilidad.
   ],
 })
 export class AppModule { }
