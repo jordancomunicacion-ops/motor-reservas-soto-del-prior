@@ -38,15 +38,29 @@ export class CreatePublicReservationDto {
   @IsString()
   restaurantId: string;
 
+  @IsOptional()
   @IsString()
-  guestName: string;
+  guestName?: string;
 
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
   @IsEmail()
-  guestEmail: string;
+  guestEmail?: string;
+
+  @IsOptional()
+  @IsEmail()
+  email?: string;
 
   @IsOptional()
   @IsString()
   guestPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  phone?: string;
 
   @IsDateString()
   date: string;
@@ -63,6 +77,62 @@ export class CreatePublicReservationDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsString()
+  guestSurname2?: string;
+
+  @IsOptional()
+  @IsString()
+  surname2?: string;
+
+  @IsOptional()
+  @IsNumber()
+  guestAge?: number;
+
+  @IsOptional()
+  @IsNumber()
+  age?: number;
+
+  @IsOptional()
+  @IsString()
+  guestGender?: string;
+
+  @IsOptional()
+  @IsString()
+  gender?: string;
+
+  @IsOptional()
+  @IsString()
+  guestWhatsapp?: string;
+
+  @IsOptional()
+  @IsString()
+  whatsapp?: string;
+
+  @IsOptional()
+  @IsString()
+  instagram?: string;
+
+  @IsOptional()
+  @IsString()
+  facebook?: string;
+
+  @IsOptional()
+  @IsString()
+  tiktok?: string;
+
+  @IsOptional()
+  @IsString()
+  linkedin?: string;
+
+  @IsOptional()
+  @IsString()
+  xTwitter?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentMethodId?: string;
 }
 
 export class UpdateBookingStatusDto {
