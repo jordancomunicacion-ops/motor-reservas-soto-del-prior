@@ -49,6 +49,6 @@
   },
   "prisma": {
     "seed": "node prisma/seed.js",
-    "schema": "../motor-reservas/prisma/schema.prisma"
+    "schema": "prisma/schema.prisma"
   }
 }
