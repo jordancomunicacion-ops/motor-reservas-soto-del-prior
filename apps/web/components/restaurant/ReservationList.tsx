@@ -215,7 +215,7 @@ export default function ReservationList({ bookings, zones = [], onStatusChange, 
                                                     <MoreHorizontal className="w-4 h-4" />
                                                 </Button>
                                             </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
+                                            <DropdownMenuContent align="end" className="max-h-[80vh] overflow-y-auto">
                                                 <DropdownMenuItem onSelect={() => onSelectProfile?.(booking)}>
                                                     <UserCircle className="w-4 h-4 mr-2" /> Ficha de Cliente
                                                 </DropdownMenuItem>
