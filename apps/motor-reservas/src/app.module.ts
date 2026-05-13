@@ -21,6 +21,7 @@ import { CampaignsModule } from './modules/campaigns/campaigns.module';
 import { GlobalModule } from './modules/global/global.module';
 import { MailModule } from './modules/mail/mail.module';
 import { EventModule } from './modules/event/event.module';
+import { ConnectionsModule } from './modules/connections/connections.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { EventModule } from './modules/event/event.module';
     PaymentModule,
     MailModule,
     EventModule,
+    ConnectionsModule,
     GlobalModule
   ],
   controllers: [AppController],
