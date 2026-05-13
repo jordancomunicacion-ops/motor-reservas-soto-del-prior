@@ -1,11 +1,15 @@
-import { Controller, Post, Body, Get, Query } from '@nestjs/common';
+import { Controller, Post, Body, Get, Query, Param, Put } from '@nestjs/common';
 import { CrmService } from './crm.service';
+import { CrmConfigService } from './crm-config.service';
 import { Public } from '../../auth/public.decorator';
 import { Roles } from '../../auth/roles.decorator';
 
 @Controller('crm')
 export class CrmController {
-    constructor(private readonly crmService: CrmService) { }
+    constructor(
+        private readonly crmService: CrmService,
+        private readonly crmConfigService: CrmConfigService
+    ) { }
 
     @Public()
     @Post('identify')
@@ -15,13 +19,80 @@ export class CrmController {
 
     @Public()
     @Post('track')
-    async track(@Body() body: { sessionId: string; url: string; visitorId?: string; email?: string }) {
+    async track(@Body() body: {
+        sessionId: string;
+        url: string;
+        visitorId?: string;
+        email?: string;
+        referrer?: string;
+        userAgent?: string;
+        duration?: number;
+    }) {
         return this.crmService.trackVisit(body);
+    }
+
+    @Public()
+    @Post('event')
+    async trackEvent(@Body() body: {
+        sessionId: string;
+        visitorId?: string;
+        event: string;
+        data?: any;
+        timestamp?: string;
+    }) {
+        // Track generic events for analytics
+        this.logger.log(`[CRM-EVENT] ${body.event}:`, body.data);
+
+        // Could be extended to store custom events in the future
+        return { success: true, event: body.event };
     }
 
     @Roles('ADMIN')
     @Get('profiles')
     async getProfiles(@Query('page') page: number = 1) {
         return this.crmService.getProfiles(Number(page));
+    }
+
+    // CRM Configuration Endpoints
+    @Roles('ADMIN')
+    @Post('setup-hotel/:hotelId')
+    async setupHotelCrm(@Param('hotelId') hotelId: string, @Body() config: any) {
+        return this.crmConfigService.setupHotelCrm(hotelId, config);
+    }
+
+    @Roles('ADMIN')
+    @Post('setup-restaurant/:restaurantId')
+    async setupRestaurantCrm(@Param('restaurantId') restaurantId: string, @Body() config: any) {
+        return this.crmConfigService.setupRestaurantCrm(restaurantId, config);
+    }
+
+    @Roles('ADMIN')
+    @Get('config/hotel/:hotelId')
+    async getHotelConfig(@Param('hotelId') hotelId: string) {
+        return this.crmConfigService.getCrmConfig(hotelId);
+    }
+
+    @Roles('ADMIN')
+    @Get('config/restaurant/:restaurantId')
+    async getRestaurantConfig(@Param('restaurantId') restaurantId: string) {
+        return this.crmConfigService.getCrmConfig(undefined, restaurantId);
+    }
+
+    @Roles('ADMIN')
+    @Post('test-connection')
+    async testConnection(@Body() body: { url: string; token?: string }) {
+        return this.crmConfigService.testConnection(body.url, body.token);
+    }
+
+    @Roles('ADMIN')
+    @Post('disable-hotel/:hotelId')
+    async disableHotelCrm(@Param('hotelId') hotelId: string) {
+        return this.crmConfigService.disableCrm(hotelId);
+    }
+
+    @Roles('ADMIN')
+    @Post('disable-restaurant/:restaurantId')
+    async disableRestaurantCrm(@Param('restaurantId') restaurantId: string) {
+        return this.crmConfigService.disableCrm(undefined, restaurantId);
     }
 }
