@@ -2,8 +2,8 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, XCircle, UserCircle, Edit2, Mail, MessageSquare, Utensils, Star, AlertTriangle, Clock } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { MoreHorizontal, XCircle, UserCircle, Edit2, Mail, MessageSquare, Utensils, Star, AlertTriangle, Clock, MapPin } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 function formatRelativeTime(dateInput: string | Date): string {
@@ -215,28 +215,50 @@ export default function ReservationList({ bookings, zones = [], onStatusChange, 
                                                     <MoreHorizontal className="w-4 h-4" />
                                                 </Button>
                                             </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end" className="max-h-[80vh] overflow-y-auto">
+                                            <DropdownMenuContent
+                                                align="end"
+                                                sideOffset={4}
+                                                collisionPadding={12}
+                                                className="max-h-[var(--radix-dropdown-menu-content-available-height)] overflow-y-auto overflow-x-hidden"
+                                            >
                                                 <DropdownMenuItem onSelect={() => onSelectProfile?.(booking)}>
                                                     <UserCircle className="w-4 h-4 mr-2" /> Ficha de Cliente
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem onSelect={() => onEdit(booking)}>
                                                     <Edit2 className="w-4 h-4 mr-2" /> Editar Reserva
                                                 </DropdownMenuItem>
-                                                <DropdownMenuSeparator />
-                                                <div className="px-2 py-1.5 text-[10px] font-bold text-gray-400 uppercase">Mesa</div>
-                                                {zones.map(zone => (
-                                                    <div key={zone.id} className="border-t first:border-t-0">
-                                                        {zone.tables.map((table: any) => (
-                                                            <DropdownMenuItem 
-                                                                key={table.id} 
-                                                                onSelect={() => onAssignTable?.(booking.id, table.id)}
-                                                                className={cn("text-xs pl-4", booking.tableId === table.id && "bg-gray-100 font-bold")}
-                                                            >
-                                                                {table.name} ({table.capacity}p)
-                                                            </DropdownMenuItem>
-                                                        ))}
-                                                    </div>
-                                                ))}
+                                                <DropdownMenuSub>
+                                                    <DropdownMenuSubTrigger>
+                                                        <MapPin className="w-4 h-4 mr-2" /> Cambiar Mesa
+                                                    </DropdownMenuSubTrigger>
+                                                    <DropdownMenuSubContent
+                                                        sideOffset={4}
+                                                        collisionPadding={12}
+                                                        className="max-h-[var(--radix-dropdown-menu-content-available-height)] overflow-y-auto overflow-x-hidden min-w-[180px]"
+                                                    >
+                                                        {zones.length === 0 ? (
+                                                            <div className="px-2 py-1.5 text-xs text-gray-500">No hay mesas configuradas</div>
+                                                        ) : (
+                                                            zones.map((zone, zIdx) => (
+                                                                <div key={zone.id}>
+                                                                    {zIdx > 0 && <DropdownMenuSeparator />}
+                                                                    <DropdownMenuLabel className="text-[10px] font-bold text-gray-400 uppercase py-1">
+                                                                        {zone.name}
+                                                                    </DropdownMenuLabel>
+                                                                    {zone.tables.map((table: any) => (
+                                                                        <DropdownMenuItem
+                                                                            key={table.id}
+                                                                            onSelect={() => onAssignTable?.(booking.id, table.id)}
+                                                                            className={cn("text-xs pl-4", booking.tableId === table.id && "bg-gray-100 font-bold")}
+                                                                        >
+                                                                            {table.name} ({table.capacity}p)
+                                                                        </DropdownMenuItem>
+                                                                    ))}
+                                                                </div>
+                                                            ))
+                                                        )}
+                                                    </DropdownMenuSubContent>
+                                                </DropdownMenuSub>
                                                 <DropdownMenuSeparator />
                                                 <DropdownMenuItem className="text-red-600" onSelect={() => onStatusChange(booking.id, 'CANCELLED')}>
                                                     <XCircle className="w-4 h-4 mr-2" /> Cancelar
