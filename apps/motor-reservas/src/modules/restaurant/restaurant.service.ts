@@ -81,6 +81,16 @@ export class RestaurantService {
         return b.restaurantId;
     }
 
+    /** Resuelve el restaurantId al que pertenece un AccessProfile. */
+    private async restaurantIdForAccessProfile(profileId: string): Promise<string> {
+        const p = await (this.prisma as any).accessProfile.findUnique({
+            where: { id: profileId },
+            select: { restaurantId: true }
+        });
+        if (!p) throw new NotFoundException('Perfil de acceso no encontrado');
+        return p.restaurantId;
+    }
+
     /**
      * Sanitiza datos sensibles del mailConfig antes de devolverlos en respuestas.
      * Quita contraseñas SMTP, Client Secrets, etc.
@@ -1157,6 +1167,48 @@ export class RestaurantService {
                 restaurantId: null,
                 permissions: null
             }
+        });
+    }
+
+    // --- Access Profiles (plantillas de roles por restaurante) ---
+    async getAccessProfiles(restaurantId: string, user?: any) {
+        if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
+        return (this.prisma as any).accessProfile.findMany({
+            where: { restaurantId },
+            orderBy: { createdAt: 'asc' }
+        });
+    }
+
+    async createAccessProfile(restaurantId: string, data: { name: string; baseRole?: string; permissions: string[] }, user?: any) {
+        if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
+        const name = data.name?.trim();
+        if (!name) throw new Error('Nombre del perfil obligatorio');
+        return (this.prisma as any).accessProfile.create({
+            data: {
+                restaurantId,
+                name,
+                baseRole: (data.baseRole as UserRole) || UserRole.STAFF,
+                permissions: (data.permissions || []).join(',')
+            }
+        });
+    }
+
+    async updateAccessProfile(profileId: string, data: { name?: string; baseRole?: string; permissions?: string[] }, user?: any) {
+        if (user) await ensureRestaurantAccess(user, this.prisma, await this.restaurantIdForAccessProfile(profileId));
+        const update: any = {};
+        if (data.name !== undefined) update.name = data.name.trim();
+        if (data.baseRole !== undefined) update.baseRole = data.baseRole as UserRole;
+        if (data.permissions !== undefined) update.permissions = data.permissions.join(',');
+        return (this.prisma as any).accessProfile.update({
+            where: { id: profileId },
+            data: update
+        });
+    }
+
+    async deleteAccessProfile(profileId: string, user?: any) {
+        if (user) await ensureRestaurantAccess(user, this.prisma, await this.restaurantIdForAccessProfile(profileId));
+        return (this.prisma as any).accessProfile.delete({
+            where: { id: profileId }
         });
     }
 

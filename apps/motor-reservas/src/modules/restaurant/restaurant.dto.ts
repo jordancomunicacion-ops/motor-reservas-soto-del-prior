@@ -160,3 +160,29 @@ export class AuthorizeUserDto {
   @IsArray()
   permissions?: string[];
 }
+
+export class CreateAccessProfileDto {
+  @IsString()
+  name: string;
+
+  @IsOptional()
+  @IsEnum(UserRole)
+  baseRole?: UserRole;
+
+  @IsArray()
+  permissions: string[];
+}
+
+export class UpdateAccessProfileDto {
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsEnum(UserRole)
+  baseRole?: UserRole;
+
+  @IsOptional()
+  @IsArray()
+  permissions?: string[];
+}

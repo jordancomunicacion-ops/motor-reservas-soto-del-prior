@@ -3,7 +3,7 @@ import { RestaurantService } from './restaurant.service';
 import { WaitlistService } from './waitlist.service';
 import { Public } from '../../auth/public.decorator';
 import { Roles } from '../../auth/roles.decorator';
-import { CreateRestaurantDto, CreatePublicReservationDto, UpdateBookingStatusDto, AuthorizeUserDto } from './restaurant.dto';
+import { CreateRestaurantDto, CreatePublicReservationDto, UpdateBookingStatusDto, AuthorizeUserDto, CreateAccessProfileDto, UpdateAccessProfileDto } from './restaurant.dto';
 
 @Controller('restaurant')
 export class RestaurantController {
@@ -227,6 +227,31 @@ export class RestaurantController {
     @Delete(':id/users/:userId')
     deauthorizeUser(@Param('id') id: string, @Param('userId') userId: string, @Req() req: any) {
         return this.service.deauthorizeUser(id, userId, req?.user);
+    }
+
+    // --- Access Profiles ---
+    @Roles('ADMIN')
+    @Get(':id/access-profiles')
+    getAccessProfiles(@Param('id') id: string, @Req() req: any) {
+        return this.service.getAccessProfiles(id, req?.user);
+    }
+
+    @Roles('ADMIN')
+    @Post(':id/access-profiles')
+    createAccessProfile(@Param('id') id: string, @Body() body: CreateAccessProfileDto, @Req() req: any) {
+        return this.service.createAccessProfile(id, body, req?.user);
+    }
+
+    @Roles('ADMIN')
+    @Patch('access-profiles/:profileId')
+    updateAccessProfile(@Param('profileId') profileId: string, @Body() body: UpdateAccessProfileDto, @Req() req: any) {
+        return this.service.updateAccessProfile(profileId, body, req?.user);
+    }
+
+    @Roles('ADMIN')
+    @Delete('access-profiles/:profileId')
+    deleteAccessProfile(@Param('profileId') profileId: string, @Req() req: any) {
+        return this.service.deleteAccessProfile(profileId, req?.user);
     }
 }
 
