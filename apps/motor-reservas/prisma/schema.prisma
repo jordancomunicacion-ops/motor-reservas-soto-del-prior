@@ -791,8 +791,16 @@ model Campaign {
   openCount  Int @default(0)
   clickCount Int @default(0)
 
+  // Multi-tenant scope. Una campaña se etiqueta con el centro que la crea.
+  // null en ambos => campaña heredada de antes del scoping; solo visible para super-admin.
+  hotelId      String?
+  restaurantId String?
+
   scheduledAt DateTime?
   createdAt   DateTime  @default(now())
+
+  @@index([hotelId])
+  @@index([restaurantId])
 }
 
 model Workflow {

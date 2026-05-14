@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body, Res } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Res, Req } from '@nestjs/common';
 import { ChannelManagerService } from './channel-manager.service';
 import { Roles } from '../../auth/roles.decorator';
 import type { Response } from 'express';
@@ -25,8 +25,8 @@ export class ChannelManagerController {
 
     @Roles('ADMIN')
     @Get('feeds')
-    async getFeeds() {
-        return this.channelService.getFeeds();
+    async getFeeds(@Req() req: any) {
+        return this.channelService.getFeeds(req?.user);
     }
 
     @Roles('ADMIN')
