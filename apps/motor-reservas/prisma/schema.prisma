@@ -111,7 +111,7 @@ model Hotel {
   // Synergy
   waitlistEntries HotelWaitlist[]
   restaurantId    String?         @unique
-  restaurant      Restaurant?     @relation(fields: [restaurantId], references: [id])
+  restaurant      Restaurant?     @relation(fields: [restaurantId], references: [id], onDelete: SetNull)
 
   // Integrations
   crmIntegration CrmIntegration?
@@ -132,10 +132,10 @@ model WidgetConfig {
   id String @id @default(uuid())
 
   hotelId String? @unique
-  hotel   Hotel?  @relation(fields: [hotelId], references: [id])
+  hotel   Hotel?  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
 
   restaurantId String?     @unique
-  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
   primaryColor   String  @default("#C59D5F") // Ocre
   secondaryColor String  @default("#1e40af") // Blue-800
@@ -159,7 +159,7 @@ model WidgetConfig {
 model RoomType {
   id          String  @id @default(uuid())
   hotelId     String
-  hotel       Hotel   @relation(fields: [hotelId], references: [id])
+  hotel       Hotel   @relation(fields: [hotelId], references: [id], onDelete: Cascade)
   name        String
   description String?
   basePrice   Decimal @default(0)
@@ -182,7 +182,7 @@ model RoomType {
 model Room {
   id         String   @id @default(uuid())
   roomTypeId String
-  roomType   RoomType @relation(fields: [roomTypeId], references: [id])
+  roomType   RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
   name       String // "101", "Villa A"
   isActive   Boolean  @default(true)
 
@@ -214,7 +214,7 @@ model Guest {
 model RatePlan {
   id          String  @id @default(uuid())
   hotelId     String
-  hotel       Hotel   @relation(fields: [hotelId], references: [id])
+  hotel       Hotel   @relation(fields: [hotelId], references: [id], onDelete: Cascade)
   name        String // "Standard", "Non-Refundable", "Long Stay"
   description String?
   isDefault   Boolean @default(false)
@@ -234,7 +234,7 @@ model RatePlan {
 model Season {
   id              String   @id @default(uuid())
   hotelId         String
-  hotel           Hotel    @relation(fields: [hotelId], references: [id])
+  hotel           Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
   name            String // "High Season"
   startDate       DateTime
   endDate         DateTime
@@ -245,10 +245,10 @@ model Season {
 model DailyPrice {
   id         String   @id @default(uuid())
   roomTypeId String
-  roomType   RoomType @relation(fields: [roomTypeId], references: [id])
+  roomType   RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
 
   ratePlanId String
-  ratePlan   RatePlan @relation(fields: [ratePlanId], references: [id])
+  ratePlan   RatePlan @relation(fields: [ratePlanId], references: [id], onDelete: Cascade)
 
   date  DateTime // YYYY-MM-DD
   price Decimal
@@ -261,13 +261,13 @@ model DailyPrice {
 model Restriction {
   id      String @id @default(uuid())
   hotelId String
-  hotel   Hotel  @relation(fields: [hotelId], references: [id])
+  hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
 
   roomTypeId String?
-  roomType   RoomType? @relation(fields: [roomTypeId], references: [id])
+  roomType   RoomType? @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
 
   ratePlanId String?
-  ratePlan   RatePlan? @relation(fields: [ratePlanId], references: [id])
+  ratePlan   RatePlan? @relation(fields: [ratePlanId], references: [id], onDelete: Cascade)
 
   date DateTime // YYYY-MM-DD
 
@@ -286,13 +286,13 @@ model Restriction {
 model Booking {
   id      String @id @default(uuid())
   hotelId String
-  hotel   Hotel  @relation(fields: [hotelId], references: [id])
+  hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Restrict)
 
   referenceCode String @unique // "RES-XXXX"
 
   // Linked Guest Profile
   guestId String?
-  guest   Guest?  @relation(fields: [guestId], references: [id])
+  guest   Guest?  @relation(fields: [guestId], references: [id], onDelete: SetNull)
 
   // Fallback if no guest profile created yet (API/Widget entry)
   guestName  String
@@ -337,7 +337,7 @@ model BookingRoom {
   bookingId String
   booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   roomId    String
-  room      Room    @relation(fields: [roomId], references: [id])
+  room      Room    @relation(fields: [roomId], references: [id], onDelete: Restrict)
 
   priceSnapshot Decimal // Price recorded for this specific room/night calc
   date          DateTime // Specific date for this room assignment
@@ -357,13 +357,13 @@ model Channel {
 model ChannelMapping {
   id        String  @id @default(uuid())
   channelId String
-  channel   Channel @relation(fields: [channelId], references: [id])
+  channel   Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
 
   roomTypeId String
-  roomType   RoomType @relation(fields: [roomTypeId], references: [id])
+  roomType   RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
 
   ratePlanId String?
-  ratePlan   RatePlan? @relation(fields: [ratePlanId], references: [id])
+  ratePlan   RatePlan? @relation(fields: [ratePlanId], references: [id], onDelete: SetNull)
 
   externalId   String // The ID on Booking.com (e.g. "4829102")
   externalName String? // Helper name
@@ -394,7 +394,7 @@ model AuditLog {
 model ICalFeed {
   id         String   @id @default(uuid())
   roomTypeId String
-  roomType   RoomType @relation(fields: [roomTypeId], references: [id])
+  roomType   RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
 
   url    String
   name   String?
@@ -415,9 +415,9 @@ model IntegrationConnection {
 
   // Entity Association
   hotelId           String?
-  hotel             Hotel?   @relation(fields: [hotelId], references: [id])
+  hotel             Hotel?   @relation(fields: [hotelId], references: [id], onDelete: Cascade)
   restaurantId      String?
-  restaurant        Restaurant? @relation(fields: [restaurantId], references: [id])
+  restaurant        Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
   // Credentials (encrypted in production)
   credentials       Json     // Almacena: { propertyId, apiKey, token, etc. }
@@ -442,9 +442,9 @@ model CrmIntegration {
 
   // Target
   hotelId           String?  @unique
-  hotel             Hotel?   @relation(fields: [hotelId], references: [id])
+  hotel             Hotel?   @relation(fields: [hotelId], references: [id], onDelete: Cascade)
   restaurantId      String?  @unique
-  restaurant        Restaurant? @relation(fields: [restaurantId], references: [id])
+  restaurant        Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
   // Connection Details
   enabled           Boolean  @default(false)
@@ -475,7 +475,7 @@ model CrmIntegration {
 model Payment {
   id            String        @id @default(uuid())
   bookingId     String
-  booking       Booking       @relation(fields: [bookingId], references: [id])
+  booking       Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   amount        Decimal
   gateway       String // "stripe"
   transactionId String?
@@ -489,9 +489,9 @@ model Payment {
 model User {
   id           String      @id @default(uuid())
   hotelId      String?
-  hotel        Hotel?      @relation(fields: [hotelId], references: [id])
+  hotel        Hotel?      @relation(fields: [hotelId], references: [id], onDelete: SetNull)
   restaurantId String?
-  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: SetNull)
   email        String      @unique
   name         String?
   password     String
@@ -554,7 +554,7 @@ model AccessProfile {
 model Shift {
   id           String     @id @default(uuid())
   restaurantId String
-  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
   name         String
   type         ShiftType @default(LUNCH)
@@ -571,7 +571,7 @@ model Shift {
 model RestaurantClosure {
   id           String     @id @default(uuid())
   restaurantId String
-  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   date         DateTime
   endDate      DateTime?
   reason       String?
@@ -581,9 +581,9 @@ model RestaurantClosure {
 model Zone {
   id           String      @id @default(uuid())
   restaurantId String?
-  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   hotelId      String?
-  hotel        Hotel?      @relation(fields: [hotelId], references: [id])
+  hotel        Hotel?      @relation(fields: [hotelId], references: [id], onDelete: Cascade)
   name         String // "Interior", "Terraza"
   index        Int         @default(0) // Sorting order
   isActive     Boolean     @default(true)
@@ -594,7 +594,7 @@ model Zone {
 model Table {
   id       String @id @default(uuid())
   zoneId   String
-  zone     Zone   @relation(fields: [zoneId], references: [id])
+  zone     Zone   @relation(fields: [zoneId], references: [id], onDelete: Cascade)
   name     String // "Mesa 1"
   capacity Int    @default(4)
 
@@ -620,10 +620,10 @@ model Table {
 model ResBooking {
   id           String     @id @default(uuid())
   restaurantId String
-  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
 
   tableId String?
-  table   Table?  @relation(fields: [tableId], references: [id])
+  table   Table?  @relation(fields: [tableId], references: [id], onDelete: SetNull)
 
   // Guest Info
   guestName     String
@@ -666,7 +666,7 @@ model ResBooking {
   // Synergy: Architectural Upgrades
   idempotencyKey String?            @unique
   channelId      String?
-  channel        RestaurantChannel? @relation(fields: [channelId], references: [id])
+  channel        RestaurantChannel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
 
   @@index([restaurantId, status])
   @@index([restaurantId, date])
@@ -693,7 +693,7 @@ model ResPolicy {
 model TableHold {
   id        String   @id @default(uuid())
   tableId   String
-  table     Table    @relation(fields: [tableId], references: [id])
+  table     Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
   token     String   @unique
   expiresAt DateTime
   createdAt DateTime @default(now())
@@ -702,7 +702,7 @@ model TableHold {
 model RestaurantWaitlist {
   id           String     @id @default(uuid())
   restaurantId String
-  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
   date    DateTime
   shiftId String?
@@ -729,9 +729,9 @@ model RestaurantWaitlist {
 model HotelWaitlist {
   id          String   @id @default(uuid())
   hotelId     String
-  hotel       Hotel    @relation(fields: [hotelId], references: [id])
+  hotel       Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
   roomTypeId  String
-  roomType    RoomType @relation(fields: [roomTypeId], references: [id])
+  roomType    RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
   email       String
   dateFrom    DateTime
   dateTo      DateTime
@@ -770,7 +770,7 @@ model CustomerProfile {
 model IdentityLink {
   id                String          @id @default(uuid())
   customerProfileId String
-  customerProfile   CustomerProfile @relation(fields: [customerProfileId], references: [id])
+  customerProfile   CustomerProfile @relation(fields: [customerProfileId], references: [id], onDelete: Cascade)
 
   // Source
   sourceType String // "GUEST", "USER", "RES_BOOKING"
@@ -783,7 +783,7 @@ model WebVisit {
   sessionId         String
   visitorId         String? // Cookie ID
   customerProfileId String?
-  customerProfile   CustomerProfile? @relation(fields: [customerProfileId], references: [id])
+  customerProfile   CustomerProfile? @relation(fields: [customerProfileId], references: [id], onDelete: SetNull)
 
   url       String
   referrer  String?
@@ -844,9 +844,9 @@ model Event {
 
   // Relations
   hotelId      String?
-  hotel        Hotel?      @relation(fields: [hotelId], references: [id])
+  hotel        Hotel?      @relation(fields: [hotelId], references: [id], onDelete: Cascade)
   restaurantId String?
-  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
   // Integrations (JSON)
   integrations Json? @default("{}")
