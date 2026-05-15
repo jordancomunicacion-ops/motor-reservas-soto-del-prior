@@ -1,13 +1,14 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { WaitlistService } from './waitlist.service';
 import { CrmService } from '../crm/crm.service';
 import { CrmIntegrationService } from '../crm/crm-integration.service';
 import { MailService } from '../mail/mail.service';
-import { ShiftType, ResBookingOrigin, UserRole, ResBookingStatus } from '../../common/enums';
+import { ResBookingOrigin, ResBookingStatus } from '../../common/enums';
 import { $Enums } from '@prisma/client';
 import { getUserScope, assertRestaurantAccess, ensureRestaurantAccess, ensureHotelAccess } from '../../common/scope';
+import { RestaurantAvailabilityService } from './restaurant-availability.service';
+import { RestaurantAccessService } from './restaurant-access.service';
 
 @Injectable()
 export class RestaurantService {
@@ -18,7 +19,9 @@ export class RestaurantService {
         private waitlistService: WaitlistService,
         private crmService: CrmService,
         private crmIntegrationService: CrmIntegrationService,
-        private mailService: MailService
+        private mailService: MailService,
+        private availability: RestaurantAvailabilityService,
+        private access: RestaurantAccessService,
     ) { }
 
 
@@ -79,16 +82,6 @@ export class RestaurantService {
         });
         if (!b) throw new NotFoundException('Reserva no encontrada');
         return b.restaurantId;
-    }
-
-    /** Resuelve el restaurantId al que pertenece un AccessProfile. */
-    private async restaurantIdForAccessProfile(profileId: string): Promise<string> {
-        const p = await (this.prisma as any).accessProfile.findUnique({
-            where: { id: profileId },
-            select: { restaurantId: true }
-        });
-        if (!p) throw new NotFoundException('Perfil de acceso no encontrado');
-        return p.restaurantId;
     }
 
     /**
@@ -550,44 +543,8 @@ export class RestaurantService {
         return booking;
     }
 
-    private async findAvailableTable(restaurantId: string, date: Date, pax: number, duration: number): Promise<string | null> {
-        const startOfDay = new Date(date);
-        startOfDay.setUTCHours(0, 0, 0, 0);
-        const endOfDay = new Date(date);
-        endOfDay.setUTCHours(23, 59, 59, 999);
-
-        const tables = await this.prisma.table.findMany({
-            where: { zone: { restaurantId }, isActive: true }
-        });
-
-        const bookings = await this.prisma.resBooking.findMany({
-            where: {
-                restaurantId,
-                date: { gte: startOfDay, lte: endOfDay },
-                status: { notIn: [ResBookingStatus.CANCELLED, ResBookingStatus.RELEASED, ResBookingStatus.NO_SHOW] }
-            },
-            select: { id: true, date: true, duration: true, tableId: true }
-        });
-
-        // 1. Try single table
-        const freeTables = tables.filter(table => {
-            const isBooked = bookings.some(b => {
-                if (!b.tableId || b.tableId !== table.id) return false;
-                const bStart = new Date(b.date);
-                const bEnd = new Date(bStart.getTime() + (b.duration || duration) * 60000);
-                
-                const slotEnd = new Date(date.getTime() + duration * 60000);
-                return (date < bEnd && slotEnd > bStart);
-            });
-            return !isBooked;
-        });
-
-        // Find smallest table that fits
-        const bestTable = freeTables
-            .filter(t => t.maxPax >= pax && t.minPax <= pax)
-            .sort((a, b) => (a.maxPax - b.maxPax))[0];
-
-        return bestTable ? bestTable.id : null;
+    private findAvailableTable(restaurantId: string, date: Date, pax: number, duration: number): Promise<string | null> {
+        return this.availability.findAvailableTable(restaurantId, date, pax, duration);
     }
 
     async updateBookingStatus(bookingId: string, status: string, tableId?: string, user?: any) {
@@ -747,208 +704,8 @@ export class RestaurantService {
         }
     }
 
-    async getAvailableSlots(restaurantId: string, dateStr: string, pax: number, type?: string) {
-        console.log('--- BUSCANDO HUECOS (PROD) --- Restaurant:', restaurantId, 'Fecha:', dateStr, 'Pax:', pax);
-        const date = new Date(dateStr);
-        const now = new Date();
-        now.setUTCHours(0, 0, 0, 0);
-
-        // Si la fecha es anterior a hoy, devolvemos cerrado/vacío sin más
-        if (date < now) {
-            console.log('Fecha pasada detectada:', dateStr);
-            return { slots: [], closed: true, message: 'Fecha pasada' };
-        }
-
-        const dayOfWeek = date.getDay(); // 0-6
-
-        const shifts = await this.prisma.shift.findMany({
-            where: {
-                restaurantId,
-                isActive: true,
-                ...(type ? { type: type as ShiftType } : {})
-            }
-        });
-
-        // Filtro manual exacto de días de la semana para evitar errores de 'contains'
-        const activeShifts = shifts.filter(s => {
-            const days = s.daysOfWeek.split(',').map(d => d.trim());
-            return days.includes(dayOfWeek.toString());
-        });
-
-        console.log('Turnos activos encontrados para este día de la semana:', activeShifts.length);
-
-        // Si no hay turnos, está CERRADO, no COMPLETO
-        if (activeShifts.length === 0) {
-            return { slots: [], closed: true, message: 'No hay turnos para este día' };
-        }
-
-        const startOfDay = new Date(date);
-        startOfDay.setUTCHours(0, 0, 0, 0);
-        const endOfDay = new Date(date);
-        endOfDay.setUTCHours(23, 59, 59, 999);
-
-        // Check for events on this date and their blocked zones
-        const dayEvents = await this.prisma.event.findMany({
-            where: {
-                restaurantId,
-                date: { gte: startOfDay, lte: endOfDay },
-                isActive: true
-            },
-            include: {
-                zones: true,
-                _count: {
-                    select: { bookings: true }
-                }
-            }
-        });
-
-        const blockedZoneIds = dayEvents.flatMap(e => e.zones.map(z => z.id));
-
-        const tables = await this.prisma.table.findMany({
-            where: {
-                zone: {
-                    restaurantId,
-                    id: blockedZoneIds.length > 0 ? { notIn: blockedZoneIds } : undefined
-                },
-                isActive: true
-            }
-        });
-
-        const bookings = await this.prisma.resBooking.findMany({
-            where: {
-                restaurantId,
-                date: { gte: startOfDay, lte: endOfDay },
-                status: { notIn: [ResBookingStatus.CANCELLED, ResBookingStatus.RELEASED, ResBookingStatus.NO_SHOW] }
-            },
-            select: { id: true, date: true, duration: true, tableId: true }
-        });
-
-        const availableSlots: string[] = [];
-
-        const restaurant = await this.prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { defaultDuration: true } });
-        const defaultDuration = restaurant?.defaultDuration || 90;
-
-        for (const shift of activeShifts) {
-            const slots = this.generateSlots(shift.startTime, shift.endTime, shift.slotInterval);
-
-            for (const slot of slots) {
-                const [h, m] = slot.split(':').map(Number);
-                const slotTime = new Date(date);
-                slotTime.setUTCHours(h, m, 0, 0);
-
-                // No permitir horas que ya han pasado si el día es hoy
-                const now = new Date();
-                if (date.toISOString().split('T')[0] === now.toISOString().split('T')[0] && slotTime < now) {
-                    continue;
-                }
-
-                if (this.isSlotAvailable(slotTime, pax, tables, bookings, defaultDuration)) {
-                    // Evitar duplicados en la lista de slots
-                    if (!availableSlots.includes(slot)) {
-                        availableSlots.push(slot);
-                    }
-                }
-            }
-        }
-
-        console.log('Huecos finales encontrados:', availableSlots.length);
-
-        // Si es una fecha pasada, siempre devolvemos closed: true
-        if (date < now) {
-            return { slots: [], closed: true, message: 'Fecha pasada' };
-        }
-
-        return {
-            slots: availableSlots,
-            closed: activeShifts.length === 0,
-            event: dayEvents[0] || null
-        };
-    }
-
-    private isSlotAvailable(slotTime: Date, pax: number, tables: any[], bookings: any[], defaultDuration: number = 90): boolean {
-        // Find free tables at this slotTime
-        const freeTables = tables.filter(table => {
-            // Check if table is booked at this time
-            const isBooked = bookings.some(b => {
-                if (!b.tableId || b.tableId !== table.id) return false;
-                const bStart = new Date(b.date);
-                const bEnd = new Date(bStart.getTime() + (b.duration || defaultDuration) * 60000);
-                
-                const slotEnd = new Date(slotTime.getTime() + defaultDuration * 60000);
-                return (slotTime < bEnd && slotEnd > bStart);
-            });
-            return !isBooked;
-        });
-
-        // 1. Try to find a single table that fits pax
-        const singleTable = freeTables.find(t => t.maxPax >= pax && t.minPax <= pax);
-        if (singleTable) return true;
-
-        // 2. Try to find a connected cluster of tables that sums up to pax
-        for (const startTable of freeTables) {
-            if (this.canSatisfyPaxWithCluster(startTable, freeTables, pax)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private canSatisfyPaxWithCluster(startTable: any, freeTables: any[], targetPax: number): boolean {
-        const visited = new Set<string>();
-        // We use a queue for BFS, but we need to calculate the total capacity of the growing cluster
-        const cluster: any[] = [startTable];
-        visited.add(startTable.id);
-
-        let head = 0;
-
-        while (head < cluster.length) {
-            const table = cluster[head++];
-            
-            // Re-calculate the total capacity of the CURRENT cluster in each step
-            // to account for new links formed
-            let tempCapacity = 0;
-            for (const t of cluster) {
-                const metadata = (t.metadata as any) || {};
-                const neighborsInCluster = (metadata.contiguousTableIds || [])
-                    .filter((id: string) => cluster.some(ct => ct.id === id)).length;
-                
-                tempCapacity += Math.max(0, t.maxPax - (neighborsInCluster * (t.seatsLostPerJoin || 1)));
-            }
-            
-            if (tempCapacity >= targetPax) return true;
-
-            const metadata = (table.metadata as any) || {};
-            const neighborIds = metadata.contiguousTableIds || [];
-
-            for (const nId of neighborIds) {
-                if (visited.has(nId)) continue;
-                const neighbor = freeTables.find(t => t.id === nId);
-                if (neighbor) {
-                    visited.add(nId);
-                    cluster.push(neighbor);
-                    // Optimization: if adding this neighbor might solve it, we'll check in next iteration
-                }
-            }
-        }
-
-        return false;
-    }
-
-    private generateSlots(startStr: string, endStr: string, interval: number): string[] {
-        const slots: string[] = [];
-        let [h, m] = startStr.split(':').map(Number);
-        const [eh, em] = endStr.split(':').map(Number);
-
-        while (h < eh || (h === eh && m < em)) {
-            slots.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
-            m += interval;
-            if (m >= 60) {
-                h += Math.floor(m / 60);
-                m = m % 60;
-            }
-        }
-        return slots;
+    getAvailableSlots(restaurantId: string, dateStr: string, pax: number, type?: string) {
+        return this.availability.getAvailableSlots(restaurantId, dateStr, pax, type);
     }
 
     async createLinkedReservation(data: {
@@ -1108,108 +865,34 @@ export class RestaurantService {
         });
     }
 
-    async getAuthorizedUsers(restaurantId: string, user?: any) {
-        if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
-        return this.prisma.user.findMany({
-            where: { restaurantId },
-            select: { id: true, email: true, name: true, role: true, permissions: true }
-        });
+    // --- Access (delegated to RestaurantAccessService) ---
+
+    getAuthorizedUsers(restaurantId: string, user?: any) {
+        return this.access.getAuthorizedUsers(restaurantId, user);
     }
 
-    async authorizeUser(restaurantId: string, data: { email: string, password?: string, role?: string, permissions?: string[] }, user?: any) {
-        if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
-        const { password, role, permissions } = data;
-        const email = data.email?.trim().toLowerCase();
-        if (!email) {
-            throw new Error('Email obligatorio');
-        }
-
-        // Hash password if provided. If absent on create, store a placeholder that no bcrypt.compare can match
-        // (bcrypt.compare requires a $2a/$2b/$2y$ hash; an empty placeholder will always fail safely).
-        const hashedPassword = password && password.length > 0
-            ? await bcrypt.hash(password, 10)
-            : undefined;
-
-        const existingUser = await this.prisma.user.findUnique({ where: { email } });
-
-        if (existingUser) {
-            return this.prisma.user.update({
-                where: { email },
-                data: {
-                    restaurantId,
-                    role: (role as UserRole) || existingUser.role,
-                    ...(hashedPassword ? { password: hashedPassword } : {}),
-                    permissions: permissions?.join(',') || existingUser.permissions
-                }
-            });
-        }
-
-        if (!hashedPassword) {
-            throw new Error('Se requiere contraseña para crear un nuevo usuario');
-        }
-
-        return this.prisma.user.create({
-            data: {
-                email,
-                restaurantId,
-                password: hashedPassword,
-                role: (role as UserRole) || UserRole.STAFF,
-                permissions: permissions?.join(','),
-            }
-        });
+    authorizeUser(restaurantId: string, data: { email: string; password?: string; role?: string; permissions?: string[] }, user?: any) {
+        return this.access.authorizeUser(restaurantId, data, user);
     }
 
-    async deauthorizeUser(restaurantId: string, userId: string, user?: any) {
-        if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
-        return this.prisma.user.update({
-            where: { id: userId },
-            data: {
-                restaurantId: null,
-                permissions: null
-            }
-        });
+    deauthorizeUser(restaurantId: string, userId: string, user?: any) {
+        return this.access.deauthorizeUser(restaurantId, userId, user);
     }
 
-    // --- Access Profiles (plantillas de roles por restaurante) ---
-    async getAccessProfiles(restaurantId: string, user?: any) {
-        if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
-        return (this.prisma as any).accessProfile.findMany({
-            where: { restaurantId },
-            orderBy: { createdAt: 'asc' }
-        });
+    getAccessProfiles(restaurantId: string, user?: any) {
+        return this.access.getAccessProfiles(restaurantId, user);
     }
 
-    async createAccessProfile(restaurantId: string, data: { name: string; baseRole?: string; permissions: string[] }, user?: any) {
-        if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
-        const name = data.name?.trim();
-        if (!name) throw new Error('Nombre del perfil obligatorio');
-        return (this.prisma as any).accessProfile.create({
-            data: {
-                restaurantId,
-                name,
-                baseRole: (data.baseRole as UserRole) || UserRole.STAFF,
-                permissions: (data.permissions || []).join(',')
-            }
-        });
+    createAccessProfile(restaurantId: string, data: { name: string; baseRole?: string; permissions: string[] }, user?: any) {
+        return this.access.createAccessProfile(restaurantId, data, user);
     }
 
-    async updateAccessProfile(profileId: string, data: { name?: string; baseRole?: string; permissions?: string[] }, user?: any) {
-        if (user) await ensureRestaurantAccess(user, this.prisma, await this.restaurantIdForAccessProfile(profileId));
-        const update: any = {};
-        if (data.name !== undefined) update.name = data.name.trim();
-        if (data.baseRole !== undefined) update.baseRole = data.baseRole as UserRole;
-        if (data.permissions !== undefined) update.permissions = data.permissions.join(',');
-        return (this.prisma as any).accessProfile.update({
-            where: { id: profileId },
-            data: update
-        });
+    updateAccessProfile(profileId: string, data: { name?: string; baseRole?: string; permissions?: string[] }, user?: any) {
+        return this.access.updateAccessProfile(profileId, data, user);
     }
 
-    async deleteAccessProfile(profileId: string, user?: any) {
-        if (user) await ensureRestaurantAccess(user, this.prisma, await this.restaurantIdForAccessProfile(profileId));
-        return (this.prisma as any).accessProfile.delete({
-            where: { id: profileId }
-        });
+    deleteAccessProfile(profileId: string, user?: any) {
+        return this.access.deleteAccessProfile(profileId, user);
     }
 
     async autoAssignPendingBookings(restaurantId: string, date: Date) {
