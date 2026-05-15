@@ -1,5 +1,7 @@
 import type { NextAuthConfig } from 'next-auth';
 
+const ADMIN_ROLES = new Set(['ADMIN']);
+
 export const authConfig = {
     pages: {
         signIn: '/login',
@@ -7,14 +9,14 @@ export const authConfig = {
     callbacks: {
         authorized({ auth, request: { nextUrl } }) {
             const isLoggedIn = !!auth?.user;
+            const role = auth?.user?.role;
+            const isAdmin = typeof role === 'string' && ADMIN_ROLES.has(role);
             const isOnAdmin = nextUrl.pathname.startsWith('/admin');
             if (isOnAdmin) {
-                if (isLoggedIn) return true;
-                return false;
-            } else if (isLoggedIn) {
-                if (nextUrl.pathname === '/login') {
-                    return Response.redirect(new URL('/admin', nextUrl));
-                }
+                return isLoggedIn && isAdmin;
+            }
+            if (isLoggedIn && isAdmin && nextUrl.pathname === '/login') {
+                return Response.redirect(new URL('/admin', nextUrl));
             }
             return true;
         },
