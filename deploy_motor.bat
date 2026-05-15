@@ -1,8 +1,20 @@
 @echo off
 setlocal
-set REMOTE_USER=root
-set REMOTE_HOST=164.92.167.42
-set REMOTE_PATH=/root/SOTOdelPRIOR/apps/reservas
+cd /d "%~dp0"
+
+if exist deploy.env (
+    for /f "usebackq tokens=1,* delims==" %%A in ("deploy.env") do (
+        if not "%%A"=="" set "%%A=%%B"
+    )
+)
+
+if "%REMOTE_USER%"=="" set REMOTE_USER=root
+if "%REMOTE_HOST%"=="" (
+    echo ERROR: REMOTE_HOST no definido. Crea deploy.env con REMOTE_HOST=tu.servidor.com
+    exit /b 1
+)
+if "%REMOTE_PATH%"=="" set REMOTE_PATH=/root/SOTOdelPRIOR/apps/reservas
+
 echo [1/3] Construyendo imagen MOTOR-RESERVAS...
 docker build --platform linux/amd64 -t sotoreservas-api:latest ./apps/motor-reservas
 echo [2/3] Enviando imagen al servidor...
