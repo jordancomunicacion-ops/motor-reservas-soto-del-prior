@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:20.18.1-alpine
 
 RUN apk add --no-cache openssl libc6-compat
 

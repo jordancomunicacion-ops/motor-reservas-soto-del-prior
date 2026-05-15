@@ -1,73 +1,75 @@
 # SOTO PMS - Lightweight Hotel Booking Engine
 
-A modern, full-stack Property Management System (PMS) and Booking Engine for small to medium hotels. 
-Built with **NestJS**, **Next.js**, and **PostgreSQL**. Envato-ready architecture.
+Property Management System (PMS) y motor de reservas multi-tenant para
+hoteles y restaurantes. Construido con **NestJS**, **Next.js 16** y **PostgreSQL**.
 
-## 🚀 Features
+## Stack
 
-- **Channel Manager**: Import/Export iCal feeds from Booking.com, Airbnb, etc.
-- **Booking Engine**: Public-facing widget for direct reservations.
-- **Admin Dashboard**: Manage rooms, rates, blocks, and reservations.
-- **Inventory Management**: Flexible Room Types and Units configuration.
-- **Installer Wizard**: Easy setup for new deployments.
+- **Backend**: NestJS + Prisma + PostgreSQL (`apps/motor-reservas`)
+- **Frontend**: Next.js 16 + NextAuth + Tailwind v4 + Radix UI (`apps/web`)
+- **Infra**: Docker Compose + Traefik
 
-## 🛠️ Stack
+## Estructura
 
-- **Backend**: NestJS (Node.js), Prisma (ORM), PostgreSQL.
-- **Frontend**: Next.js 14, TailwindCSS, Radix UI.
-- **Infrastructure**: Docker Ready (optional).
-
-## 📦 Installation
-
-### Prerequisites
-- Node.js 18+
-- PostgreSQL Database
-- NPM or Yarn
-
-### 1. Setup Backend (API)
-
-```bash
-cd apps/api
-# Copy environment file
-cp .env.example .env
-# Update DATABASE_URL in .env
-# ...
-
-# Install Dependencies
-npm install
-
-# Run Migrations
-npx prisma migrate deploy
-
-# Start Server
-npm run start
+```
+apps/
+  motor-reservas/   API NestJS (puerto 4000 en local, 3000 en Docker)
+  web/              Next.js admin + widget público (puerto 3001 en local)
+  brain/            Workspace experimental (no se despliega)
+docker-compose.yml  Stack de producción (web + api + engine + postgres)
+DESPLEGAR.bat       Despliegue completo por scp + docker compose up
+deploy_motor.bat    Despliegue rápido solo del motor (docker save | docker load)
 ```
 
-### 2. Setup Frontend (Web)
+## Setup local
 
+### Requisitos
+- Node.js 20+
+- PostgreSQL 15
+- Docker (opcional, para usar el stack completo)
+
+### Variables de entorno
+Copia `.env.example` a `.env` y rellena:
+- `DB_PASS`, `JWT_SECRET`, `AUTH_SECRET` son **obligatorios** (sin fallback).
+- `BOOTSTRAP_ADMIN_*` solo si necesitas un admin temporal antes del installer.
+
+### Arranque
 ```bash
-cd apps/web
-# Install Dependencies
 npm install
-
-# Start Development Server (runs on Port 3001)
-npm run dev
+npx prisma generate --schema=apps/motor-reservas/prisma/schema.prisma
+npx prisma generate --schema=apps/web/prisma/schema.prisma
+npm run dev          # arranca web (3001) + motor-reservas (4000) en paralelo
 ```
 
-### 3. Run the Installer
+### Installer
+1. Abre `http://localhost:3001/install`.
+2. Crea hotel/restaurante y primer usuario ADMIN.
+3. Login en `http://localhost:3001/login` (solo rol ADMIN entra al panel).
 
-1. Open `http://localhost:3001/install` in your browser.
-2. Follow the wizard to create your Hotel Profile and Admin User.
-3. You will be redirected to the Dashboard upon completion.
+## Despliegue
 
-## 🔑 Default Ports
+Los `.bat` de despliegue leen `REMOTE_USER`/`REMOTE_HOST`/`REMOTE_PATH` de
+`deploy.env` (ignorado por git). Crea `deploy.env` con:
+```
+REMOTE_USER=root
+REMOTE_HOST=tu.servidor.com
+REMOTE_PATH=/root/SOTOdelPRIOR/apps/reservas
+```
+Luego:
+- `DESPLEGAR.bat` — despliegue completo (web + motor + db).
+- `deploy_motor.bat` — solo el motor (más rápido para hotfixes de API).
 
-- **API**: `http://localhost:4000`
-- **Web Widget**: `http://localhost:3001`
-- **App Cocina**: `http://localhost:3002`
-- **App Ganadera**: `http://localhost:3003`
+En el servidor, asegúrate de tener un `.env` junto al `docker-compose.yml`
+con `DB_PASS`, `AUTH_SECRET` y `JWT_SECRET` (todos obligatorios).
 
-## 📄 License
+## Tests E2E
+
+```bash
+npm run test:e2e        # Playwright headless
+npm run test:e2e:ui     # con UI interactiva
+```
+
+## Licencia
 
 Commercial License. Redistribution prohibited without authorization.
-Copyright © 2024 SOTOdelPRIOR.
+Copyright © SOTOdelPRIOR.

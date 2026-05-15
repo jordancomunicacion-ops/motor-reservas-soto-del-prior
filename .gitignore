@@ -1,10 +1,27 @@
 node_modules
 .env
+.env.local
+.env.*.local
 .DS_Store
 dist/
+build/
 .next/
 coverage/
 *.log
 .vscode/
+.idea/
 .claude/
 deploy.tar.gz
+deploy.env
+
+# scratch / one-off debug scripts (mantener solo .md docs en scratch raíz)
+scratch/*
+!scratch/*.md
+apps/*/scratch/
+apps/*/*/scratch/
+*scratch_*.js
+*scratch_*.ts
+cleanup_*.js
+dump_*.js
+search_chunks.js
+widget_demo_v*.html

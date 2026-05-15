@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    name: Lint, typecheck, prisma validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.18.1'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prisma generate (motor-reservas)
+        run: npx prisma generate --schema=apps/motor-reservas/prisma/schema.prisma
+
+      - name: Prisma generate (web)
+        run: npx prisma generate --schema=apps/web/prisma/schema.prisma
+
+      - name: Prisma validate (motor-reservas)
+        run: npx prisma validate --schema=apps/motor-reservas/prisma/schema.prisma
+
+      - name: Prisma validate (web)
+        run: npx prisma validate --schema=apps/web/prisma/schema.prisma
+
+      - name: Typecheck motor-reservas
+        run: npx tsc --noEmit -p apps/motor-reservas/tsconfig.json
+
+      - name: Typecheck web
+        working-directory: apps/web
+        run: npx tsc --noEmit
+
+      - name: Lint motor-reservas
+        working-directory: apps/motor-reservas
+        run: npm run lint -- --max-warnings=0
+        continue-on-error: true
+
+      - name: Lint web
+        working-directory: apps/web
+        run: npm run lint
+        continue-on-error: true
