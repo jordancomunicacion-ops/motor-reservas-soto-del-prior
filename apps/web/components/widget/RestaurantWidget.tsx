@@ -7,87 +7,28 @@ import { ChevronLeft, ChevronRight, Play, Check, Calendar, Users, MapPin, PartyP
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { fetchAPI } from '@/lib/api';
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { loadStripe, type Stripe } from '@stripe/stripe-js';
+import { Elements } from '@stripe/react-stripe-js';
+import { WidgetCardForm } from './WidgetCardForm';
+import { BASE_STEPS, type WidgetConfig } from './widget-types';
+import { computeDayStatus, shouldRequireStripe } from './widget-helpers';
 
-// Types
-type Step = {
-    id: number;
-    label: string;
+const logWidgetError = (context: string, err: unknown) => {
+    if (process.env.NODE_ENV !== 'production') {
+        console.error(`[widget] ${context}`, err);
+    }
 };
 
-const STEPS: Step[] = [
-    { id: 1, label: 'Encontrar' },
-    { id: 2, label: 'Información' },
-    { id: 3, label: 'Garantía' },
-    { id: 4, label: 'Confirmación' }
-];
-
-function CardForm({ onSuccess, submitting, colors, amount }: { onSuccess: (pmId: string) => void, submitting: boolean, colors: any, amount: number }) {
-    const stripe = useStripe();
-    const elements = useElements();
-    const [error, setError] = useState<string | null>(null);
-
-    const handleSubmit = async (e: any) => {
-        if (e) e.preventDefault();
-        if (!stripe || !elements) return;
-
-        const cardElement = elements.getElement(CardElement);
-        if (!cardElement) return;
-
-        const { error, paymentMethod } = await stripe.createPaymentMethod({
-            type: 'card',
-            card: cardElement,
-        });
-
-        if (error) {
-            setError(error.message || 'Error al procesar la tarjeta');
-        } else {
-            onSuccess(paymentMethod.id);
-        }
-    };
-
-    return (
-        <div className="space-y-4">
-            <div className="p-4 bg-gray-50 border rounded-none">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-[#C59D5F] mb-4">Datos de la Tarjeta</p>
-                <CardElement options={{
-                    style: {
-                        base: {
-                            fontSize: '16px',
-                            color: '#424770',
-                            '::placeholder': { color: '#aab7c4' },
-                        },
-                        invalid: { color: '#9e2146' },
-                    },
-                }} />
-            </div>
-            {error && <p className="text-xs text-red-500 italic">{error}</p>}
-            <p className="text-[11px] text-gray-500 leading-relaxed italic">
-                * No se realizará ningún cargo ahora. Solo se solicita como garantía. Se aplicará una penalización de {amount}€ por persona en caso de no presentarse sin cancelar con 48h de antelación.
-            </p>
-            <Button
-                id="stripe-submit-btn"
-                className="hidden"
-                onClick={handleSubmit}
-                disabled={submitting}
-            >
-                Confirmar
-            </Button>
-        </div>
-    );
-}
-
 export function RestaurantWidget() {
-    const [stripePromise, setStripePromise] = useState<any>(null);
-    const [widgetConfig, setWidgetConfig] = useState<any>(null);
+    const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
+    const [widgetConfig, setWidgetConfig] = useState<WidgetConfig | null>(null);
     const searchParams = useSearchParams();
     const restaurantId = searchParams.get('id') || '';
 
     useEffect(() => {
         if (!restaurantId) return;
         fetchAPI(`/restaurant/${restaurantId}`)
-            .then(data => { 
+            .then(data => {
                 if (data?.widgetConfig) {
                     setWidgetConfig(data.widgetConfig);
                 }
@@ -95,7 +36,7 @@ export function RestaurantWidget() {
                     setStripePromise(loadStripe(data.integrations.stripe.publicKey));
                 }
             })
-            .catch(() => {});
+            .catch(err => logWidgetError('load restaurant', err));
     }, [restaurantId]);
 
     if (stripePromise && widgetConfig) {
@@ -109,7 +50,7 @@ export function RestaurantWidget() {
     return <RestaurantWidgetContent widgetConfig={widgetConfig} />;
 }
 
-function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
+function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig | null }) {
     const searchParams = useSearchParams();
     const restaurantId = searchParams.get('id') || searchParams.get('hotelId') || '';
     const mode = searchParams.get('mode') || 'popup';
@@ -130,10 +71,18 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
     const [acceptMarketing, setAcceptMarketing] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [loadingSlots, setLoadingSlots] = useState(false);
-    const [closures, setClosures] = useState<any[]>([]);
+    const [closures, setClosures] = useState<{ date: string; endDate?: string | null }[]>([]);
     const [restaurantName, setRestaurantName] = useState('');
-    const [createdBooking, setCreatedBooking] = useState<any>(null);
-    const [selectedEvent, setSelectedEvent] = useState<any>(null);
+    const [createdBooking, setCreatedBooking] = useState<{ id?: string; isWaitlist?: boolean } | null>(null);
+    const [selectedEvent, setSelectedEvent] = useState<{
+        id: string;
+        name: string;
+        description: string | null;
+        date: string;
+        price: number;
+        capacity: number;
+        _count: { bookings: number };
+    } | null>(null);
     const [eventDates, setEventDates] = useState<string[]>([]);
 
     // CRM Additional Fields (Step 3)
@@ -150,31 +99,11 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
     });
 
     // Granular No-Show Logic
-    const shouldRequireStripe = () => {
-        if (!widgetConfig?.stripeEnabled) return false;
-        
-        // 1. All reservations
-        if (widgetConfig.noShowFeeAll) return true;
-        
-        // 2. Groups
-        if (widgetConfig.noShowFeeGroups && pax >= widgetConfig.noShowGroupMinPax) return true;
-        
-        // 3. Events
-        if (widgetConfig.noShowFeeEvents && selectedEvent) return true;
-        
-        return false;
-    };
+    const stripeRequired = shouldRequireStripe(widgetConfig, pax, !!selectedEvent);
 
-    const isStep3Skipped = widgetConfig?.skipGuaranteeStep && !shouldRequireStripe();
-    
-    const baseSteps = [
-        { id: 1, label: 'Encontrar' },
-        { id: 2, label: 'Información' },
-        { id: 3, label: 'Garantía' },
-        { id: 4, label: 'Confirmación' }
-    ];
+    const isStep3Skipped = widgetConfig?.skipGuaranteeStep && !stripeRequired;
 
-    const displaySteps = isStep3Skipped ? baseSteps.filter(s => s.id !== 3) : baseSteps;
+    const displaySteps = isStep3Skipped ? BASE_STEPS.filter(s => s.id !== 3) : BASE_STEPS;
 
     const handleBack = () => {
         if (currentStep === 5) {
@@ -210,33 +139,30 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
         }
     }, [widgetConfig?.customCss]);
 
-    const [restaurantShifts, setRestaurantShifts] = useState<any[]>([]);
-    
+    const [restaurantShifts, setRestaurantShifts] = useState<{ daysOfWeek: string }[]>([]);
+
     // Load restaurant info and closures
     useEffect(() => {
         if (!restaurantId) return;
         fetchAPI(`/restaurant/${restaurantId}`)
-            .then(data => { 
-                if (data?.name) setRestaurantName(data.name); 
+            .then(data => {
+                if (data?.name) setRestaurantName(data.name);
                 if (data?.shifts) setRestaurantShifts(data.shifts);
             })
-            .catch(() => {});
+            .catch(err => logWidgetError('load restaurant info', err));
         fetchAPI(`/restaurant/${restaurantId}/closures`)
             .then(data => {
-                if (Array.isArray(data)) {
-                    setClosures(data);
-                }
+                if (Array.isArray(data)) setClosures(data);
             })
-            .catch(() => {});
-        
-        // Load events for this restaurant
+            .catch(err => logWidgetError('load closures', err));
+
         fetchAPI(`/event?restaurantId=${restaurantId}`)
             .then(data => {
                 if (Array.isArray(data)) {
-                    setEventDates(data.map((e: any) => format(new Date(e.date), 'yyyy-MM-dd')));
+                    setEventDates(data.map((e: { date: string }) => format(new Date(e.date), 'yyyy-MM-dd')));
                 }
             })
-            .catch(() => {});
+            .catch(err => logWidgetError('load events', err));
     }, [restaurantId]);
 
     // Refresh slots when pax changes
@@ -246,33 +172,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
         }
     }, [pax]);
 
-    const getDayStatus = (date: Date) => {
-        const dateStr = format(date, 'yyyy-MM-dd');
-        const dayOfWeek = date.getDay(); // 0=Sun, 1=Mon, etc.
-
-        // 1. Check if it's a past date
-        if (isBefore(date, startOfDay(new Date()))) return 'closed';
-        
-        // 2. Check closures
-        const isClosed = closures.some(c => {
-            const startStr = format(new Date(c.date), 'yyyy-MM-dd');
-            const endStr = c.endDate ? format(new Date(c.endDate), 'yyyy-MM-dd') : startStr;
-            return dateStr >= startStr && dateStr <= endStr;
-        });
-        if (isClosed) return 'closed';
-
-        // 3. Check if any shift is active for this day of week
-        const hasShift = restaurantShifts.some(s => {
-            const days = s.daysOfWeek.split(',').map((d: string) => d.trim());
-            return days.includes(dayOfWeek.toString());
-        });
-        if (!hasShift) return 'closed';
-
-        // 4. Check for events
-        if (eventDates.includes(dateStr)) return 'event';
-
-        return 'available';
-    };
+    const getDayStatus = (date: Date) => computeDayStatus(date, closures, restaurantShifts, eventDates);
 
     const handleDateSelect = async (date: Date) => {
         const status = getDayStatus(date);
@@ -379,7 +279,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
 
 
     const handleMainSubmit = () => {
-        if (shouldRequireStripe()) {
+        if (stripeRequired) {
             document.getElementById('stripe-submit-btn')?.click();
         } else {
             handleSubmitReservation();
@@ -744,10 +644,10 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: any }) {
 
                                 {/* Stripe Form */}
                                 <div className="mt-6">
-                                    {shouldRequireStripe() ? (
-                                        <CardForm 
-                                            onSuccess={(pmId) => handleSubmitReservation(pmId)} 
-                                            submitting={submitting} 
+                                    {stripeRequired ? (
+                                        <WidgetCardForm
+                                            onSuccess={(pmId) => handleSubmitReservation(pmId)}
+                                            submitting={submitting}
                                             colors={colors}
                                             amount={widgetConfig?.noShowFeeAmount || 20}
                                         />
