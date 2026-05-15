@@ -1,12 +1,13 @@
-import NextAuth from 'next-auth';
+import NextAuth, { type User } from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { authConfig } from './auth.config';
 
-const BOOTSTRAP_EMAIL = process.env.BOOTSTRAP_ADMIN_EMAIL?.trim().toLowerCase() || 'gerencia@sotodelprior.com';
-const BOOTSTRAP_PASSWORD = process.env.BOOTSTRAP_ADMIN_PASSWORD || '123456';
+const BOOTSTRAP_EMAIL = process.env.BOOTSTRAP_ADMIN_EMAIL?.trim().toLowerCase();
+const BOOTSTRAP_PASSWORD = process.env.BOOTSTRAP_ADMIN_PASSWORD;
+const BOOTSTRAP_ENABLED = Boolean(BOOTSTRAP_EMAIL && BOOTSTRAP_PASSWORD && BOOTSTRAP_PASSWORD.length >= 8);
 
 export const { auth, signIn, signOut, handlers } = NextAuth({
     ...authConfig,
@@ -35,20 +36,22 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
                             name: user.name,
                             email: user.email,
                             role: user.role,
-                        } as any;
+                        } satisfies User;
                     }
 
-                    // Bootstrap super-admin: only valid while there are zero users in DB.
-                    // As soon as the installer creates the first admin, this path becomes unreachable.
-                    const userCount = await prisma.user.count();
-                    if (userCount === 0 && email === BOOTSTRAP_EMAIL && password === BOOTSTRAP_PASSWORD) {
-                        console.warn('[AUTH] Using bootstrap admin login. Finish the installer to create a real admin.');
-                        return {
-                            id: 'bootstrap-admin',
-                            name: 'Bootstrap Admin',
-                            email: BOOTSTRAP_EMAIL,
-                            role: 'ADMIN',
-                        } as any;
+                    // Bootstrap super-admin: only valid while there are zero users in DB AND
+                    // BOOTSTRAP_ADMIN_EMAIL + BOOTSTRAP_ADMIN_PASSWORD are explicitly set in env.
+                    if (BOOTSTRAP_ENABLED) {
+                        const userCount = await prisma.user.count();
+                        if (userCount === 0 && email === BOOTSTRAP_EMAIL && password === BOOTSTRAP_PASSWORD) {
+                            console.warn('[AUTH] Using bootstrap admin login. Finish the installer to create a real admin.');
+                            return {
+                                id: 'bootstrap-admin',
+                                name: 'Bootstrap Admin',
+                                email: BOOTSTRAP_EMAIL!,
+                                role: 'ADMIN',
+                            } satisfies User;
+                        }
                     }
 
                     return null;

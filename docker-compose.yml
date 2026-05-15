@@ -17,7 +17,7 @@ services:
     environment:
       POSTGRES_DB: ${DB_NAME:-reservas}
       POSTGRES_USER: ${DB_USER:-reservas_user}
-      POSTGRES_PASSWORD: ${DB_PASS:-reservas_pass}
+      POSTGRES_PASSWORD: ${DB_PASS:?DB_PASS is required}
     volumes:
       - reservas_db_data:/var/lib/postgresql/data
     networks:
@@ -38,7 +38,8 @@ services:
     container_name: sotoreservas-engine
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://${DB_USER:-reservas_user}:${DB_PASS:-reservas_pass}@sotoreservas-db:5432/${DB_NAME:-reservas}
+      DATABASE_URL: postgresql://${DB_USER:-reservas_user}:${DB_PASS:?DB_PASS is required}@sotoreservas-db:5432/${DB_NAME:-reservas}
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required}"
       PORT: 3000
     networks:
       - reservas-internal-net
@@ -56,8 +57,9 @@ services:
     container_name: sotoreservas-api
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://${DB_USER:-reservas_user}:${DB_PASS:-reservas_pass}@sotoreservas-db:5432/${DB_NAME:-reservas}
+      DATABASE_URL: postgresql://${DB_USER:-reservas_user}:${DB_PASS:?DB_PASS is required}@sotoreservas-db:5432/${DB_NAME:-reservas}
       ENGINE_URL: http://sotoreservas-engine:3000
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required}"
       PORT: 3000
       CORS_ORIGIN: "https://reservas.sotodelprior.com,https://www.reservas.sotodelprior.com"
     networks:
@@ -99,8 +101,9 @@ services:
       NEXTAUTH_URL_INTERNAL: "http://localhost:3000"
       NEXTAUTH_SKIP_ENV_VALIDATION: "true"
       NODE_ENV: "production"
-      AUTH_SECRET: "${AUTH_SECRET:-supersecretkeyreservas123}"
-      DATABASE_URL: postgresql://${DB_USER:-reservas_user}:${DB_PASS:-reservas_pass}@sotoreservas-db:5432/${DB_NAME:-reservas}
+      AUTH_SECRET: "${AUTH_SECRET:?AUTH_SECRET is required}"
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required}"
+      DATABASE_URL: postgresql://${DB_USER:-reservas_user}:${DB_PASS:?DB_PASS is required}@sotoreservas-db:5432/${DB_NAME:-reservas}
     networks:
       - proxy-net
       - reservas-internal-net
