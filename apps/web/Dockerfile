@@ -48,9 +48,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 # Need schema for runtime generation
-COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma 
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 
-# USER nextjs
+USER nextjs
 
 EXPOSE 3000
 

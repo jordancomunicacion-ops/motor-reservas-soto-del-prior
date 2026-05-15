@@ -17,6 +17,11 @@ RUN npx prisma generate --schema=./prisma/schema.prisma
 # Build
 RUN npm run build
 
+# Usuario no-root
+RUN addgroup -S -g 1001 nodejs && adduser -S -u 1001 -G nodejs nestjs \
+    && chown -R nestjs:nodejs /app
+USER nestjs
+
 EXPOSE 3000
 
 # Start
