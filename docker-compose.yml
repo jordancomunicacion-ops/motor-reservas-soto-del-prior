@@ -31,6 +31,7 @@ services:
       retries: 5
 
   sotoreservas-engine:
+    image: sotoreservas-api:latest
     build:
       context: ./apps/motor-reservas
       dockerfile: Dockerfile
@@ -48,6 +49,7 @@ services:
       - "3000"
 
   sotoreservas-api:
+    image: sotoreservas-api:latest
     build:
       context: ./apps/motor-reservas
       dockerfile: Dockerfile

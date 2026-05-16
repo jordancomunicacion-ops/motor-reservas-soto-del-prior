@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ShiftType } from '../../common/enums';
+import { getUserScope, assertHotelAccess, ensureHotelAccess } from '../../common/scope';
 
 @Injectable()
 export class PropertyService {
@@ -34,12 +35,20 @@ export class PropertyService {
         return { ...entity, mailConfig: sanitized };
     }
 
-    async getHotels() {
-        const hotels = await this.prisma.hotel.findMany({ include: { restaurant: true } });
+    async getHotels(user?: any) {
+        const scope = await getUserScope(user, this.prisma);
+        const hotels = await this.prisma.hotel.findMany({
+            where: scope.hotelIds === null ? {} : { id: { in: scope.hotelIds } },
+            include: { restaurant: true }
+        });
         return hotels.map(h => this.sanitizeMailConfig(h));
     }
 
-    async getHotel(id: string) {
+    async getHotel(id: string, user?: any) {
+        if (user) {
+            const scope = await getUserScope(user, this.prisma);
+            assertHotelAccess(scope, id);
+        }
         const hotel = await this.prisma.hotel.findUnique({
             where: { id },
             include: {
@@ -50,7 +59,18 @@ export class PropertyService {
         return this.sanitizeMailConfig(hotel);
     }
 
-    async updateHotel(id: string, data: any) {
+    /** Resuelve el hotelId al que pertenece un RoomType. */
+    private async hotelIdForRoomType(roomTypeId: string): Promise<string> {
+        const rt = await this.prisma.roomType.findUnique({
+            where: { id: roomTypeId },
+            select: { hotelId: true }
+        });
+        if (!rt) throw new NotFoundException('Tipo de habitación no encontrado');
+        return rt.hotelId;
+    }
+
+    async updateHotel(id: string, data: any, user?: any) {
+        if (user) await ensureHotelAccess(user, this.prisma, id);
         const { restaurantId: rawRestaurantId, ...rest } = data;
         const restaurantId = (rawRestaurantId === 'none' || rawRestaurantId === '') ? null : rawRestaurantId;
 
@@ -145,7 +165,8 @@ export class PropertyService {
         });
     }
 
-    async deleteHotel(id: string) {
+    async deleteHotel(id: string, user?: any) {
+        if (user) await ensureHotelAccess(user, this.prisma, id);
         return this.prisma.$transaction(async (tx) => {
             // 1. Clean up bookings and related
             await tx.booking.deleteMany({ where: { hotelId: id } });
@@ -172,9 +193,10 @@ export class PropertyService {
     }
 
     // ROOM TYPES
-    async createRoomType(hotelId: string, data: any) {
+    async createRoomType(hotelId: string, data: any, user?: any) {
+        if (user) await ensureHotelAccess(user, this.prisma, hotelId);
         const { quantity = 1, id, ...rest } = data;
-        
+
         return this.prisma.$transaction(async (tx) => {
             const roomType = await tx.roomType.create({
                 data: {
@@ -199,7 +221,8 @@ export class PropertyService {
         });
     }
 
-    async updateRoomType(id: string, data: any) {
+    async updateRoomType(id: string, data: any, user?: any) {
+        if (user) await ensureHotelAccess(user, this.prisma, await this.hotelIdForRoomType(id));
         const { quantity, id: _, ...rest } = data;
         
         return this.prisma.$transaction(async (tx) => {
@@ -220,13 +243,15 @@ export class PropertyService {
         });
     }
 
-    async deleteRoomType(id: string) {
+    async deleteRoomType(id: string, user?: any) {
+        if (user) await ensureHotelAccess(user, this.prisma, await this.hotelIdForRoomType(id));
         return this.prisma.roomType.delete({
             where: { id },
         });
     }
 
-    async getRoomTypes(hotelId: string) {
+    async getRoomTypes(hotelId: string, user?: any) {
+        if (user) await ensureHotelAccess(user, this.prisma, hotelId);
         return this.prisma.roomType.findMany({
             where: { hotelId },
             include: { rooms: true },
@@ -234,7 +259,8 @@ export class PropertyService {
     }
 
     // ROOMS (UNITS)
-    async createRoom(roomTypeId: string, name: string) {
+    async createRoom(roomTypeId: string, name: string, user?: any) {
+        if (user) await ensureHotelAccess(user, this.prisma, await this.hotelIdForRoomType(roomTypeId));
         return this.prisma.room.create({
             data: {
                 roomTypeId,
@@ -243,7 +269,8 @@ export class PropertyService {
         });
     }
 
-    async getHotelZones(hotelId: string) {
+    async getHotelZones(hotelId: string, user?: any) {
+        if (user) await ensureHotelAccess(user, this.prisma, hotelId);
         const hotel: any = await this.prisma.hotel.findUnique({
             where: { id: hotelId },
             include: { zones: true, restaurant: { include: { zones: true } } }

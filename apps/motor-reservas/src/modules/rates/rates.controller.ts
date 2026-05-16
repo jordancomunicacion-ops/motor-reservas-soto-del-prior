@@ -1,8 +1,9 @@
-import { Controller, Get, Post, Body, Param, Query, HttpCode, Patch, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, HttpCode, Patch, Delete, Req, NotFoundException } from '@nestjs/common';
 import { RatesService } from './rates.service';
 import { AvailabilityService } from './availability.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Roles } from '../../auth/roles.decorator';
+import { ensureHotelAccess } from '../../common/scope';
 
 @Controller('rates')
 export class RatesController {
@@ -12,9 +13,21 @@ export class RatesController {
         private readonly prisma: PrismaService
     ) { }
 
+    /** Resuelve el hotelId al que pertenece un RatePlan (para checks de ownership). */
+    private async hotelIdForRatePlan(ratePlanId: string): Promise<string> {
+        const plan = await this.prisma.ratePlan.findUnique({
+            where: { id: ratePlanId },
+            select: { hotelId: true }
+        });
+        if (!plan) throw new NotFoundException('Tarifa no encontrada');
+        return plan.hotelId;
+    }
+
     @Roles('ADMIN')
     @Get('plans/:hotelId')
-    async getRatePlans(@Param('hotelId') hotelId: string) {
+    async getRatePlans(@Param('hotelId') hotelId: string, @Req() req: any) {
+        await ensureHotelAccess(req?.user, this.prisma, hotelId);
+
         const plans = await this.prisma.ratePlan.findMany({
             where: { hotelId }
         });
@@ -36,13 +49,17 @@ export class RatesController {
 
     @Roles('ADMIN')
     @Post('plans')
-    async createRatePlan(@Body() body: any) {
+    async createRatePlan(@Body() body: any, @Req() req: any) {
+        if (body?.hotelId) {
+            await ensureHotelAccess(req?.user, this.prisma, body.hotelId);
+        }
         return this.prisma.ratePlan.create({ data: body });
     }
 
     @Roles('ADMIN')
     @Patch('plans/:id')
-    async updateRatePlan(@Param('id') id: string, @Body() body: any) {
+    async updateRatePlan(@Param('id') id: string, @Body() body: any, @Req() req: any) {
+        await ensureHotelAccess(req?.user, this.prisma, await this.hotelIdForRatePlan(id));
         const { id: _, ...data } = body;
         return this.prisma.ratePlan.update({
             where: { id },
@@ -52,7 +69,8 @@ export class RatesController {
 
     @Roles('ADMIN')
     @Delete('plans/:id')
-    async deleteRatePlan(@Param('id') id: string) {
+    async deleteRatePlan(@Param('id') id: string, @Req() req: any) {
+        await ensureHotelAccess(req?.user, this.prisma, await this.hotelIdForRatePlan(id));
         return this.prisma.ratePlan.delete({
             where: { id }
         });
@@ -62,7 +80,7 @@ export class RatesController {
     @Roles('ADMIN')
     @Post('prices/bulk')
     @HttpCode(200)
-    async updatePrices(@Body() body: {
+    async updatePrices(@Req() req: any, @Body() body: {
         hotelId: string;
         ratePlanId: string;
         roomTypeId: string;
@@ -71,6 +89,7 @@ export class RatesController {
         price: number;
         daysOfWeek?: number[]; // [0, 6] for Sun, Sat
     }) {
+        await ensureHotelAccess(req?.user, this.prisma, body.hotelId);
         const start = new Date(body.fromDate);
         const end = new Date(body.toDate);
         let count = 0;

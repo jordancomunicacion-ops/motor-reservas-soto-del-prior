@@ -4,6 +4,7 @@ import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma/prisma.service';
 import * as ical from 'node-ical';
 import { BookingStatus, BookingSource } from '../../common/constants';
+import { getUserScope } from '../../common/scope';
 
 @Injectable()
 export class ChannelManagerService {
@@ -21,8 +22,15 @@ export class ChannelManagerService {
 
     // --- LEVEL 1: iCal Sync ---
 
-    async getFeeds() {
-        return this.prisma.iCalFeed.findMany({ include: { roomType: true } });
+    async getFeeds(user?: any) {
+        const scope = await getUserScope(user, this.prisma);
+        // Los iCalFeed cuelgan de RoomType, que a su vez pertenece a un Hotel.
+        // Si el usuario está atado a un hotel, solo se muestran los feeds de habitaciones de ese hotel.
+        // Usuarios atados solo a restaurante no manejan habitaciones → no ven feeds.
+        const where = scope.hotelIds === null
+            ? {}
+            : { roomType: { hotelId: { in: scope.hotelIds } } };
+        return this.prisma.iCalFeed.findMany({ where, include: { roomType: true } });
     }
 
     async createFeed(data: { roomTypeId: string; url: string; name: string; source: string }) {
