@@ -6,7 +6,7 @@ import { CrmIntegrationService } from '../crm/crm-integration.service';
 import { MailService } from '../mail/mail.service';
 import { ResBookingOrigin, ResBookingStatus } from '../../common/enums';
 import { $Enums } from '@prisma/client';
-import { getUserScope, assertRestaurantAccess, ensureRestaurantAccess, ensureHotelAccess } from '../../common/scope';
+import { getUserScope, assertRestaurantAccess, ensureRestaurantAccess, ensureHotelAccess, type AuthenticatedUser } from '../../common/scope';
 import { RestaurantAvailabilityService } from './restaurant-availability.service';
 import { RestaurantAccessService } from './restaurant-access.service';
 
@@ -40,7 +40,7 @@ export class RestaurantService {
      * Verifica que el usuario tenga acceso a la Zone indicada.
      * Una Zone puede colgar de un restaurante o de un hotel; comprobamos contra el que aplique.
      */
-    private async ensureZoneAccess(user: any, zoneId: string): Promise<void> {
+    private async ensureZoneAccess(user: AuthenticatedUser, zoneId: string): Promise<void> {
         const zone = await this.prisma.zone.findUnique({
             where: { id: zoneId },
             select: { restaurantId: true, hotelId: true }
@@ -113,7 +113,7 @@ export class RestaurantService {
         return { ...restaurant, mailConfig: sanitized };
     }
 
-    async getRestaurants(user?: any) {
+    async getRestaurants(user?: AuthenticatedUser) {
         const scope = await getUserScope(user, this.prisma);
         const restaurants = await this.prisma.restaurant.findMany({
             where: scope.restaurantIds === null ? {} : { id: { in: scope.restaurantIds } },
@@ -122,7 +122,7 @@ export class RestaurantService {
         return restaurants.map(r => this.sanitizeMailConfig(r));
     }
 
-    async getRestaurant(id: string, user?: any) {
+    async getRestaurant(id: string, user?: AuthenticatedUser) {
         if (user) {
             const scope = await getUserScope(user, this.prisma);
             assertRestaurantAccess(scope, id);
@@ -135,7 +135,7 @@ export class RestaurantService {
     }
 
 
-    async updateRestaurant(id: string, data: any, user?: any) {
+    async updateRestaurant(id: string, data: any, user?: AuthenticatedUser) {
         if (user) await ensureRestaurantAccess(user, this.prisma, id);
         const { hotelId, ...rest } = data;
 
@@ -195,7 +195,7 @@ export class RestaurantService {
     }
 
 
-    async deleteRestaurant(id: string, user?: any) {
+    async deleteRestaurant(id: string, user?: AuthenticatedUser) {
         if (user) await ensureRestaurantAccess(user, this.prisma, id);
         return this.prisma.$transaction(async (tx) => {
             // 1. Clear any hotel links to this restaurant to avoid FK errors
@@ -236,7 +236,7 @@ export class RestaurantService {
     }
 
     // --- Visual Plan & Zones ---
-    async syncZones(restaurantId: string, zones: any[], user?: any) {
+    async syncZones(restaurantId: string, zones: any[], user?: AuthenticatedUser) {
         if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
         for (const z of zones) {
             if (z.id && z.id.length > 10) {
@@ -248,7 +248,7 @@ export class RestaurantService {
         return this.getTables(restaurantId);
     }
 
-    async createZone(restaurantId: string, name: string, user?: any) {
+    async createZone(restaurantId: string, name: string, user?: AuthenticatedUser) {
         if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
         return this.prisma.zone.create({
             data: { restaurantId, name }
@@ -256,7 +256,7 @@ export class RestaurantService {
     }
 
     // --- Tables ---
-    async syncTables(zoneId: string, tables: any[], user?: any) {
+    async syncTables(zoneId: string, tables: any[], user?: AuthenticatedUser) {
         if (user) await this.ensureZoneAccess(user, zoneId);
         return this.prisma.$transaction(async (tx) => {
             const results: any[] = [];
@@ -321,7 +321,7 @@ export class RestaurantService {
         });
     }
 
-    async createTable(zoneId: string, name: string, capacity: number, user?: any) {
+    async createTable(zoneId: string, name: string, capacity: number, user?: AuthenticatedUser) {
         if (user) await this.ensureZoneAccess(user, zoneId);
         return this.prisma.table.create({
             data: { zoneId, name, capacity }
@@ -425,7 +425,7 @@ export class RestaurantService {
         return statsMap;
     }
 
-    async getTables(restaurantId: string, dateStr?: string, user?: any) {
+    async getTables(restaurantId: string, dateStr?: string, user?: AuthenticatedUser) {
         if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
         let start: Date;
         let end: Date;
@@ -495,7 +495,7 @@ export class RestaurantService {
     }
 
     // --- Bookings ---
-    async updateBooking(id: string, data: any, user?: any) {
+    async updateBooking(id: string, data: any, user?: AuthenticatedUser) {
         if (user) await ensureRestaurantAccess(user, this.prisma, await this.restaurantIdForBooking(id));
         return this.prisma.resBooking.update({
             where: { id },
@@ -504,7 +504,7 @@ export class RestaurantService {
         });
     }
 
-    async createBooking(data: any, user?: any) {
+    async createBooking(data: any, user?: AuthenticatedUser) {
         if (user && data?.restaurantId) await ensureRestaurantAccess(user, this.prisma, data.restaurantId);
         // Basic impl, can be expanded for validation
         const { name, ...rest } = data;
@@ -547,7 +547,7 @@ export class RestaurantService {
         return this.availability.findAvailableTable(restaurantId, date, pax, duration);
     }
 
-    async updateBookingStatus(bookingId: string, status: string, tableId?: string, user?: any) {
+    async updateBookingStatus(bookingId: string, status: string, tableId?: string, user?: AuthenticatedUser) {
         if (user) await ensureRestaurantAccess(user, this.prisma, await this.restaurantIdForBooking(bookingId));
         const updateData: any = { status };
         if (tableId) updateData.tableId = tableId;
@@ -612,7 +612,7 @@ export class RestaurantService {
     }
 
 
-    async getBookings(restaurantId: string, dateStr?: string, startDateStr?: string, endDateStr?: string, user?: any) {
+    async getBookings(restaurantId: string, dateStr?: string, startDateStr?: string, endDateStr?: string, user?: AuthenticatedUser) {
         if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
         let start: Date;
         let end: Date;
@@ -661,7 +661,7 @@ export class RestaurantService {
     }
 
     // --- Waitlist ---
-    async addToWaitlist(restaurantId: string, data: any, user?: any) {
+    async addToWaitlist(restaurantId: string, data: any, user?: AuthenticatedUser) {
         if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
         return this.prisma.restaurantWaitlist.create({
             data: {
@@ -676,7 +676,7 @@ export class RestaurantService {
         });
     }
 
-    async getWaitlist(restaurantId: string, user?: any) {
+    async getWaitlist(restaurantId: string, user?: AuthenticatedUser) {
         if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
         return this.prisma.restaurantWaitlist.findMany({
             where: { restaurantId, status: { in: ['WAITING', 'NOTIFIED'] } },
@@ -685,14 +685,14 @@ export class RestaurantService {
     }
 
     // --- Shifts & Slots (Synergy) ---
-    async getShifts(restaurantId: string, user?: any) {
+    async getShifts(restaurantId: string, user?: AuthenticatedUser) {
         if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
         return this.prisma.shift.findMany({
             where: { restaurantId, isActive: true }
         });
     }
 
-    async createShift(restaurantId: string, data: any, user?: any) {
+    async createShift(restaurantId: string, data: any, user?: AuthenticatedUser) {
         if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
         try {
             return await this.prisma.shift.create({
@@ -717,7 +717,7 @@ export class RestaurantService {
         pax: number;
         name: string;
         email: string;
-    }, user?: any) {
+    }, user?: AuthenticatedUser) {
         if (user) await ensureRestaurantAccess(user, this.prisma, data.restaurantId);
         const [hours, minutes] = data.time.split(':').map(Number);
         const start = new Date(data.date);
@@ -832,14 +832,14 @@ export class RestaurantService {
 
     }
 
-    async deleteShift(id: string, user?: any) {
+    async deleteShift(id: string, user?: AuthenticatedUser) {
         if (user) await ensureRestaurantAccess(user, this.prisma, await this.restaurantIdForShift(id));
         return this.prisma.shift.delete({
             where: { id }
         });
     }
 
-    async getClosures(restaurantId: string, user?: any) {
+    async getClosures(restaurantId: string, user?: AuthenticatedUser) {
         if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
         return this.prisma.restaurantClosure.findMany({
             where: { restaurantId },
@@ -847,7 +847,7 @@ export class RestaurantService {
         });
     }
 
-    async createClosure(restaurantId: string, data: { date: string, endDate?: string, reason?: string }, user?: any) {
+    async createClosure(restaurantId: string, data: { date: string, endDate?: string, reason?: string }, user?: AuthenticatedUser) {
         if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
         return this.prisma.restaurantClosure.create({
             data: {
@@ -859,7 +859,7 @@ export class RestaurantService {
         });
     }
 
-    async deleteClosure(id: string, user?: any) {
+    async deleteClosure(id: string, user?: AuthenticatedUser) {
         if (user) await ensureRestaurantAccess(user, this.prisma, await this.restaurantIdForClosure(id));
         return this.prisma.restaurantClosure.delete({
             where: { id }
@@ -868,31 +868,31 @@ export class RestaurantService {
 
     // --- Access (delegated to RestaurantAccessService) ---
 
-    getAuthorizedUsers(restaurantId: string, user?: any) {
+    getAuthorizedUsers(restaurantId: string, user?: AuthenticatedUser) {
         return this.access.getAuthorizedUsers(restaurantId, user);
     }
 
-    authorizeUser(restaurantId: string, data: { email: string; password?: string; role?: string; permissions?: string[] }, user?: any) {
+    authorizeUser(restaurantId: string, data: { email: string; password?: string; role?: string; permissions?: string[] }, user?: AuthenticatedUser) {
         return this.access.authorizeUser(restaurantId, data, user);
     }
 
-    deauthorizeUser(restaurantId: string, userId: string, user?: any) {
+    deauthorizeUser(restaurantId: string, userId: string, user?: AuthenticatedUser) {
         return this.access.deauthorizeUser(restaurantId, userId, user);
     }
 
-    getAccessProfiles(restaurantId: string, user?: any) {
+    getAccessProfiles(restaurantId: string, user?: AuthenticatedUser) {
         return this.access.getAccessProfiles(restaurantId, user);
     }
 
-    createAccessProfile(restaurantId: string, data: { name: string; baseRole?: string; permissions: string[] }, user?: any) {
+    createAccessProfile(restaurantId: string, data: { name: string; baseRole?: string; permissions: string[] }, user?: AuthenticatedUser) {
         return this.access.createAccessProfile(restaurantId, data, user);
     }
 
-    updateAccessProfile(profileId: string, data: { name?: string; baseRole?: string; permissions?: string[] }, user?: any) {
+    updateAccessProfile(profileId: string, data: { name?: string; baseRole?: string; permissions?: string[] }, user?: AuthenticatedUser) {
         return this.access.updateAccessProfile(profileId, data, user);
     }
 
-    deleteAccessProfile(profileId: string, user?: any) {
+    deleteAccessProfile(profileId: string, user?: AuthenticatedUser) {
         return this.access.deleteAccessProfile(profileId, user);
     }
 

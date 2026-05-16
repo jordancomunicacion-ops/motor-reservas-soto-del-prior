@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UserRole } from '../../common/enums';
-import { ensureRestaurantAccess } from '../../common/scope';
+import { ensureRestaurantAccess, type AuthenticatedUser } from '../../common/scope';
 
 interface AuthorizedUserPayload {
     email: string;
@@ -27,7 +27,7 @@ interface AccessProfileUpdatePayload {
 export class RestaurantAccessService {
     constructor(private readonly prisma: PrismaService) {}
 
-    async getAuthorizedUsers(restaurantId: string, user?: unknown) {
+    async getAuthorizedUsers(restaurantId: string, user?: AuthenticatedUser) {
         if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
         return this.prisma.user.findMany({
             where: { restaurantId },
@@ -35,7 +35,7 @@ export class RestaurantAccessService {
         });
     }
 
-    async authorizeUser(restaurantId: string, data: AuthorizedUserPayload, user?: unknown) {
+    async authorizeUser(restaurantId: string, data: AuthorizedUserPayload, user?: AuthenticatedUser) {
         if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
         const email = data.email?.trim().toLowerCase();
         if (!email) throw new BadRequestException('Email obligatorio');
@@ -73,7 +73,7 @@ export class RestaurantAccessService {
         });
     }
 
-    async deauthorizeUser(restaurantId: string, userId: string, user?: unknown) {
+    async deauthorizeUser(restaurantId: string, userId: string, user?: AuthenticatedUser) {
         if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
         return this.prisma.user.update({
             where: { id: userId },
@@ -81,7 +81,7 @@ export class RestaurantAccessService {
         });
     }
 
-    async getAccessProfiles(restaurantId: string, user?: unknown) {
+    async getAccessProfiles(restaurantId: string, user?: AuthenticatedUser) {
         if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
         return this.prisma.accessProfile.findMany({
             where: { restaurantId },
@@ -89,7 +89,7 @@ export class RestaurantAccessService {
         });
     }
 
-    async createAccessProfile(restaurantId: string, data: AccessProfilePayload, user?: unknown) {
+    async createAccessProfile(restaurantId: string, data: AccessProfilePayload, user?: AuthenticatedUser) {
         if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
         const name = data.name?.trim();
         if (!name) throw new BadRequestException('Nombre del perfil obligatorio');
@@ -103,7 +103,7 @@ export class RestaurantAccessService {
         });
     }
 
-    async updateAccessProfile(profileId: string, data: AccessProfileUpdatePayload, user?: unknown) {
+    async updateAccessProfile(profileId: string, data: AccessProfileUpdatePayload, user?: AuthenticatedUser) {
         if (user) {
             const restaurantId = await this.restaurantIdForProfile(profileId);
             await ensureRestaurantAccess(user, this.prisma, restaurantId);
@@ -115,7 +115,7 @@ export class RestaurantAccessService {
         return this.prisma.accessProfile.update({ where: { id: profileId }, data: update });
     }
 
-    async deleteAccessProfile(profileId: string, user?: unknown) {
+    async deleteAccessProfile(profileId: string, user?: AuthenticatedUser) {
         if (user) {
             const restaurantId = await this.restaurantIdForProfile(profileId);
             await ensureRestaurantAccess(user, this.prisma, restaurantId);

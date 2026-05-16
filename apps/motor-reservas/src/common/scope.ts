@@ -10,6 +10,20 @@ export interface UserScope {
     isGlobalAdmin: boolean;
 }
 
+/** Forma mínima de `req.user` que JwtStrategy.validate inyecta. */
+export interface AuthenticatedUser {
+    id: string;
+    email: string;
+    role: string;
+    hotelId: string | null;
+    restaurantId: string | null;
+}
+
+/** Request con `user` ya poblado por el JwtAuthGuard. */
+export interface AuthenticatedRequest {
+    user?: AuthenticatedUser;
+}
+
 /**
  * Calcula el alcance multi-tenant del usuario autenticado a partir de `req.user`
  * (que ya viene poblado por JwtStrategy.validate con hotelId/restaurantId).
@@ -22,7 +36,7 @@ export interface UserScope {
  * Hace una consulta a Hotel solo si el usuario está atado a un hotel, para resolver
  * el restaurante de sinergia.
  */
-export async function getUserScope(user: any, prisma: PrismaService): Promise<UserScope> {
+export async function getUserScope(user: AuthenticatedUser | null | undefined, prisma: PrismaService): Promise<UserScope> {
     const hotelId: string | null = user?.hotelId ?? null;
     const restaurantId: string | null = user?.restaurantId ?? null;
 
@@ -71,13 +85,13 @@ export function assertRestaurantAccess(scope: UserScope, restaurantId: string): 
 }
 
 /** Calcula el scope y verifica acceso a un hotel en una sola llamada. */
-export async function ensureHotelAccess(user: any, prisma: PrismaService, hotelId: string): Promise<void> {
+export async function ensureHotelAccess(user: AuthenticatedUser | null | undefined, prisma: PrismaService, hotelId: string): Promise<void> {
     const scope = await getUserScope(user, prisma);
     assertHotelAccess(scope, hotelId);
 }
 
 /** Calcula el scope y verifica acceso a un restaurante en una sola llamada. */
-export async function ensureRestaurantAccess(user: any, prisma: PrismaService, restaurantId: string): Promise<void> {
+export async function ensureRestaurantAccess(user: AuthenticatedUser | null | undefined, prisma: PrismaService, restaurantId: string): Promise<void> {
     const scope = await getUserScope(user, prisma);
     assertRestaurantAccess(scope, restaurantId);
 }

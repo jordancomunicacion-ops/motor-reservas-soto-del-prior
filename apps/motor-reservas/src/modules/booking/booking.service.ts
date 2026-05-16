@@ -60,8 +60,9 @@ export class BookingService {
                 checkOut,
                 1 // units
             );
-        } catch (e: any) {
-            throw new BadRequestException(e.message);
+        } catch (e) {
+            const message = e instanceof Error ? e.message : 'Availability check failed';
+            throw new BadRequestException(message);
         }
 
         // 2. Calculate Price (Server Side Authority)
@@ -167,7 +168,12 @@ export class BookingService {
 
         if (!defaultRatePlan) return []; // No public rates
 
-        const availableTypes: any[] = [];
+        type AvailableRoomType = (typeof roomTypes)[number] & {
+            totalPrice: number;
+            ratePlan: string;
+            breakdown: Awaited<ReturnType<typeof this.ratesService.calculatePrice>>['breakdown'];
+        };
+        const availableTypes: AvailableRoomType[] = [];
 
         for (const type of roomTypes) {
             try {
@@ -179,11 +185,11 @@ export class BookingService {
 
                 availableTypes.push({
                     ...type,
-                    totalPrice: priceInfo.totalPrice,
+                    totalPrice: Number(priceInfo.totalPrice),
                     ratePlan: defaultRatePlan.name,
-                    breakdown: priceInfo.breakdown
+                    breakdown: priceInfo.breakdown,
                 });
-            } catch (e) {
+            } catch {
                 // Not available
                 continue;
             }

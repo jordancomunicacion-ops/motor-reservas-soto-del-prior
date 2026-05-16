@@ -1,7 +1,7 @@
 import { Controller, Get, Req, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Roles } from '../../auth/roles.decorator';
-import { getUserScope } from '../../common/scope';
+import { getUserScope, type AuthenticatedRequest } from '../../common/scope';
 
 @Controller('global')
 export class GlobalController {
@@ -11,7 +11,7 @@ export class GlobalController {
 
     @Roles('ADMIN')
     @Get('contexts')
-    async getContexts(@Req() req: any) {
+    async getContexts(@Req() req: AuthenticatedRequest) {
         // El alcance real del usuario no lo da el role (todos son ADMIN por defecto en el schema),
         // sino hotelId/restaurantId del propio User. Si no tiene ninguno, es super-admin global.
         const scope = await getUserScope(req?.user, this.prisma);
@@ -34,7 +34,7 @@ export class GlobalController {
 
     @Roles('ADMIN')
     @Get('stats')
-    async getStats(@Req() req: any) {
+    async getStats(@Req() req: AuthenticatedRequest) {
         const now = new Date();
         const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
