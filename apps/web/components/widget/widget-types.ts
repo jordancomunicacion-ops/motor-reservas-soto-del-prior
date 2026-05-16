@@ -36,6 +36,10 @@ export type RestaurantEvent = {
     id: string;
     name: string;
     date: string;
+    description: string | null;
+    price: number;
+    capacity: number;
+    _count: { bookings: number };
 };
 
 export type DayStatus = 'closed' | 'event' | 'available';
@@ -46,3 +50,25 @@ export const BASE_STEPS: Step[] = [
     { id: 3, label: 'Garantía' },
     { id: 4, label: 'Confirmación' },
 ];
+
+export interface RestaurantResponse {
+    id: string;
+    name: string;
+    widgetConfig?: WidgetConfig | null;
+    integrations?: {
+        stripe?: { enabled?: boolean; publicKey?: string };
+    } | null;
+    shifts?: Shift[];
+}
+
+export interface SlotsResponse {
+    slots: string[];
+    closed?: boolean;
+    message?: string;
+    event?: RestaurantEvent | null;
+}
+
+export interface CreatedBooking {
+    id?: string;
+    isWaitlist?: boolean;
+}

@@ -10,7 +10,13 @@ if (typeof window !== 'undefined') {
     }
 }
 
-export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
+const isDev = process.env.NODE_ENV !== 'production';
+
+// Default returns `any` to preserve compatibility with hundreds of call sites
+// that rely on implicit `any`. New code should pass an explicit type:
+//   fetchAPI<Restaurant>('/restaurant/x')
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function fetchAPI<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const method = options.method || 'GET';
     try {
         const res = await fetch(`${API_URL}/${endpoint.replace(/^\//, '')}`, {
@@ -22,29 +28,27 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
         });
 
         if (!res.ok) {
-            console.warn(`API Error ${endpoint}: Server returned ${res.status}`);
+            if (isDev) console.warn(`API Error ${endpoint}: Server returned ${res.status}`);
             throw new Error(`Server returned ${res.status}`);
         }
 
-        // Check if there's content to parse
         const contentType = res.headers.get('content-type');
         if (contentType && contentType.includes('application/json')) {
-            return res.json();
+            return res.json() as Promise<T>;
         }
 
-        // Handle empty or non-JSON responses
-        return { success: true };
+        return { success: true } as T;
     } catch (err) {
-        // Only use mock data for GET requests in development. 
-        // Mutations and production environment should fail explicitly.
+        // Only use mock data for GET requests in development. Mutations and
+        // production environment should fail explicitly.
         const isProduction = typeof window !== 'undefined' && window.location.host === 'reservas.sotodelprior.com';
-        
+
         if (method === 'GET' && !isProduction) {
-            console.warn(`Network/API Error ${endpoint}: Returning mock data.`, err);
-            return getMockData(endpoint);
+            if (isDev) console.warn(`Network/API Error ${endpoint}: Returning mock data.`, err);
+            return getMockData(endpoint) as T;
         }
-        
-        console.error(`API Failure on ${endpoint}:`, err);
+
+        if (isDev) console.error(`API Failure on ${endpoint}:`, err);
         throw err;
     }
 }

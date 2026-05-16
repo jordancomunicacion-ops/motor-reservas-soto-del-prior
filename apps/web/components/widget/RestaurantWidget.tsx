@@ -10,7 +10,7 @@ import { fetchAPI } from '@/lib/api';
 import { loadStripe, type Stripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import { WidgetCardForm } from './WidgetCardForm';
-import { BASE_STEPS, type WidgetConfig } from './widget-types';
+import { BASE_STEPS, type WidgetConfig, type RestaurantResponse, type SlotsResponse, type CreatedBooking, type RestaurantEvent, type Closure } from './widget-types';
 import { computeDayStatus, shouldRequireStripe } from './widget-helpers';
 
 const logWidgetError = (context: string, err: unknown) => {
@@ -27,13 +27,14 @@ export function RestaurantWidget() {
 
     useEffect(() => {
         if (!restaurantId) return;
-        fetchAPI(`/restaurant/${restaurantId}`)
+        fetchAPI<RestaurantResponse>(`/restaurant/${restaurantId}`)
             .then(data => {
                 if (data?.widgetConfig) {
                     setWidgetConfig(data.widgetConfig);
                 }
-                if (data?.integrations?.stripe?.enabled && data?.integrations?.stripe?.publicKey) {
-                    setStripePromise(loadStripe(data.integrations.stripe.publicKey));
+                const stripe = data?.integrations?.stripe;
+                if (stripe?.enabled && stripe.publicKey) {
+                    setStripePromise(loadStripe(stripe.publicKey));
                 }
             })
             .catch(err => logWidgetError('load restaurant', err));
@@ -73,16 +74,8 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
     const [loadingSlots, setLoadingSlots] = useState(false);
     const [closures, setClosures] = useState<{ date: string; endDate?: string | null }[]>([]);
     const [restaurantName, setRestaurantName] = useState('');
-    const [createdBooking, setCreatedBooking] = useState<{ id?: string; isWaitlist?: boolean } | null>(null);
-    const [selectedEvent, setSelectedEvent] = useState<{
-        id: string;
-        name: string;
-        description: string | null;
-        date: string;
-        price: number;
-        capacity: number;
-        _count: { bookings: number };
-    } | null>(null);
+    const [createdBooking, setCreatedBooking] = useState<CreatedBooking | null>(null);
+    const [selectedEvent, setSelectedEvent] = useState<RestaurantEvent | null>(null);
     const [eventDates, setEventDates] = useState<string[]>([]);
 
     // CRM Additional Fields (Step 3)
@@ -144,22 +137,22 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
     // Load restaurant info and closures
     useEffect(() => {
         if (!restaurantId) return;
-        fetchAPI(`/restaurant/${restaurantId}`)
+        fetchAPI<RestaurantResponse>(`/restaurant/${restaurantId}`)
             .then(data => {
                 if (data?.name) setRestaurantName(data.name);
                 if (data?.shifts) setRestaurantShifts(data.shifts);
             })
             .catch(err => logWidgetError('load restaurant info', err));
-        fetchAPI(`/restaurant/${restaurantId}/closures`)
+        fetchAPI<Closure[]>(`/restaurant/${restaurantId}/closures`)
             .then(data => {
                 if (Array.isArray(data)) setClosures(data);
             })
             .catch(err => logWidgetError('load closures', err));
 
-        fetchAPI(`/event?restaurantId=${restaurantId}`)
+        fetchAPI<RestaurantEvent[]>(`/event?restaurantId=${restaurantId}`)
             .then(data => {
                 if (Array.isArray(data)) {
-                    setEventDates(data.map((e: { date: string }) => format(new Date(e.date), 'yyyy-MM-dd')));
+                    setEventDates(data.map(e => format(new Date(e.date), 'yyyy-MM-dd')));
                 }
             })
             .catch(err => logWidgetError('load events', err));
@@ -183,8 +176,8 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
 
         try {
             const dateStr = format(date, 'yyyy-MM-dd');
-            const lunchData = await fetchAPI(`/restaurant/${restaurantId}/slots?date=${dateStr}&pax=${pax}&type=LUNCH`);
-            const dinnerData = await fetchAPI(`/restaurant/${restaurantId}/slots?date=${dateStr}&pax=${pax}&type=DINNER`);
+            const lunchData = await fetchAPI<SlotsResponse>(`/restaurant/${restaurantId}/slots?date=${dateStr}&pax=${pax}&type=LUNCH`);
+            const dinnerData = await fetchAPI<SlotsResponse>(`/restaurant/${restaurantId}/slots?date=${dateStr}&pax=${pax}&type=DINNER`);
 
             setTimeSlots({
                 lunch: lunchData?.slots || [],
