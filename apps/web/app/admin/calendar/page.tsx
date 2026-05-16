@@ -4,6 +4,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { format, isSameDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { es as esCalendar } from 'react-day-picker/locale';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { fetchAPI } from '@/lib/api';
@@ -269,7 +270,7 @@ function CalendarReservationsContent() {
                             mode="single"
                             selected={date}
                             onSelect={setDate}
-                            locale={es}
+                            locale={esCalendar}
                             captionLayout="dropdown"
                             fromYear={2020}
                             toYear={2030}

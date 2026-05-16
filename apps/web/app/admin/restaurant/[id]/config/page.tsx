@@ -71,6 +71,7 @@ function RestaurantConfigContent() {
             setFormData({
                 name: data.name || '',
                 currency: data.currency || 'EUR',
+                timezone: data.timezone || 'Europe/Madrid',
                 hotelId: data.hotel?.id || '',
                 defaultDuration: data.defaultDuration || 90,
                 contactEmail: data.contactEmail || '',

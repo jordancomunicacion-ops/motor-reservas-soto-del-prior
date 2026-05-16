@@ -30,7 +30,7 @@ function RestaurantDashboardContent() {
     const [zones, setZones] = useState<any[]>([]);
     const [bookings, setBookings] = useState<any[]>([]);
     const [waitlist, setWaitlist] = useState<any[]>([]);
-    const [rawTables, setRawTables] = useState<any>([]); // Flattened tables
+    const [rawTables, setRawTables] = useState<any[]>([]); // Flattened tables
     const [restaurant, setRestaurant] = useState<any>(null);
 
     // UI State

@@ -346,11 +346,11 @@ function HotelPlanning({
                                         <tr key={room.id} className="group hover:bg-gray-50 dark:hover:bg-zinc-700/50">
                                             <td className="p-3 border-b dark:border-zinc-700 text-sm font-medium sticky left-0 bg-white dark:bg-zinc-800 z-10">{room.name}</td>
                                             {dates.map((date: Date) => {
-                                                const booking = bookings.find(b => 
-                                                    b.bookingRooms.some(br => br.roomId === room.id) &&
-                                                    isWithinInterval(date, { 
-                                                        start: new Date(b.checkInDate), 
-                                                        end: new Date(b.checkOutDate) 
+                                                const booking = (bookings as HotelBooking[]).find((b) =>
+                                                    b.bookingRooms.some((br) => br.roomId === room.id) &&
+                                                    isWithinInterval(date, {
+                                                        start: new Date(b.checkInDate),
+                                                        end: new Date(b.checkOutDate)
                                                     })
                                                 );
                                                 
