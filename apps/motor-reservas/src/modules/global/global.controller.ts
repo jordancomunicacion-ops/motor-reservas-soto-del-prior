@@ -1,10 +1,12 @@
-import { Controller, Get, Req } from '@nestjs/common';
+import { Controller, Get, Req, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Roles } from '../../auth/roles.decorator';
 import { getUserScope } from '../../common/scope';
 
 @Controller('global')
 export class GlobalController {
+    private readonly logger = new Logger(GlobalController.name);
+
     constructor(private prisma: PrismaService) { }
 
     @Roles('ADMIN')
@@ -25,7 +27,7 @@ export class GlobalController {
             })
         ]);
 
-        console.log(`[GlobalController] contexts for ${req?.user?.email ?? '?'} (hotelId=${req?.user?.hotelId ?? null}, restaurantId=${req?.user?.restaurantId ?? null}) -> ${hotels.length} hotels, ${restaurants.length} restaurants`);
+        this.logger.debug(`contexts for ${req?.user?.email ?? '?'} (hotelId=${req?.user?.hotelId ?? null}, restaurantId=${req?.user?.restaurantId ?? null}) -> ${hotels.length} hotels, ${restaurants.length} restaurants`);
 
         return { hotels, restaurants };
     }

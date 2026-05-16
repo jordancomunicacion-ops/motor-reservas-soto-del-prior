@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { BookingStatus, BookingSource } from '../../common/enums';
 import { RatesService } from '../rates/rates.service';
@@ -8,6 +8,8 @@ import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class BookingService {
+    private readonly logger = new Logger(BookingService.name);
+
     constructor(
         private prisma: PrismaService,
         private ratesService: RatesService,
@@ -101,17 +103,17 @@ export class BookingService {
 
         // Sync with CRM
         this.crmIntegrationService.syncHotelBooking(booking.id).catch(err => {
-            console.error(`Error syncing hotel booking ${booking.id} to CRM:`, err);
+            this.logger.error(`Error syncing hotel booking ${booking.id} to CRM`, err);
         });
 
         // NEW: Send Confirmation Email (If guest has email)
         const guestEmail = data.guestEmail;
         if (guestEmail) {
             this.mailService.sendHotelNotification(booking, 'created').catch(err => {
-                console.error(`Error sending confirmation email for hotel booking ${booking.id}:`, err);
+                this.logger.error(`Error sending confirmation email for hotel booking ${booking.id}`, err);
             });
         }
-        
+
         return booking;
 
     }
@@ -133,13 +135,13 @@ export class BookingService {
 
         // Sync with CRM
         this.crmIntegrationService.syncHotelBooking(booking.id, 'CANCELLED').catch(err => {
-            console.error(`Error syncing cancelled hotel booking ${booking.id} to CRM:`, err);
+            this.logger.error(`Error syncing cancelled hotel booking ${booking.id} to CRM`, err);
         });
 
         // NEW: Send Cancellation Email
         if (booking.guestEmail) {
             this.mailService.sendHotelNotification(booking, 'cancelled').catch(err => {
-                console.error(`Error sending cancellation email for hotel booking ${booking.id}:`, err);
+                this.logger.error(`Error sending cancellation email for hotel booking ${booking.id}`, err);
             });
         }
         

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query, Patch, Delete, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, Patch, Delete, Req, Logger } from '@nestjs/common';
 import { RestaurantService } from './restaurant.service';
 import { WaitlistService } from './waitlist.service';
 import { Public } from '../../auth/public.decorator';
@@ -7,6 +7,8 @@ import { CreateRestaurantDto, CreatePublicReservationDto, UpdateBookingStatusDto
 
 @Controller('restaurant')
 export class RestaurantController {
+    private readonly logger = new Logger(RestaurantController.name);
+
     constructor(
         private readonly service: RestaurantService,
         private readonly waitlistService: WaitlistService
@@ -117,9 +119,10 @@ export class RestaurantController {
     async createPublicReservation(@Body() body: CreatePublicReservationDto) {
         try {
             return await this.service.createPublicReservation(body);
-        } catch (error: any) {
-            console.error('Error creating public reservation:', error);
-            return { error: true, message: error.message || 'Unknown error' };
+        } catch (error) {
+            this.logger.error('Error creating public reservation', error as Error);
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            return { error: true, message };
         }
     }
 

@@ -698,9 +698,10 @@ export class RestaurantService {
             return await this.prisma.shift.create({
                 data: { ...data, restaurantId }
             });
-        } catch (error: any) {
-            console.error('Error creating shift:', error);
-            throw new Error(`Error de base de datos: ${error.message || 'Error desconocido'}`);
+        } catch (error) {
+            this.logger.error(`Error creating shift in restaurant ${restaurantId}`, error as Error);
+            const message = error instanceof Error ? error.message : 'Error desconocido';
+            throw new Error(`Error de base de datos: ${message}`);
         }
     }
 
