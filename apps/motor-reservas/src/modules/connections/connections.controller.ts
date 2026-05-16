@@ -1,6 +1,7 @@
 import { Controller, Post, Get, Delete, Body, Param, Query, Req, ForbiddenException } from '@nestjs/common';
 import { ConnectionsService } from './connections.service';
 import { Roles } from '../../auth/roles.decorator';
+import type { AuthenticatedRequest } from '../../common/scope';
 
 @Controller('connections')
 export class ConnectionsController {
@@ -42,7 +43,7 @@ export class ConnectionsController {
     @Roles('ADMIN')
     @Post()
     async saveConnection(
-        @Req() req: any,
+        @Req() req: AuthenticatedRequest,
         @Body() body: {
             type: string;
             name: string;
@@ -62,7 +63,7 @@ export class ConnectionsController {
     @Roles('ADMIN')
     @Get()
     async getConnections(
-        @Req() req: any,
+        @Req() req: AuthenticatedRequest,
         @Query('hotelId') hotelId?: string,
         @Query('restaurantId') restaurantId?: string
     ) {
@@ -74,7 +75,7 @@ export class ConnectionsController {
     @Get(':type')
     async getConnection(
         @Param('type') type: string,
-        @Req() req: any,
+        @Req() req: AuthenticatedRequest,
         @Query('hotelId') hotelId?: string,
         @Query('restaurantId') restaurantId?: string
     ) {

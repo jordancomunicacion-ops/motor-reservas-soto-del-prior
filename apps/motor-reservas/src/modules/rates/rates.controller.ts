@@ -3,7 +3,7 @@ import { RatesService } from './rates.service';
 import { AvailabilityService } from './availability.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Roles } from '../../auth/roles.decorator';
-import { ensureHotelAccess } from '../../common/scope';
+import { ensureHotelAccess, type AuthenticatedRequest } from '../../common/scope';
 
 @Controller('rates')
 export class RatesController {
@@ -25,7 +25,7 @@ export class RatesController {
 
     @Roles('ADMIN')
     @Get('plans/:hotelId')
-    async getRatePlans(@Param('hotelId') hotelId: string, @Req() req: any) {
+    async getRatePlans(@Param('hotelId') hotelId: string, @Req() req: AuthenticatedRequest) {
         await ensureHotelAccess(req?.user, this.prisma, hotelId);
 
         const plans = await this.prisma.ratePlan.findMany({
@@ -49,7 +49,7 @@ export class RatesController {
 
     @Roles('ADMIN')
     @Post('plans')
-    async createRatePlan(@Body() body: any, @Req() req: any) {
+    async createRatePlan(@Body() body: any, @Req() req: AuthenticatedRequest) {
         if (body?.hotelId) {
             await ensureHotelAccess(req?.user, this.prisma, body.hotelId);
         }
@@ -58,7 +58,7 @@ export class RatesController {
 
     @Roles('ADMIN')
     @Patch('plans/:id')
-    async updateRatePlan(@Param('id') id: string, @Body() body: any, @Req() req: any) {
+    async updateRatePlan(@Param('id') id: string, @Body() body: any, @Req() req: AuthenticatedRequest) {
         await ensureHotelAccess(req?.user, this.prisma, await this.hotelIdForRatePlan(id));
         const { id: _, ...data } = body;
         return this.prisma.ratePlan.update({
@@ -69,7 +69,7 @@ export class RatesController {
 
     @Roles('ADMIN')
     @Delete('plans/:id')
-    async deleteRatePlan(@Param('id') id: string, @Req() req: any) {
+    async deleteRatePlan(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
         await ensureHotelAccess(req?.user, this.prisma, await this.hotelIdForRatePlan(id));
         return this.prisma.ratePlan.delete({
             where: { id }
@@ -80,7 +80,7 @@ export class RatesController {
     @Roles('ADMIN')
     @Post('prices/bulk')
     @HttpCode(200)
-    async updatePrices(@Req() req: any, @Body() body: {
+    async updatePrices(@Req() req: AuthenticatedRequest, @Body() body: {
         hotelId: string;
         ratePlanId: string;
         roomTypeId: string;
