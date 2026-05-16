@@ -6,12 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Save, Building2, Trash2, Hotel, Users, Sparkles, Mail, CreditCard, Key, BellRing } from 'lucide-react';
+import { ArrowLeft, Save, Building2, Trash2, Hotel, Users, Sparkles, Mail } from 'lucide-react';
 import Link from 'next/link';
 import { ShiftsManager } from '@/components/admin/ShiftsManager';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { WidgetConfigSection } from '@/components/admin/WidgetConfigSection';
-import { Switch } from '@/components/ui/switch';
+import { MailConfigSection, type MailConfigValue } from '@/components/admin/MailConfigSection';
 
 
 
@@ -54,8 +54,10 @@ function RestaurantConfigContent() {
             user: '',
             pass: '',
             from: '',
-            notificationsEnabled: true
-        }
+            notificationsEnabled: true,
+            passConfigured: false,
+            graph: { tenantId: '', clientId: '', senderEmail: '', clientSecretConfigured: false }
+        } as MailConfigValue
 
     });
 
@@ -71,6 +73,7 @@ function RestaurantConfigContent() {
             setFormData({
                 name: data.name || '',
                 currency: data.currency || 'EUR',
+                timezone: data.timezone || 'Europe/Madrid',
                 hotelId: data.hotel?.id || '',
                 defaultDuration: data.defaultDuration || 90,
                 contactEmail: data.contactEmail || '',
@@ -81,7 +84,9 @@ function RestaurantConfigContent() {
                     user: '',
                     pass: '',
                     from: '',
-                    notificationsEnabled: true
+                    notificationsEnabled: true,
+                    passConfigured: false,
+                    graph: { tenantId: '', clientId: '', senderEmail: '', clientSecretConfigured: false }
                 }
 
             });
@@ -283,85 +288,10 @@ function RestaurantConfigContent() {
 
             </div>
 
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-slate-600">
-                            <Mail className="w-5 h-5" />
-                        </div>
-                        <div>
-                            <CardTitle>Configuración del Servidor de Envío</CardTitle>
-                            <CardDescription>Define la cuenta de correo desde la que se enviarán las notificaciones de este restaurante.</CardDescription>
-                        </div>
-                    </div>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    <div className="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-blue-500 text-white rounded-full">
-                                <BellRing className="w-4 h-4" />
-                            </div>
-                            <div>
-                                <p className="text-sm font-semibold">Notificaciones por Email</p>
-                                <p className="text-xs text-muted-foreground italic">Activa o desactiva el envío de correos automáticos.</p>
-                            </div>
-                        </div>
-                        <Switch 
-                            checked={formData.mailConfig.notificationsEnabled !== false}
-                            onCheckedChange={(checked) => setFormData({
-                                ...formData, 
-                                mailConfig: { ...formData.mailConfig, notificationsEnabled: checked }
-                            })}
-                        />
-
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label>Servidor SMTP (ej: smtp.office365.com)</Label>
-                            <Input 
-                                value={formData.mailConfig.host}
-                                onChange={(e) => setFormData({...formData, mailConfig: {...formData.mailConfig, host: e.target.value}})}
-                                placeholder="smtp.ejemplo.com"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Puerto (ej: 587)</Label>
-                            <Input 
-                                value={formData.mailConfig.port}
-                                onChange={(e) => setFormData({...formData, mailConfig: {...formData.mailConfig, port: e.target.value}})}
-                                placeholder="587"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Usuario / Email</Label>
-                            <Input 
-                                value={formData.mailConfig.user}
-                                onChange={(e) => setFormData({...formData, mailConfig: {...formData.mailConfig, user: e.target.value}})}
-                                placeholder="usuario@ejemplo.com"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Contraseña (o Contraseña de Aplicación)</Label>
-                            <Input 
-                                type="password"
-                                value={formData.mailConfig.pass}
-                                onChange={(e) => setFormData({...formData, mailConfig: {...formData.mailConfig, pass: e.target.value}})}
-                                placeholder="••••••••••••"
-                            />
-                        </div>
-                        <div className="md:col-span-2 space-y-2">
-                            <Label>Email remitente (Aparecerá como el 'De:')</Label>
-                            <Input 
-                                value={formData.mailConfig.from}
-                                onChange={(e) => setFormData({...formData, mailConfig: {...formData.mailConfig, from: e.target.value}})}
-                                placeholder="reservas@tudominio.com"
-                            />
-                            <p className="text-[10px] text-muted-foreground">Si se deja vacío, se usará el usuario/email de arriba.</p>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
+            <MailConfigSection
+                mailConfig={formData.mailConfig}
+                onChange={(mc) => setFormData({ ...formData, mailConfig: mc })}
+            />
 
             <Card>
                 <CardHeader>
