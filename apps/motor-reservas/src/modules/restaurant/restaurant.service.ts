@@ -1080,6 +1080,44 @@ export class RestaurantService {
         });
     }
 
+    // --- Access Profiles (Custom Roles) ---
+    async getAccessProfiles(restaurantId: string) {
+        return (this.prisma as any).accessProfile.findMany({
+            where: { restaurantId },
+            orderBy: { createdAt: 'asc' }
+        });
+    }
+
+    async createAccessProfile(restaurantId: string, data: { name: string; baseRole?: string; permissions: string[] }) {
+        const name = data.name?.trim();
+        if (!name) throw new Error('Nombre del perfil obligatorio');
+        return (this.prisma as any).accessProfile.create({
+            data: {
+                restaurantId,
+                name,
+                baseRole: (data.baseRole as UserRole) || UserRole.STAFF,
+                permissions: (data.permissions || []).join(',')
+            }
+        });
+    }
+
+    async updateAccessProfile(profileId: string, data: { name?: string; baseRole?: string; permissions?: string[] }) {
+        const update: any = {};
+        if (data.name !== undefined) update.name = data.name.trim();
+        if (data.baseRole !== undefined) update.baseRole = data.baseRole as UserRole;
+        if (data.permissions !== undefined) update.permissions = data.permissions.join(',');
+        return (this.prisma as any).accessProfile.update({
+            where: { id: profileId },
+            data: update
+        });
+    }
+
+    async deleteAccessProfile(profileId: string) {
+        return (this.prisma as any).accessProfile.delete({
+            where: { id: profileId }
+        });
+    }
+
     async autoAssignPendingBookings(restaurantId: string, date: Date) {
         const startOfDay = new Date(date);
         startOfDay.setUTCHours(0, 0, 0, 0);

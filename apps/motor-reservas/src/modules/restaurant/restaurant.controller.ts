@@ -3,7 +3,7 @@ import { RestaurantService } from './restaurant.service';
 import { WaitlistService } from './waitlist.service';
 import { Public } from '../../auth/public.decorator';
 import { Roles } from '../../auth/roles.decorator';
-import { CreateRestaurantDto, CreatePublicReservationDto, UpdateBookingStatusDto, AuthorizeUserDto } from './restaurant.dto';
+import { CreateRestaurantDto, CreatePublicReservationDto, UpdateBookingStatusDto, AuthorizeUserDto, CreateAccessProfileDto, UpdateAccessProfileDto } from './restaurant.dto';
 
 @Controller('restaurant')
 export class RestaurantController {
@@ -226,6 +226,31 @@ export class RestaurantController {
     @Delete(':id/users/:userId')
     deauthorizeUser(@Param('id') id: string, @Param('userId') userId: string) {
         return this.service.deauthorizeUser(id, userId);
+    }
+
+    // --- Access Profiles (Custom Roles) ---
+    @Roles('ADMIN')
+    @Get(':id/access-profiles')
+    getAccessProfiles(@Param('id') id: string) {
+        return this.service.getAccessProfiles(id);
+    }
+
+    @Roles('ADMIN')
+    @Post(':id/access-profiles')
+    createAccessProfile(@Param('id') id: string, @Body() body: CreateAccessProfileDto) {
+        return this.service.createAccessProfile(id, body);
+    }
+
+    @Roles('ADMIN')
+    @Patch('access-profiles/:profileId')
+    updateAccessProfile(@Param('profileId') profileId: string, @Body() body: UpdateAccessProfileDto) {
+        return this.service.updateAccessProfile(profileId, body);
+    }
+
+    @Roles('ADMIN')
+    @Delete('access-profiles/:profileId')
+    deleteAccessProfile(@Param('profileId') profileId: string) {
+        return this.service.deleteAccessProfile(profileId);
     }
 }
 
