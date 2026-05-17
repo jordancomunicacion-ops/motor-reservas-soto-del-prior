@@ -23,14 +23,32 @@ import {
 import Link from 'next/link';
 import { format } from 'date-fns';
 
+interface HotelSummary {
+    id: string;
+    name?: string;
+}
+interface RoomTypeRow {
+    id: string;
+    name: string;
+    basePrice: number;
+    capacity: number;
+    rooms?: Array<{ id: string }>;
+}
+interface RatePlanRow {
+    id: string;
+    name: string;
+    mealsIncluded?: string | null;
+    isDefault?: boolean;
+}
+
 function HotelInventoryContent() {
     const params = useParams();
     const router = useRouter();
     const hotelId = params.id as string;
-    
-    const [hotel, setHotel] = useState<any>(null);
-    const [roomTypes, setRoomTypes] = useState<any[]>([]);
-    const [ratePlans, setRatePlans] = useState<any[]>([]);
+
+    const [hotel, setHotel] = useState<HotelSummary | null>(null);
+    const [roomTypes, setRoomTypes] = useState<RoomTypeRow[]>([]);
+    const [ratePlans, setRatePlans] = useState<RatePlanRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState("rooms");
 
@@ -71,9 +89,9 @@ function HotelInventoryContent() {
         setLoading(true);
         try {
             const [hotelData, roomsData, ratesData] = await Promise.all([
-                fetchAPI(`/property/hotels/${hotelId}`),
-                fetchAPI(`/property/hotels/${hotelId}/room-types`),
-                fetchAPI(`/rates/plans/${hotelId}`)
+                fetchAPI<HotelSummary>(`/property/hotels/${hotelId}`),
+                fetchAPI<RoomTypeRow[]>(`/property/hotels/${hotelId}/room-types`),
+                fetchAPI<RatePlanRow[]>(`/rates/plans/${hotelId}`),
             ]);
             setHotel(hotelData);
             setRoomTypes(roomsData);
@@ -423,11 +441,11 @@ function HotelInventoryContent() {
                                                 onClick={() => {
                                                     const plan = ratePlans.find(p => p.id === rateFormData.ratePlanId);
                                                     if (plan) {
-                                                        setRatePlanFormData({ 
-                                                            id: plan.id, 
-                                                            name: plan.name, 
+                                                        setRatePlanFormData({
+                                                            id: plan.id,
+                                                            name: plan.name,
                                                             mealsIncluded: plan.mealsIncluded || 'Solo alojamiento',
-                                                            isDefault: plan.isDefault 
+                                                            isDefault: plan.isDefault ?? false,
                                                         });
                                                         setShowRatePlanForm(true);
                                                     }

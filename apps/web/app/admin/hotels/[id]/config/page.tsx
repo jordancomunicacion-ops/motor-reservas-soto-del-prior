@@ -18,6 +18,44 @@ import { BellRing } from 'lucide-react';
 import AccessManager from '@/components/admin/AccessManager';
 import { Users } from 'lucide-react';
 
+interface MailConfig {
+    host: string;
+    port: string;
+    user: string;
+    pass: string;
+    from: string;
+    notificationsEnabled: boolean;
+}
+
+interface EmailTemplates {
+    created: string;
+    confirmed: string;
+    cancelled: string;
+    modified: string;
+    reminder: string;
+}
+
+interface HotelDetail {
+    id: string;
+    name?: string;
+    currency?: string;
+    timezone?: string;
+    restaurantId?: string | null;
+    contactEmail?: string | null;
+    emailTemplates?: EmailTemplates | null;
+    mailConfig?: MailConfig | null;
+    integrations?: {
+        stripeEnabled?: boolean;
+        noShowFee?: number;
+        cancelHours?: number;
+    } | null;
+}
+
+interface RestaurantOption {
+    id: string;
+    name: string;
+}
+
 function HotelConfigContent() {
     const params = useParams();
     const router = useRouter();
@@ -27,8 +65,8 @@ function HotelConfigContent() {
     const tab = searchParams.get('tab') || 'general';
     const [activeTemplate, setActiveTemplate] = useState<'created' | 'confirmed' | 'cancelled' | 'modified' | 'reminder'>('created');
     
-    const [hotel, setHotel] = useState<any>(null);
-    const [restaurants, setRestaurants] = useState<any[]>([]);
+    const [hotel, setHotel] = useState<HotelDetail | null>(null);
+    const [restaurants, setRestaurants] = useState<RestaurantOption[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [sendingTest, setSendingTest] = useState(false);
@@ -67,7 +105,7 @@ function HotelConfigContent() {
 
     async function loadHotel() {
         try {
-            const data = await fetchAPI(`/property/hotels/${hotelId}`);
+            const data = await fetchAPI<HotelDetail>(`/property/hotels/${hotelId}`);
             setHotel(data);
             setFormData({
                 name: data.name || '',
@@ -98,7 +136,7 @@ function HotelConfigContent() {
 
     async function loadRestaurants() {
         try {
-            const data = await fetchAPI('/restaurant');
+            const data = await fetchAPI<RestaurantOption[]>('/restaurant');
             setRestaurants(data);
         } catch (e) {
             console.error(e);

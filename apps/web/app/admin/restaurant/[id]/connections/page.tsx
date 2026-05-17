@@ -13,14 +13,27 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 
+import type { WidgetConfigResponse } from '@/types/widget-config';
+
+interface RestaurantIntegrations {
+    crm: { enabled: boolean; url: string; token: string; syncBookings: boolean };
+    stripe: { enabled: boolean; publicKey: string; secretKey: string };
+}
+
+interface RestaurantWithIntegrations {
+    id: string;
+    name: string;
+    integrations?: Partial<RestaurantIntegrations> | null;
+}
+
 function RestaurantConnectionsContent() {
     const params = useParams();
     const restaurantId = params.id as string;
-    const [restaurant, setRestaurant] = useState<any>(null);
+    const [restaurant, setRestaurant] = useState<RestaurantWithIntegrations | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    
-    const [integrations, setIntegrations] = useState({
+
+    const [integrations, setIntegrations] = useState<RestaurantIntegrations>({
         crm: { enabled: false, url: 'https://crm.sotodelprior.com/api/integrations/restaurant', token: '', syncBookings: true },
         stripe: { enabled: false, publicKey: '', secretKey: '' }
     });
@@ -46,7 +59,7 @@ function RestaurantConnectionsContent() {
 
     async function loadRestaurant() {
         try {
-            const data = await fetchAPI(`/restaurant/${restaurantId}`);
+            const data = await fetchAPI<RestaurantWithIntegrations>(`/restaurant/${restaurantId}`);
             setRestaurant(data);
             if (data.integrations) {
                 setIntegrations(prev => ({ ...prev, ...data.integrations }));
@@ -60,7 +73,7 @@ function RestaurantConnectionsContent() {
 
     async function loadConfig() {
         try {
-            const data = await fetchAPI(`/config/${restaurantId}`);
+            const data = await fetchAPI<WidgetConfigResponse>(`/config/${restaurantId}`);
             if (data) {
                 setConfig({
                     primaryColor: data.primaryColor || '#C59D5F',

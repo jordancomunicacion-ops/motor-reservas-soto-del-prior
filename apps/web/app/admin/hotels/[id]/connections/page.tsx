@@ -12,15 +12,37 @@ import Link from 'next/link';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
+import type { WidgetConfigResponse } from '@/types/widget-config';
+
+interface OtaConfig { enabled: boolean; apiKey: string; syncInventory: boolean }
+interface AirbnbConfig { enabled: boolean; icalUrl: string; syncInventory: boolean }
+interface CrmConfig { enabled: boolean; url: string; token: string; syncBookings: boolean }
+interface StripeConfig { enabled: boolean; publicKey: string; secretKey: string }
+
+interface HotelIntegrations {
+    booking: OtaConfig;
+    airbnb: AirbnbConfig;
+    expedia: OtaConfig;
+    agoda: OtaConfig;
+    hostelworld: OtaConfig;
+    crm: CrmConfig;
+    stripe: StripeConfig;
+}
+
+interface HotelWithIntegrations {
+    id: string;
+    name: string;
+    integrations?: Partial<HotelIntegrations> | null;
+}
 
 function HotelConnectionsContent() {
     const params = useParams();
     const hotelId = params.id as string;
-    const [hotel, setHotel] = useState<any>(null);
+    const [hotel, setHotel] = useState<HotelWithIntegrations | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    
-    const [integrations, setIntegrations] = useState({
+
+    const [integrations, setIntegrations] = useState<HotelIntegrations>({
         booking: { enabled: false, apiKey: '', syncInventory: true },
         airbnb: { enabled: false, icalUrl: '', syncInventory: true },
         expedia: { enabled: false, apiKey: '', syncInventory: true },
@@ -51,7 +73,7 @@ function HotelConnectionsContent() {
 
     async function loadHotel() {
         try {
-            const data = await fetchAPI(`/property/hotels/${hotelId}`);
+            const data = await fetchAPI<HotelWithIntegrations>(`/property/hotels/${hotelId}`);
             setHotel(data);
             if (data.integrations) {
                 // Merge with defaults
@@ -66,7 +88,7 @@ function HotelConnectionsContent() {
 
     async function loadConfig() {
         try {
-            const data = await fetchAPI(`/config/${hotelId}`);
+            const data = await fetchAPI<WidgetConfigResponse>(`/config/${hotelId}`);
             if (data) {
                 setConfig({
                     primaryColor: data.primaryColor || '#C59D5F',
