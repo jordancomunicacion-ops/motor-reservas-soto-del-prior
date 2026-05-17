@@ -4,35 +4,32 @@
  * realmente se leen en el frontend. El servicio devuelve más.
  */
 
+export interface TableSummary {
+    id: string;
+    name?: string;
+    capacity?: number;
+    resBookings?: Array<{ id: string; status?: string }>;
+}
+
 export interface ZoneWithTables {
     id: string;
     name?: string;
-    tables: Array<{
-        id: string;
-        name?: string;
-        resBookings?: Array<{ id: string; status?: string }>;
-        [key: string]: unknown;
-    }>;
+    tables: TableSummary[];
 }
 
-export interface TableWithZone {
-    id: string;
+export interface TableWithZone extends TableSummary {
     zoneId: string;
-    name?: string;
-    resBookings?: Array<{ id: string; status?: string }>;
-    [key: string]: unknown;
 }
 
 export interface RestaurantBooking {
     id: string;
     guestName?: string;
-    guestEmail?: string;
-    guestPhone?: string;
+    guestEmail?: string | null;
+    guestPhone?: string | null;
     pax?: number;
-    date?: string;
-    status?: string;
+    date?: string | Date;
+    status: string;
     tableId?: string | null;
-    [key: string]: unknown;
 }
 
 export interface WaitlistEntry {
@@ -43,5 +40,5 @@ export interface WaitlistEntry {
     pax?: number;
     date?: string;
     status?: string;
-    [key: string]: unknown;
+    createdAt?: string;
 }

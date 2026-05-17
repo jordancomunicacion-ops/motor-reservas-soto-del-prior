@@ -9,9 +9,18 @@ import { UserPlus, Clock, ArrowRight } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 
+import type { WaitlistEntry } from '@/types/restaurant';
+
+export interface WaitlistFormPayload {
+    name: string;
+    pax: number;
+    phone: string;
+    notes: string;
+}
+
 interface WaitlistProps {
-    entries: any[];
-    onAdd: (data: any) => void;
+    entries: WaitlistEntry[];
+    onAdd: (data: WaitlistFormPayload) => void;
     onSeat: (id: string) => void;
 }
 
@@ -73,9 +82,12 @@ export default function WaitlistPanel({ entries, onAdd, onSeat }: WaitlistProps)
                             </div>
                             <div className="flex justify-between items-center text-xs text-gray-500">
                                 <span>
-                                    Hace {isNaN(new Date(entry.createdAt).getTime()) 
-                                        ? '??' 
-                                        : formatDistanceToNow(new Date(entry.createdAt), { locale: es })}
+                                    {(() => {
+                                        if (!entry.createdAt) return 'Hace ??';
+                                        const created = new Date(entry.createdAt);
+                                        if (isNaN(created.getTime())) return 'Hace ??';
+                                        return `Hace ${formatDistanceToNow(created, { locale: es })}`;
+                                    })()}
                                 </span>
                                 <Button size="icon" variant="ghost" className="h-6 w-6 opacity-0 group-hover:opacity-100 text-green-600" onClick={() => onSeat(entry.id)}>
                                     <ArrowRight className="w-4 h-4" />

@@ -25,14 +25,22 @@ const DEFAULT_PROFILES = [
     { id: 'MANAGER', name: 'Gerencia / Propietario', permissions: ['view_dashboard', 'view_calendar', 'view_occupancy', 'manage_restaurant', 'manage_hotels', 'manage_events'] },
 ];
 
+interface AuthorizedUser {
+    id: string;
+    email: string;
+    name?: string | null;
+    role: string;
+    permissions?: string | null;
+}
+
 export default function AccessManager({ contextId, contextType }: { contextId: string, contextType: string }) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [selectedProfile, setSelectedProfile] = useState('STAFF');
     const [customPermissions, setCustomPermissions] = useState<string[]>(DEFAULT_PROFILES[0].permissions);
     const [isManagingProfiles, setIsManagingProfiles] = useState(false);
-    
-    const [users, setUsers] = useState<any[]>([]);
+
+    const [users, setUsers] = useState<AuthorizedUser[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
@@ -43,7 +51,7 @@ export default function AccessManager({ contextId, contextType }: { contextId: s
     async function loadUsers() {
         setLoading(true);
         try {
-            const data = await fetchAPI(`/restaurant/${contextId}/users`);
+            const data = await fetchAPI<AuthorizedUser[]>(`/restaurant/${contextId}/users`);
             setUsers(data);
         } catch (e) {
             console.error(e);

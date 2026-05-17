@@ -12,8 +12,48 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
+export interface GuestBookingProfile {
+    id: string;
+    guestName?: string;
+    guestSurname2?: string | null;
+    guestEmail?: string | null;
+    guestPhone?: string | null;
+    guestWhatsapp?: string | null;
+    guestAge?: number | null;
+    guestGender?: 'M' | 'F' | string | null;
+    instagram?: string | null;
+    facebook?: string | null;
+    tiktok?: string | null;
+    linkedin?: string | null;
+    xTwitter?: string | null;
+    date?: string | Date;
+    pax?: number;
+    duration?: number;
+    origin?: string;
+    createdAt?: string | Date;
+    isMealPlan?: boolean;
+    hotelBookingId?: string | null;
+    stripePaymentMethodId?: string | null;
+    emailSent?: boolean;
+    smsSent?: boolean;
+    notes?: string | null;
+    tags?: string | null;
+    visitCount?: number;
+    source?: string;
+    preferredTable?: string | null;
+    topItems?: string[];
+    emails?: Array<{ id: string; type?: string; subject?: string; sentAt?: string; date?: string; status?: string }>;
+    guestStats?: {
+        visitCount: number;
+        firstVisit: string | null;
+        cancelledCount: number;
+        totalBookings: number;
+        cancellationRate: number;
+    };
+}
+
 interface GuestProfileSheetProps {
-    booking: any;
+    booking: GuestBookingProfile | null;
     isOpen: boolean;
     onClose: () => void;
 }
@@ -66,13 +106,20 @@ export default function GuestProfileSheet({ booking, isOpen, onClose }: GuestPro
     const hasAllergies = tags.some(t => /alerg/i.test(t)) || /alerg|intoler/i.test(booking.notes || '');
     const firstVisitYear = guestStats.firstVisit ? new Date(guestStats.firstVisit).getFullYear() : null;
 
-    const socialNetworks = [
+    type SocialNetwork = {
+        key: string;
+        label: string;
+        Icon: typeof Instagram;
+        value: string | null | undefined;
+        baseUrl: string;
+    };
+    const socialNetworks: Array<Omit<SocialNetwork, 'value'> & { value: string }> = ([
         { key: 'instagram', label: 'Instagram', Icon: Instagram, value: booking.instagram, baseUrl: 'https://instagram.com/' },
         { key: 'facebook', label: 'Facebook', Icon: Facebook, value: booking.facebook, baseUrl: 'https://facebook.com/' },
         { key: 'tiktok', label: 'TikTok', Icon: Globe, value: booking.tiktok, baseUrl: 'https://tiktok.com/@' },
         { key: 'linkedin', label: 'LinkedIn', Icon: Linkedin, value: booking.linkedin, baseUrl: 'https://linkedin.com/in/' },
         { key: 'xTwitter', label: 'X/Twitter', Icon: Globe, value: booking.xTwitter, baseUrl: 'https://x.com/' },
-    ].filter(s => !!s.value);
+    ] as SocialNetwork[]).filter((s): s is Omit<SocialNetwork, 'value'> & { value: string } => typeof s.value === 'string' && s.value.length > 0);
 
     return (
         <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -220,7 +267,7 @@ export default function GuestProfileSheet({ booking, isOpen, onClose }: GuestPro
                             </div>
                             <div className="flex justify-between p-2 bg-stone-50 rounded">
                                 <span className="text-stone-500 flex items-center gap-1"><Globe className="w-3.5 h-3.5" /> Origen</span>
-                                <span className="font-medium">{originLabels[booking.origin] || booking.origin || '—'}</span>
+                                <span className="font-medium">{(booking.origin && originLabels[booking.origin]) || booking.origin || '—'}</span>
                             </div>
                             <div className="flex justify-between p-2 bg-stone-50 rounded">
                                 <span className="text-stone-500 flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> Recibida</span>
@@ -366,7 +413,7 @@ export default function GuestProfileSheet({ booking, isOpen, onClose }: GuestPro
                         <section>
                             <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-3">Comunicaciones</h3>
                             <div className="border rounded-lg divide-y">
-                                {booking.emails.map((email: any) => (
+                                {booking.emails.map((email) => (
                                     <div key={email.id} className="p-3 flex items-center justify-between hover:bg-stone-50 transition-colors">
                                         <div className="flex flex-col">
                                             <span className="text-sm font-medium">{email.type}</span>

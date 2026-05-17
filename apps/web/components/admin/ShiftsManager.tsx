@@ -119,9 +119,10 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
                 daysOfWeek: '1,2,3,4,5,6,0'
             });
             loadShifts();
-        } catch (e: any) {
+        } catch (e) {
             console.error(e);
-            alert(`Error al crear el turno: ${e.message || 'Error desconocido'}`);
+            const message = e instanceof Error ? e.message : 'Error desconocido';
+            alert(`Error al crear el turno: ${message}`);
         }
     }
 

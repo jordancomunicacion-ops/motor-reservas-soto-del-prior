@@ -36,17 +36,17 @@ function LocationSwitcherContent() {
     async function loadContexts() {
         setLoading(true);
         try {
-            const data = await fetchAPI('/global/contexts');
+            const data = await fetchAPI<{ hotels?: ContextItem[]; restaurants?: ContextItem[] }>('/global/contexts');
             if (data && typeof data === 'object') {
                 // Deduplicate items by ID to prevent UI glitches
                 const hList = Array.isArray(data.hotels) ? data.hotels : [];
                 const rList = Array.isArray(data.restaurants) ? data.restaurants : [];
 
-                const uniqueHotels = Array.from(new Map(hList.map((h: any) => [h.id, h])).values());
-                const uniqueRestaurants = Array.from(new Map(rList.map((r: any) => [r.id, r])).values());
-                
-                setHotels(uniqueHotels as ContextItem[]);
-                setRestaurants(uniqueRestaurants as ContextItem[]);
+                const uniqueHotels = Array.from(new Map(hList.map(h => [h.id, h])).values());
+                const uniqueRestaurants = Array.from(new Map(rList.map(r => [r.id, r])).values());
+
+                setHotels(uniqueHotels);
+                setRestaurants(uniqueRestaurants);
             }
         } catch (e) {
             console.error("Failed to load contexts", e);

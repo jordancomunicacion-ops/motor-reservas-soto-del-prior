@@ -29,18 +29,29 @@ function parseTags(tags: string | null | undefined): string[] {
     }
 }
 
+import type { ZoneWithTables } from '@/types/restaurant';
+import type { GuestBookingProfile } from './GuestProfileSheet';
+
+// La lista necesita más campos que GuestBookingProfile (status, tableId, surname).
+// La extendemos en lugar de duplicar.
+export interface ListBooking extends GuestBookingProfile {
+    status: string;
+    tableId?: string | null;
+    table?: { name?: string } | null;
+}
+
 interface ReservationListProps {
-    bookings: any[];
-    zones?: any[];
+    bookings: ListBooking[];
+    zones?: ZoneWithTables[];
     onStatusChange: (id: string, status: string) => void;
     onAssignTable?: (bookingId: string, tableId: string) => void;
-    onEdit: (booking: any) => void;
-    onSelectProfile?: (booking: any) => void;
+    onEdit: (booking: ListBooking) => void;
+    onSelectProfile?: (booking: ListBooking) => void;
 }
 
 export default function ReservationList({ bookings, zones = [], onStatusChange, onAssignTable, onEdit, onSelectProfile }: ReservationListProps) {
 
-    const statusColors: any = {
+    const statusColors: Record<string, string> = {
         NO_SHOW: "bg-red-100 text-red-800",
         CANCELLED: "bg-slate-100 text-slate-800",
         PENDING_CONFIRMATION: "bg-orange-100 text-orange-800",
@@ -54,7 +65,7 @@ export default function ReservationList({ bookings, zones = [], onStatusChange, 
         TO_REVIEW: "bg-blue-100 text-blue-800 border border-blue-200"
     };
 
-    const statusLabels: any = {
+    const statusLabels: Record<string, string> = {
         NO_SHOW: "No Show",
         CANCELLED: "Cancelada",
         PENDING_CONFIRMATION: "Pendiente",
@@ -97,11 +108,11 @@ export default function ReservationList({ bookings, zones = [], onStatusChange, 
                             const bookingTags = parseTags(booking.tags);
                             const hasAllergies = bookingTags.some(t => /alerg/i.test(t)) || /alerg|intoler/i.test(booking.notes || '');
                             const isVip = bookingTags.some(t => /vip/i.test(t));
+                            const bookingDate = booking.date ? new Date(booking.date) : null;
                             return (
                             <TableRow key={booking.id} className="hover:bg-gray-50">
                                 <TableCell className="font-medium">
-                                    {String(new Date(booking.date).getUTCHours()).padStart(2, '0')}:
-                                    {String(new Date(booking.date).getUTCMinutes()).padStart(2, '0')}
+                                    {bookingDate ? `${String(bookingDate.getUTCHours()).padStart(2, '0')}:${String(bookingDate.getUTCMinutes()).padStart(2, '0')}` : '—'}
                                 </TableCell>
                                 <TableCell>
                                     {(() => {
@@ -116,7 +127,7 @@ export default function ReservationList({ bookings, zones = [], onStatusChange, 
                                     <div className="flex flex-col">
                                         <div className="flex items-center gap-1 flex-wrap">
                                             <span className="font-semibold">{fullName}</span>
-                                            {booking.visitCount > 1 && (
+                                            {(booking.visitCount ?? 0) > 1 && (
                                                 <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 text-[9px] h-4 px-1">
                                                     {booking.visitCount}v
                                                 </Badge>
@@ -169,10 +180,10 @@ export default function ReservationList({ bookings, zones = [], onStatusChange, 
                                 <TableCell>
                                     <span
                                         className="inline-flex items-center gap-1 text-[10px] text-gray-500 whitespace-nowrap"
-                                        title={`Reserva creada: ${new Date(booking.createdAt).toLocaleString('es-ES')}`}
+                                        title={booking.createdAt ? `Reserva creada: ${new Date(booking.createdAt).toLocaleString('es-ES')}` : 'Reserva sin fecha de creación'}
                                     >
                                         <Clock className="w-3 h-3" />
-                                        {formatRelativeTime(booking.createdAt)}
+                                        {booking.createdAt ? formatRelativeTime(booking.createdAt) : '—'}
                                     </span>
                                 </TableCell>
                                 <TableCell className="text-right">
@@ -245,7 +256,7 @@ export default function ReservationList({ bookings, zones = [], onStatusChange, 
                                                                     <DropdownMenuLabel className="text-[10px] font-bold text-gray-400 uppercase py-1">
                                                                         {zone.name}
                                                                     </DropdownMenuLabel>
-                                                                    {zone.tables.map((table: any) => (
+                                                                    {zone.tables.map((table) => (
                                                                         <DropdownMenuItem
                                                                             key={table.id}
                                                                             onSelect={() => onAssignTable?.(booking.id, table.id)}

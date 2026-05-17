@@ -7,12 +7,38 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { format } from "date-fns";
 import { User, X, ChevronDown, ChevronRight, Utensils, MessageCircle, Instagram, Facebook, Globe, Linkedin } from "lucide-react";
 
+import type { GuestBookingProfile } from './GuestProfileSheet';
+
+export interface ReservationFormPayload {
+    guestName: string;
+    guestSurname2: string | null;
+    guestEmail: string | null;
+    guestPhone: string | null;
+    guestWhatsapp: string | null;
+    guestAge: number | null;
+    guestGender: string | null;
+    pax: number;
+    duration: number;
+    date: Date;
+    notes: string | null;
+    tags: string | null;
+    isMealPlan: boolean;
+    instagram: string | null;
+    facebook: string | null;
+    tiktok: string | null;
+    linkedin: string | null;
+    xTwitter: string | null;
+    status?: string;
+    origin?: string;
+    tableId?: string;
+}
+
 interface ReservationFormProps {
     isOpen: boolean;
     onClose: () => void;
-    onSubmit: (data: any) => void;
+    onSubmit: (data: ReservationFormPayload) => void;
     initialDate?: Date;
-    initialBooking?: any;
+    initialBooking?: GuestBookingProfile | null;
     initialTableId?: string | null;
 }
 
@@ -75,7 +101,7 @@ export default function ReservationForm({ isOpen, onClose, onSubmit, initialDate
 
         const tagsArr = tagsInput.split(',').map((t: string) => t.trim()).filter(Boolean);
 
-        const payload: any = {
+        const payload: ReservationFormPayload = {
             guestName: name,
             guestSurname2: surname2 || null,
             guestEmail: email || null,

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { Suspense } from 'react';
+import type { LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import {
@@ -28,7 +29,7 @@ function SidebarNav({ userRole }: SidebarNavProps) {
     const searchParams = useSearchParams();
     const queryString = searchParams.toString();
 
-    const navItems: { href: string; label: string; icon: any; permission: Permission }[] = [
+    const navItems: { href: string; label: string; icon: LucideIcon; permission: Permission }[] = [
         { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, permission: 'view_dashboard' },
         { href: '/admin/calendar', label: 'Calendario y Reservas', icon: Calendar, permission: 'view_calendar' },
         { href: '/admin/occupancy', label: 'Planning de Ocupación', icon: Building2, permission: 'view_occupancy' },
