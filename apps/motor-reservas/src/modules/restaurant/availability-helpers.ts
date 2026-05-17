@@ -70,40 +70,25 @@ export function isTableBooked(
  * BFS sobre las mesas contiguas (declaradas en metadata.contiguousTableIds)
  * para ver si un cluster que arranca en `startTable` puede acomodar `targetPax`.
  * Resta `seatsLostPerJoin` por cada unión efectiva dentro del cluster.
+ *
+ * Mantiene capacidad y contadores de vecinos-en-cluster de forma incremental
+ * (delta al añadir un vecino) en vez de recalcular el cluster entero por iteración.
  */
 export function canSatisfyPaxWithCluster(
     startTable: SlotTable,
     freeTables: SlotTable[],
     targetPax: number,
 ): boolean {
-    const visited = new Set<string>();
-    const cluster: SlotTable[] = [startTable];
-    visited.add(startTable.id);
-    let head = 0;
+    return findClusterForPax(startTable, freeTables, targetPax) !== null;
+}
 
-    while (head < cluster.length) {
-        const table = cluster[head++];
+function contiguousIdsOf(t: SlotTable): string[] {
+    const meta = (t.metadata as { contiguousTableIds?: string[] }) || {};
+    return Array.isArray(meta.contiguousTableIds) ? meta.contiguousTableIds : [];
+}
 
-        let tempCapacity = 0;
-        for (const t of cluster) {
-            const metadata = (t.metadata as { contiguousTableIds?: string[] }) || {};
-            const neighborsInCluster = (metadata.contiguousTableIds || [])
-                .filter(id => cluster.some(ct => ct.id === id)).length;
-            tempCapacity += Math.max(0, t.maxPax - neighborsInCluster * (t.seatsLostPerJoin || 1));
-        }
-        if (tempCapacity >= targetPax) return true;
-
-        const metadata = (table.metadata as { contiguousTableIds?: string[] }) || {};
-        for (const nId of metadata.contiguousTableIds || []) {
-            if (visited.has(nId)) continue;
-            const neighbor = freeTables.find(t => t.id === nId);
-            if (neighbor) {
-                visited.add(nId);
-                cluster.push(neighbor);
-            }
-        }
-    }
-    return false;
+function effectiveCapacity(t: SlotTable, neighborsInCluster: number): number {
+    return Math.max(0, t.maxPax - neighborsInCluster * (t.seatsLostPerJoin || 1));
 }
 
 /**
@@ -139,33 +124,42 @@ export function findClusterForPax(
     freeTables: SlotTable[],
     targetPax: number,
 ): string[] | null {
-    const visited = new Set<string>([startTable.id]);
+    const tableById = new Map(freeTables.map(t => [t.id, t]));
     const cluster: SlotTable[] = [startTable];
+    const visited = new Set<string>([startTable.id]);
+    const neighborCount = new Map<string, number>([[startTable.id, 0]]);
+    let totalCapacity = effectiveCapacity(startTable, 0);
+
+    if (totalCapacity >= targetPax) return [startTable.id];
+
     let head = 0;
-
-    const capacity = (members: SlotTable[]) => {
-        let cap = 0;
-        for (const t of members) {
-            const meta = (t.metadata as { contiguousTableIds?: string[] }) || {};
-            const neighborsInCluster = (meta.contiguousTableIds || [])
-                .filter(id => members.some(m => m.id === id)).length;
-            cap += Math.max(0, t.maxPax - neighborsInCluster * (t.seatsLostPerJoin || 1));
-        }
-        return cap;
-    };
-
-    if (capacity(cluster) >= targetPax) return cluster.map(t => t.id);
-
     while (head < cluster.length) {
         const table = cluster[head++];
-        const meta = (table.metadata as { contiguousTableIds?: string[] }) || {};
-        for (const nId of meta.contiguousTableIds || []) {
+        for (const nId of contiguousIdsOf(table)) {
             if (visited.has(nId)) continue;
-            const neighbor = freeTables.find(t => t.id === nId);
+            const neighbor = tableById.get(nId);
             if (!neighbor) continue;
+
+            // Cuenta cuántos miembros del cluster enlazan con este vecino y, en el camino,
+            // actualiza incrementalmente la capacidad de los enlazados (un vecino-en-cluster más).
+            let newNeighborInClusterCount = 0;
+            for (const linkId of contiguousIdsOf(neighbor)) {
+                if (!visited.has(linkId)) continue;
+                const linked = tableById.get(linkId);
+                if (!linked) continue;
+                const prev = neighborCount.get(linkId) ?? 0;
+                totalCapacity -= effectiveCapacity(linked, prev);
+                neighborCount.set(linkId, prev + 1);
+                totalCapacity += effectiveCapacity(linked, prev + 1);
+                newNeighborInClusterCount++;
+            }
+
             visited.add(nId);
             cluster.push(neighbor);
-            if (capacity(cluster) >= targetPax) return cluster.map(t => t.id);
+            neighborCount.set(nId, newNeighborInClusterCount);
+            totalCapacity += effectiveCapacity(neighbor, newNeighborInClusterCount);
+
+            if (totalCapacity >= targetPax) return cluster.map(t => t.id);
         }
     }
     return null;

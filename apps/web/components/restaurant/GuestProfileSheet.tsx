@@ -48,7 +48,7 @@ export interface GuestBookingProfile {
         firstVisit: string | null;
         cancelledCount: number;
         totalBookings: number;
-        cancellationRate: number;
+        cancelledOrNoShowRate: number;
     };
 }
 
@@ -95,7 +95,7 @@ export default function GuestProfileSheet({ booking, isOpen, onClose }: GuestPro
         firstVisit: null,
         cancelledCount: 0,
         totalBookings: booking?.visitCount || 1,
-        cancellationRate: 0
+        cancelledOrNoShowRate: 0
     };
 
     if (!booking) return null;
@@ -168,12 +168,12 @@ export default function GuestProfileSheet({ booking, isOpen, onClose }: GuestPro
                                         <AlertTriangle className="w-3 h-3" /> Alergias
                                     </Badge>
                                 )}
-                                {guestStats.cancellationRate > 0 && (
+                                {guestStats.cancelledOrNoShowRate > 0 && (
                                     <Badge variant="outline" className={cn(
                                         "text-[10px] px-1.5 h-5",
-                                        guestStats.cancellationRate > 20 ? "text-red-600 border-red-200 bg-red-50" : "text-amber-600 border-amber-200 bg-amber-50"
+                                        guestStats.cancelledOrNoShowRate > 20 ? "text-red-600 border-red-200 bg-red-50" : "text-amber-600 border-amber-200 bg-amber-50"
                                     )}>
-                                        {guestStats.cancellationRate}% Cancelación
+                                        {guestStats.cancelledOrNoShowRate}% Canc./No-show
                                     </Badge>
                                 )}
                                 {firstVisitYear && (

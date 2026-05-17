@@ -318,7 +318,7 @@ describe('CrmIntegrationService', () => {
             expect(body.data.visitCount).toBe(2);
             expect(body.data.cancelledCount).toBe(1);
             expect(body.data.totalBookings).toBe(3);
-            expect(body.data.cancellationRate).toBe(33);
+            expect(body.data.cancelledOrNoShowRate).toBe(33);
             // Tras JSON.stringify/parse las fechas viajan como string ISO.
             expect(body.data.firstReservationDate).toBe(new Date('2025-12-01').toISOString());
         });
