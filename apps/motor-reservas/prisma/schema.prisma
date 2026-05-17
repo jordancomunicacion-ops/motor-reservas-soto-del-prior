@@ -510,6 +510,7 @@ model Restaurant {
   currency        String               @default("EUR")
   defaultDuration Int                  @default(90)
   timezone        String               @default("Europe/Madrid")
+  bufferMinutes   Int                  @default(15)
   zones           Zone[]
   bookings        ResBooking[]
   waitlist        RestaurantWaitlist[]

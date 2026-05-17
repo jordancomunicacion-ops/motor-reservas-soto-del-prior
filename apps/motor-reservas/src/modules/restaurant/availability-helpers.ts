@@ -51,7 +51,9 @@ export function isTableBooked(
     slotTime: Date,
     defaultDuration: number,
     bookings: SlotBooking[],
+    bufferMinutes = 0,
 ): boolean {
+    const bufMs = bufferMinutes * 60000;
     const slotEnd = new Date(slotTime.getTime() + defaultDuration * 60000);
     return bookings.some(b => {
         const matchesTable = b.tableId === table.id ||
@@ -59,7 +61,8 @@ export function isTableBooked(
         if (!matchesTable) return false;
         const bStart = new Date(b.date);
         const bEnd = new Date(bStart.getTime() + (b.duration || defaultDuration) * 60000);
-        return slotTime < bEnd && slotEnd > bStart;
+        // overlap con buffer: b.start < new.end + buffer && b.end + buffer > new.start
+        return bStart.getTime() < slotEnd.getTime() + bufMs && bEnd.getTime() + bufMs > slotTime.getTime();
     });
 }
 
@@ -112,8 +115,9 @@ export function isSlotAvailable(
     tables: SlotTable[],
     bookings: SlotBooking[],
     defaultDuration = 90,
+    bufferMinutes = 0,
 ): boolean {
-    const freeTables = tables.filter(table => !isTableBooked(table, slotTime, defaultDuration, bookings));
+    const freeTables = tables.filter(table => !isTableBooked(table, slotTime, defaultDuration, bookings, bufferMinutes));
 
     const singleTable = freeTables.find(t => t.maxPax >= pax && t.minPax <= pax);
     if (singleTable) return true;
@@ -178,8 +182,9 @@ export function selectTableOrCluster(
     tables: SlotTable[],
     bookings: SlotBooking[],
     defaultDuration = 90,
+    bufferMinutes = 0,
 ): { tableId: string; linkedTableIds: string[] } | null {
-    const freeTables = tables.filter(t => !isTableBooked(t, slotTime, defaultDuration, bookings));
+    const freeTables = tables.filter(t => !isTableBooked(t, slotTime, defaultDuration, bookings, bufferMinutes));
 
     const single = freeTables
         .filter(t => t.maxPax >= pax && t.minPax <= pax)

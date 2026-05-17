@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { WaitlistService } from './waitlist.service';
 import { CrmService } from '../crm/crm.service';
@@ -76,14 +76,15 @@ export class RestaurantService {
         return c.restaurantId;
     }
 
-    private async getRestaurantConfig(restaurantId: string): Promise<{ timezone: string; defaultDuration: number }> {
+    private async getRestaurantConfig(restaurantId: string): Promise<{ timezone: string; defaultDuration: number; bufferMinutes: number }> {
         const r = await this.prisma.restaurant.findUnique({
             where: { id: restaurantId },
-            select: { timezone: true, defaultDuration: true }
+            select: { timezone: true, defaultDuration: true, bufferMinutes: true }
         });
         return {
             timezone: r?.timezone || 'Europe/Madrid',
-            defaultDuration: r?.defaultDuration || 90
+            defaultDuration: r?.defaultDuration || 90,
+            bufferMinutes: r?.bufferMinutes ?? 15
         };
     }
 
@@ -495,13 +496,14 @@ export class RestaurantService {
             });
 
             if (!created.tableId && created.restaurantId && created.date) {
-                const { defaultDuration } = await this.getRestaurantConfig(created.restaurantId);
+                const { defaultDuration, bufferMinutes } = await this.getRestaurantConfig(created.restaurantId);
                 const cluster = await this.availability.findAvailableCluster(
                     created.restaurantId,
                     new Date(created.date),
                     created.pax,
                     defaultDuration,
-                    tx
+                    tx,
+                    bufferMinutes
                 );
                 if (cluster) {
                     return tx.resBooking.update({
@@ -590,10 +592,12 @@ export class RestaurantService {
         }
 
 
-        // Trigger dynamic adaptation: try to assign other unassigned bookings
-        this.autoAssignPendingBookings(booking.restaurantId, booking.date).catch(err => {
-            this.logger.error(`Error in dynamic adaptation for restaurant ${booking.restaurantId}:`, err);
-        });
+        // Trigger dynamic adaptation only when a table is freed (cancel / no-show).
+        if (status === 'CANCELLED' || status === 'NO_SHOW') {
+            this.autoAssignPendingBookings(booking.restaurantId, booking.date).catch(err => {
+                this.logger.error(`Error in dynamic adaptation for restaurant ${booking.restaurantId}:`, err);
+            });
+        }
 
         return booking;
     }
@@ -697,7 +701,7 @@ export class RestaurantService {
         email: string;
     }, user?: AuthenticatedUser) {
         if (user) await ensureRestaurantAccess(user, this.prisma, data.restaurantId);
-        const { timezone, defaultDuration } = await this.getRestaurantConfig(data.restaurantId);
+        const { timezone, defaultDuration, bufferMinutes } = await this.getRestaurantConfig(data.restaurantId);
         const dayStr = toDateOnlyString(data.date);
         const start = zonedDateToUtc(dayStr, data.time, timezone);
 
@@ -717,7 +721,7 @@ export class RestaurantService {
             });
 
             if (data.pax <= 12) {
-                const cluster = await this.availability.findAvailableCluster(data.restaurantId, start, data.pax, defaultDuration, tx);
+                const cluster = await this.availability.findAvailableCluster(data.restaurantId, start, data.pax, defaultDuration, tx, bufferMinutes);
                 if (cluster) {
                     return tx.resBooking.update({
                         where: { id: created.id },
@@ -742,12 +746,37 @@ export class RestaurantService {
     }
 
     async createPublicReservation(data: any) {
-        const { timezone, defaultDuration } = await this.getRestaurantConfig(data.restaurantId);
+        if (!data?.time) {
+            throw new BadRequestException('Falta el campo "time" (HH:mm) en la reserva.');
+        }
+        const { timezone, defaultDuration, bufferMinutes } = await this.getRestaurantConfig(data.restaurantId);
         const dayStr = toDateOnlyString(data.date);
-        // Backward-compat: si no llega time, asumir 19:00 local del restaurante.
-        // (La validación dura — exigir time + pre-check availability — se aplica en la rama rotation-validation.)
-        const time: string = data.time || '19:00';
-        const start = zonedDateToUtc(dayStr, time, timezone);
+        const start = zonedDateToUtc(dayStr, data.time, timezone);
+
+        // Pre-check: cierres del restaurante.
+        const closures = await this.prisma.restaurantClosure.findMany({
+            where: {
+                restaurantId: data.restaurantId,
+                date: { lte: start },
+                OR: [
+                    { endDate: null, date: { equals: start } },
+                    { endDate: { gte: start } }
+                ]
+            }
+        });
+        if (closures.length > 0) {
+            throw new BadRequestException('Restaurante cerrado en la fecha solicitada.');
+        }
+
+        // Pre-check: disponibilidad para grupos ≤ 12 (los grandes se gestionan a mano).
+        if (data.pax <= 12) {
+            const preCheck = await this.availability.findAvailableCluster(
+                data.restaurantId, start, data.pax, defaultDuration, this.prisma, bufferMinutes
+            );
+            if (!preCheck) {
+                throw new BadRequestException('No hay disponibilidad para la hora solicitada.');
+            }
+        }
 
         const booking = await this.prisma.$transaction(async (tx) => {
             const created = await tx.resBooking.create({
@@ -775,7 +804,7 @@ export class RestaurantService {
             });
 
             if (data.pax <= 12) {
-                const cluster = await this.availability.findAvailableCluster(data.restaurantId, start, data.pax, defaultDuration, tx);
+                const cluster = await this.availability.findAvailableCluster(data.restaurantId, start, data.pax, defaultDuration, tx, bufferMinutes);
                 if (cluster) {
                     return tx.resBooking.update({
                         where: { id: created.id },
@@ -785,7 +814,7 @@ export class RestaurantService {
                         }
                     });
                 }
-                this.logger.warn(`createPublicReservation ${created.id}: sin mesa libre.`);
+                this.logger.warn(`createPublicReservation ${created.id}: sin mesa libre tras pre-check (race).`);
             }
             return created;
         });
@@ -879,7 +908,7 @@ export class RestaurantService {
     }
 
     async autoAssignPendingBookings(restaurantId: string, date: Date) {
-        const { timezone, defaultDuration } = await this.getRestaurantConfig(restaurantId);
+        const { timezone, defaultDuration, bufferMinutes } = await this.getRestaurantConfig(restaurantId);
         const dayStr = toDateOnlyString(date);
         const { start: startOfDay, end: endOfDay } = zonedDayRangeUtc(dayStr, timezone);
 
@@ -900,7 +929,7 @@ export class RestaurantService {
         for (const booking of pendingBookings) {
             if (booking.pax > 12) continue;
 
-            const cluster = await this.availability.findAvailableCluster(restaurantId, new Date(booking.date), booking.pax, defaultDuration);
+            const cluster = await this.availability.findAvailableCluster(restaurantId, new Date(booking.date), booking.pax, defaultDuration, this.prisma, bufferMinutes);
             if (cluster) {
                 await this.prisma.resBooking.update({
                     where: { id: booking.id },

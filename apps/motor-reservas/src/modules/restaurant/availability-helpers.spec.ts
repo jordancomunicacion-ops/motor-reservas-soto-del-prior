@@ -92,6 +92,25 @@ describe('isTableBooked', () => {
         const bookings = [booking('b1', 't2', '2026-05-20T13:00:00Z', 90, ['t1'])];
         expect(isTableBooked(t1, new Date('2026-05-20T13:30:00Z'), 90, bookings)).toBe(true);
     });
+
+    describe('con buffer', () => {
+        it('buffer=15: 14:30 inicio (reserva acaba 14:30) ya no colisiona... pero buffer extiende 15min', () => {
+            // reserva 13:00-14:30; nuevo slot 14:30-16:00. Sin buffer no colisiona.
+            const bookings = [booking('b1', 't1', '2026-05-20T13:00:00Z')];
+            expect(isTableBooked(t1, new Date('2026-05-20T14:30:00Z'), 90, bookings, 15)).toBe(true);
+        });
+
+        it('buffer=15: hueco de 16 minutos basta', () => {
+            // reserva 13:00-14:30; nuevo slot 14:46-16:16 → gap de 16 min ≥ buffer
+            const bookings = [booking('b1', 't1', '2026-05-20T13:00:00Z')];
+            expect(isTableBooked(t1, new Date('2026-05-20T14:46:00Z'), 90, bookings, 15)).toBe(false);
+        });
+
+        it('buffer=0 mantiene comportamiento original', () => {
+            const bookings = [booking('b1', 't1', '2026-05-20T13:00:00Z')];
+            expect(isTableBooked(t1, new Date('2026-05-20T14:30:00Z'), 90, bookings, 0)).toBe(false);
+        });
+    });
 });
 
 describe('findClusterForPax', () => {
