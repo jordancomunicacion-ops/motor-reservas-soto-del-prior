@@ -2,6 +2,42 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { fetchAPI } from '@/lib/api';
+
+interface RestaurantDetail {
+    id: string;
+    name: string;
+    currency: string;
+    timezone?: string;
+    hotel?: { id: string } | null;
+    defaultDuration?: number;
+    contactEmail?: string | null;
+    emailTemplates?: typeof DEFAULT_EMAIL_TEMPLATES | null;
+    mailConfig?: typeof DEFAULT_MAIL_CONFIG | null;
+}
+
+interface HotelOption {
+    id: string;
+    name: string;
+}
+
+const DEFAULT_EMAIL_TEMPLATES = {
+    created: '<h1>¡Hola {{name}}!</h1><p>Hemos recibido tu reserva para el día {{date}} a las {{time}}.</p>',
+    confirmed: '<h1>Reserva Confirmada</h1><p>Tu mesa está lista para el {{date}}.</p>',
+    cancelled: '<h1>Reserva Cancelada</h1><p>Lamentamos informarte que tu reserva ha sido cancelada.</p>',
+    modified: '<h1>Reserva Modificada</h1><p>Hola {{name}}, tu reserva para el día {{date}} a las {{time}} ha sido modificada.</p>',
+    reminder: '<h1>Recordatorio de Reserva</h1><p>Hola {{name}}, te recordamos tu reserva para el {{date}} a las {{time}}. Por favor, confirma tu asistencia o cancela si no puedes venir.</p>',
+    waitlist_join: '<h1>Estás en lista de espera</h1><p>Hola {{name}}, te hemos añadido a la lista de espera para el {{date}}.</p>',
+    waitlist_available: '<h1>¡Hay un hueco libre!</h1><p>Hola {{name}}, se ha liberado una mesa para tu solicitud del {{date}}. Por favor, confirma para reservarla.</p>',
+};
+
+const DEFAULT_MAIL_CONFIG = {
+    host: '',
+    port: '587',
+    user: '',
+    pass: '',
+    from: '',
+    notificationsEnabled: true,
+};
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -26,8 +62,8 @@ function RestaurantConfigContent() {
     const tab = searchParams.get('tab') || 'general';
     const [activeTemplate, setActiveTemplate] = useState<'created' | 'confirmed' | 'cancelled' | 'modified' | 'reminder'>('created');
     
-    const [restaurant, setRestaurant] = useState<any>(null);
-    const [hotels, setHotels] = useState<any[]>([]);
+    const [restaurant, setRestaurant] = useState<RestaurantDetail | null>(null);
+    const [hotels, setHotels] = useState<HotelOption[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [sendingTest, setSendingTest] = useState(false);
@@ -66,7 +102,7 @@ function RestaurantConfigContent() {
 
     async function loadRestaurant() {
         try {
-            const data = await fetchAPI(`/restaurant/${restaurantId}`);
+            const data = await fetchAPI<RestaurantDetail>(`/restaurant/${restaurantId}`);
             setRestaurant(data);
             setFormData({
                 name: data.name || '',
@@ -76,15 +112,7 @@ function RestaurantConfigContent() {
                 defaultDuration: data.defaultDuration || 90,
                 contactEmail: data.contactEmail || '',
                 emailTemplates: data.emailTemplates || formData.emailTemplates,
-                mailConfig: data.mailConfig || {
-                    host: '',
-                    port: '587',
-                    user: '',
-                    pass: '',
-                    from: '',
-                    notificationsEnabled: true
-                }
-
+                mailConfig: data.mailConfig || DEFAULT_MAIL_CONFIG,
             });
         } catch (e) {
             console.error(e);
@@ -95,7 +123,7 @@ function RestaurantConfigContent() {
 
     async function loadHotels() {
         try {
-            const data = await fetchAPI('/property/hotels');
+            const data = await fetchAPI<HotelOption[]>('/property/hotels');
             setHotels(data);
         } catch (e) {
             console.error(e);

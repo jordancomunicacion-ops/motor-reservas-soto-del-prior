@@ -17,6 +17,50 @@ import { DateSelector } from '@/components/admin/DateSelector';
 
 import AccessManager from '@/components/admin/AccessManager';
 
+// Tipos mínimos para las respuestas que esta página consume. Los servicios
+// devuelven más campos, pero aquí solo declaramos los que se leen.
+interface ZoneWithTables {
+    id: string;
+    name?: string;
+    tables: Array<{
+        id: string;
+        name?: string;
+        resBookings?: Array<{ id: string; status?: string }>;
+        [key: string]: unknown;
+    }>;
+}
+
+interface TableWithZone {
+    id: string;
+    zoneId: string;
+    name?: string;
+    resBookings?: Array<{ id: string; status?: string }>;
+    [key: string]: unknown;
+}
+
+interface RestaurantBooking {
+    id: string;
+    guestName?: string;
+    guestEmail?: string;
+    guestPhone?: string;
+    pax?: number;
+    date?: string;
+    status?: string;
+    tableId?: string | null;
+    [key: string]: unknown;
+}
+
+interface WaitlistEntry {
+    id: string;
+    name: string;
+    email?: string | null;
+    phone?: string | null;
+    pax?: number;
+    date?: string;
+    status?: string;
+    [key: string]: unknown;
+}
+
 function RestaurantDashboardContent() {
     const params = useParams();
     const router = useRouter();
@@ -27,11 +71,11 @@ function RestaurantDashboardContent() {
     const [loading, setLoading] = useState(false);
 
     // Data
-    const [zones, setZones] = useState<any[]>([]);
-    const [bookings, setBookings] = useState<any[]>([]);
-    const [waitlist, setWaitlist] = useState<any[]>([]);
-    const [rawTables, setRawTables] = useState<any[]>([]); // Flattened tables
-    const [restaurant, setRestaurant] = useState<any>(null);
+    const [zones, setZones] = useState<ZoneWithTables[]>([]);
+    const [bookings, setBookings] = useState<RestaurantBooking[]>([]);
+    const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
+    const [rawTables, setRawTables] = useState<TableWithZone[]>([]); // Flattened tables
+    const [restaurant, setRestaurant] = useState<{ name?: string } | null>(null);
 
     // UI State
     const [isFormOpen, setIsFormOpen] = useState(false);
@@ -48,15 +92,17 @@ function RestaurantDashboardContent() {
         try {
             // Parallel fetch
             const [tablesRes, bookingsRes, waitlistRes, restRes] = await Promise.all([
-                fetchAPI(`/restaurant/${restaurantId}/tables?date=${format(date, 'yyyy-MM-dd')}`), 
-                fetchAPI(`/restaurant/${restaurantId}/bookings?date=${format(date, 'yyyy-MM-dd')}`),
-                fetchAPI(`/restaurant/${restaurantId}/waitlist`),
-                fetchAPI(`/restaurant/${restaurantId}`).catch(() => ({ name: 'Restaurante' }))
+                fetchAPI<ZoneWithTables[]>(`/restaurant/${restaurantId}/tables?date=${format(date, 'yyyy-MM-dd')}`),
+                fetchAPI<RestaurantBooking[]>(`/restaurant/${restaurantId}/bookings?date=${format(date, 'yyyy-MM-dd')}`),
+                fetchAPI<WaitlistEntry[]>(`/restaurant/${restaurantId}/waitlist`),
+                fetchAPI<{ name?: string }>(`/restaurant/${restaurantId}`).catch(() => ({ name: 'Restaurante' })),
             ]);
 
             if (Array.isArray(tablesRes)) {
                 setZones(tablesRes);
-                const flat = tablesRes.flatMap((z: any) => z.tables.map((t: any) => ({ ...t, zoneId: z.id })));
+                const flat = tablesRes.flatMap(z =>
+                    z.tables.map(t => ({ ...t, zoneId: z.id })),
+                );
                 setRawTables(flat);
             }
             if (Array.isArray(bookingsRes)) setBookings(bookingsRes);
@@ -151,7 +197,7 @@ function RestaurantDashboardContent() {
         }
     };
 
-    const totalPax = bookings.reduce((sum, b) => sum + (b.status !== 'CANCELLED' ? b.pax : 0), 0);
+    const totalPax = bookings.reduce((sum, b) => sum + (b.status !== 'CANCELLED' ? (b.pax ?? 0) : 0), 0);
     const totalBookings = bookings.filter(b => b.status !== 'CANCELLED').length;
 
     return (
@@ -200,18 +246,20 @@ function RestaurantDashboardContent() {
                                 Pendientes de Mesa ({bookings.filter(b => !b.tableId).length})
                             </div>
                             <div className="divide-y dark:divide-zinc-700">
-                                {bookings.filter(b => !b.tableId).map(b => (
+                                {bookings.filter(b => !b.tableId).map(b => {
+                                    const when = b.date ? new Date(b.date) : null;
+                                    return (
                                     <div key={b.id} className="p-3 text-sm hover:bg-gray-50 dark:hover:bg-zinc-700/50 cursor-pointer draggable transition-colors" draggable onDragStart={(e) => e.dataTransfer.setData("bookingId", b.id)}>
                                         <div className="flex justify-between">
                                             <span className="font-bold">
-                                                {String(new Date(b.date).getUTCHours()).padStart(2, '0')}:
-                                                {String(new Date(b.date).getUTCMinutes()).padStart(2, '0')}
+                                                {when ? `${String(when.getUTCHours()).padStart(2, '0')}:${String(when.getUTCMinutes()).padStart(2, '0')}` : '—'}
                                             </span>
                                             <span className="bg-gray-200 dark:bg-zinc-700 px-1.5 rounded text-[10px] font-bold uppercase">{b.pax} Pax</span>
                                         </div>
                                         <div className="truncate text-muted-foreground mt-1">{b.guestName}</div>
                                     </div>
-                                ))}
+                                    );
+                                })}
                                 {bookings.filter(b => !b.tableId).length === 0 && (
                                     <div className="p-8 text-center text-xs text-muted-foreground italic">
                                         No hay reservas pendientes
