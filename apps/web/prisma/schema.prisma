@@ -509,6 +509,7 @@ model Restaurant {
   name            String
   currency        String               @default("EUR")
   defaultDuration Int                  @default(90)
+  timezone        String               @default("Europe/Madrid")
   zones           Zone[]
   bookings        ResBooking[]
   waitlist        RestaurantWaitlist[]
@@ -535,22 +536,6 @@ model Restaurant {
   accessProfiles AccessProfile[]
 
   events Event[]
-
-  accessProfiles AccessProfile[]
-}
-
-model AccessProfile {
-  id           String     @id @default(uuid())
-  restaurantId String
-  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  name         String
-  baseRole     UserRole   @default(STAFF)
-  permissions  String? // Comma-separated permission ids
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-
-  @@unique([restaurantId, name])
-  @@index([restaurantId])
 }
 
 model AccessProfile {
@@ -683,6 +668,8 @@ model ResBooking {
   idempotencyKey String?            @unique
   channelId      String?
   channel        RestaurantChannel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
+
+  metadata Json? @default("{}")
 
   @@index([restaurantId, status])
   @@index([restaurantId, date])
