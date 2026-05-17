@@ -9,6 +9,7 @@ import { $Enums } from '@prisma/client';
 import { getUserScope, assertRestaurantAccess, ensureRestaurantAccess, ensureHotelAccess, type AuthenticatedUser } from '../../common/scope';
 import { RestaurantAvailabilityService } from './restaurant-availability.service';
 import { RestaurantAccessService } from './restaurant-access.service';
+import { sanitizeMailConfig } from './mail-config-sanitizer';
 
 @Injectable()
 export class RestaurantService {
@@ -84,42 +85,13 @@ export class RestaurantService {
         return b.restaurantId;
     }
 
-    /**
-     * Sanitiza datos sensibles del mailConfig antes de devolverlos en respuestas.
-     * Quita contraseñas SMTP, Client Secrets, etc.
-     * Mantiene la presencia de los campos (true/false) para que el admin sepa si está configurado.
-     */
-    private sanitizeMailConfig(restaurant: any): any {
-        if (!restaurant) return restaurant;
-        const cfg = restaurant.mailConfig;
-        if (!cfg) return restaurant;
-        const sanitized: any = {
-            host: cfg.host || '',
-            port: cfg.port || '',
-            user: cfg.user || '',
-            from: cfg.from || '',
-            notificationsEnabled: cfg.notificationsEnabled !== false,
-            // No exponer la contraseña; solo si está configurada
-            passConfigured: !!(cfg.pass && cfg.pass.length > 0),
-        };
-        if (cfg.graph) {
-            sanitized.graph = {
-                tenantId: cfg.graph.tenantId || '',
-                clientId: cfg.graph.clientId || '',
-                senderEmail: cfg.graph.senderEmail || '',
-                clientSecretConfigured: !!(cfg.graph.clientSecret && cfg.graph.clientSecret.length > 0),
-            };
-        }
-        return { ...restaurant, mailConfig: sanitized };
-    }
-
     async getRestaurants(user?: AuthenticatedUser) {
         const scope = await getUserScope(user, this.prisma);
         const restaurants = await this.prisma.restaurant.findMany({
             where: scope.restaurantIds === null ? {} : { id: { in: scope.restaurantIds } },
             include: { zones: true }
         });
-        return restaurants.map(r => this.sanitizeMailConfig(r));
+        return restaurants.map(r => sanitizeMailConfig(r));
     }
 
     async getRestaurant(id: string, user?: AuthenticatedUser) {
@@ -131,7 +103,7 @@ export class RestaurantService {
             where: { id },
             include: { hotel: true, widgetConfig: true, shifts: true }
         });
-        return this.sanitizeMailConfig(restaurant);
+        return sanitizeMailConfig(restaurant);
     }
 
 
