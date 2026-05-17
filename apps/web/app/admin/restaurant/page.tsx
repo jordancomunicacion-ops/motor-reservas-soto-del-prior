@@ -4,8 +4,14 @@ import { fetchAPI } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Plus, Utensils, Settings, LayoutDashboard, Share2, Users, RefreshCw } from 'lucide-react';
 
+interface RestaurantRow {
+    id: string;
+    name: string;
+    currency?: string;
+}
+
 export default function RestaurantListPage() {
-    const [restaurants, setRestaurants] = useState<any[]>([]);
+    const [restaurants, setRestaurants] = useState<RestaurantRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [newName, setNewName] = useState('');
 
@@ -16,7 +22,7 @@ export default function RestaurantListPage() {
     async function loadRestaurants() {
         setLoading(true);
         try {
-            const data = await fetchAPI('/restaurant');
+            const data = await fetchAPI<RestaurantRow[]>('/restaurant');
             if (Array.isArray(data)) {
                 setRestaurants(data);
             }

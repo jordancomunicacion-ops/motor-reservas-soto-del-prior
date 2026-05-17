@@ -62,7 +62,7 @@ function CalendarReservationsContent() {
         notes: ''
     });
 
-    const [selectedBookingForProfile, setSelectedBookingForProfile] = useState<any>(null);
+    const [selectedBookingForProfile, setSelectedBookingForProfile] = useState<Booking | null>(null);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
 
     useEffect(() => {
@@ -141,15 +141,15 @@ function CalendarReservationsContent() {
                 }
             }
             
-            const res = await fetchAPI(endpoint);
+            const res = await fetchAPI<Booking[]>(endpoint);
             let filtered = Array.isArray(res) ? res : [];
-            
+
             // For hotels, the API might return all bookings, so we filter by date/range in frontend
             // For restaurants, we also double filter to be consistent
             const start = viewMode === 'day' ? date : (viewMode === 'week' ? startOfWeek(date, { weekStartsOn: 1 }) : startOfMonth(date));
             const end = viewMode === 'day' ? date : (viewMode === 'week' ? endOfWeek(date, { weekStartsOn: 1 }) : endOfMonth(date));
 
-            filtered = filtered.filter((b: any) => {
+            filtered = filtered.filter((b) => {
                 const bDateStr = b.checkInDate || b.date;
                 if (!bDateStr) return false;
                 const bDate = new Date(bDateStr);

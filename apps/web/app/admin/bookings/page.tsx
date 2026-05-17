@@ -5,12 +5,25 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useSearchParams } from 'next/navigation';
 
+// Forma unificada que combina hotel-booking y restaurant-booking. Solo los
+// campos que esta lista lee.
+interface BookingRow {
+    id: string;
+    referenceCode?: string;
+    guestName?: string;
+    checkInDate?: string;
+    date?: string;
+    status: string;
+    totalPrice?: number;
+    pax?: number;
+}
+
 function BookingsList() {
     const searchParams = useSearchParams();
     const contextType = searchParams.get('context') || 'hotel';
     const contextId = searchParams.get('id');
-    
-    const [bookings, setBookings] = useState<any[]>([]);
+
+    const [bookings, setBookings] = useState<BookingRow[]>([]);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -24,13 +37,13 @@ function BookingsList() {
     async function loadBookings() {
         setLoading(true);
         try {
-            const endpoint = contextType === 'hotel' 
-                ? `/bookings/${contextId}` 
+            const endpoint = contextType === 'hotel'
+                ? `/bookings/${contextId}`
                 : `/restaurant/${contextId}/bookings?date=${new Date().toISOString().split('T')[0]}`;
-            const res = await fetchAPI(endpoint);
+            const res = await fetchAPI<BookingRow[]>(endpoint);
             setBookings(Array.isArray(res) ? res : []);
-        } catch (e) { 
-            console.error(e); 
+        } catch (e) {
+            console.error(e);
             setBookings([]);
         } finally {
             setLoading(false);
@@ -72,7 +85,7 @@ function BookingsList() {
                             <TableRow key={b.id}>
                                 <TableCell className="font-mono text-xs">{b.referenceCode || b.id.split('-')[0]}</TableCell>
                                 <TableCell className="font-medium">{b.guestName}</TableCell>
-                                <TableCell>{new Date(b.checkInDate || b.date).toLocaleDateString()}</TableCell>
+                                <TableCell>{(b.checkInDate || b.date) ? new Date(b.checkInDate || b.date!).toLocaleDateString() : '—'}</TableCell>
                                 <TableCell>
                                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                                         b.status === 'CONFIRMED' || b.status === 'SEATED' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'

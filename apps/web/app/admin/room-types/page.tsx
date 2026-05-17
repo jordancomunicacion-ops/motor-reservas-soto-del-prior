@@ -4,8 +4,16 @@ import { fetchAPI } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
+interface RoomType {
+    id: string;
+    name: string;
+    basePrice: number;
+    capacity: number;
+    rooms?: Array<{ id: string }>;
+}
+
 export default function RoomTypesPage() {
-    const [types, setTypes] = useState<any[]>([]);
+    const [types, setTypes] = useState<RoomType[]>([]);
     const [loading, setLoading] = useState(false);
 
     // Hardcoded Hotel ID for MVP (User should select hotel first in real app)
@@ -15,7 +23,7 @@ export default function RoomTypesPage() {
         if (!hotelId) return;
         setLoading(true);
         try {
-            const res = await fetchAPI(`/property/hotels/${hotelId}/room-types`);
+            const res = await fetchAPI<RoomType[]>(`/property/hotels/${hotelId}/room-types`);
             setTypes(res);
         } catch (e) {
             console.error(e);

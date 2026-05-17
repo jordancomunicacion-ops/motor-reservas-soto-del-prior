@@ -17,11 +17,19 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
+interface HotelDetail {
+    id: string;
+    name: string;
+    integrations?: Record<string, { enabled?: boolean }> | null;
+}
+interface RoomTypeRow { id: string }
+interface RatePlanRow { id: string }
+
 function HotelDashboardContent() {
     const params = useParams();
     const router = useRouter();
     const hotelId = params.id as string;
-    const [hotel, setHotel] = useState<any>(null);
+    const [hotel, setHotel] = useState<HotelDetail | null>(null);
     const [stats, setStats] = useState({ rooms: 0, activeRates: 0, connections: 0 });
     const [loading, setLoading] = useState(true);
 
@@ -32,15 +40,16 @@ function HotelDashboardContent() {
     async function loadData() {
         try {
             const [hotelData, roomsData, ratesData] = await Promise.all([
-                fetchAPI(`/property/hotels/${hotelId}`),
-                fetchAPI(`/property/hotels/${hotelId}/room-types`),
-                fetchAPI(`/rates/plans/${hotelId}`)
+                fetchAPI<HotelDetail>(`/property/hotels/${hotelId}`),
+                fetchAPI<RoomTypeRow[]>(`/property/hotels/${hotelId}/room-types`),
+                fetchAPI<RatePlanRow[]>(`/rates/plans/${hotelId}`),
             ]);
             setHotel(hotelData);
+            const integrations = hotelData.integrations || {};
             setStats({
                 rooms: roomsData.length,
                 activeRates: ratesData.length,
-                connections: Object.keys(hotelData.integrations || {}).filter(k => hotelData.integrations[k].enabled).length
+                connections: Object.values(integrations).filter(i => i?.enabled).length,
             });
         } catch (e) {
             console.error(e);

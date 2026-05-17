@@ -7,12 +7,29 @@ import { PartyPopper, Calendar, Users, Euro, ArrowLeft, Save, Trash2, Building2,
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+interface EventDetail {
+    id: string;
+    name: string;
+    date: string;
+    capacity: number;
+    price: number;
+    description?: string | null;
+    isActive: boolean;
+    hotelId?: string | null;
+    restaurantId?: string | null;
+    zones?: Array<{ id: string }>;
+}
+
+interface HotelSummary { id: string; name: string; restaurantId?: string | null }
+interface RestaurantSummary { id: string; name: string }
+interface ZoneSummary { id: string; name?: string }
+
 export default function EventConfigPage() {
     const params = useParams();
     const router = useRouter();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    
+
     const [formData, setFormData] = useState({
         name: '',
         date: '',
@@ -25,13 +42,13 @@ export default function EventConfigPage() {
         zoneIds: [] as string[]
     });
 
-    const [hotels, setHotels] = useState<any[]>([]);
-    const [restaurants, setRestaurants] = useState<any[]>([]);
-    const [availableZones, setAvailableZones] = useState<any[]>([]);
+    const [hotels, setHotels] = useState<HotelSummary[]>([]);
+    const [restaurants, setRestaurants] = useState<RestaurantSummary[]>([]);
+    const [availableZones, setAvailableZones] = useState<ZoneSummary[]>([]);
 
     useEffect(() => {
         if (formData.restaurantId) {
-            fetchAPI(`/restaurant/${formData.restaurantId}/zones`)
+            fetchAPI<ZoneSummary[]>(`/restaurant/${formData.restaurantId}/zones`)
                 .then(setAvailableZones)
                 .catch(() => setAvailableZones([]));
         } else {
@@ -50,12 +67,12 @@ export default function EventConfigPage() {
         try {
             console.log('Loading data for event:', params.id);
             const [event, hotelsData, restaurantsData] = await Promise.all([
-                fetchAPI(`/event/${params.id}`),
-                fetchAPI('/property/hotels'),
-                fetchAPI('/restaurant')
+                fetchAPI<EventDetail | EventDetail[]>(`/event/${params.id}`),
+                fetchAPI<HotelSummary[]>('/property/hotels'),
+                fetchAPI<RestaurantSummary[]>('/restaurant'),
             ]).catch(err => {
                 console.error('Error in Promise.all loadData:', err);
-                return [null, [], []];
+                return [null, [], []] as const;
             });
             
             console.log('Data fetched:', { event, hotelsData, restaurantsData });
@@ -76,7 +93,7 @@ export default function EventConfigPage() {
                         isActive: eventObj.isActive,
                         hotelId: eventObj.hotelId || '',
                         restaurantId: eventObj.restaurantId || '',
-                        zoneIds: eventObj.zones?.map((z: any) => z.id) || []
+                        zoneIds: eventObj.zones?.map(z => z.id) || []
                     });
                 }
             }

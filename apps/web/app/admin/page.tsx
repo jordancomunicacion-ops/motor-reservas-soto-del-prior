@@ -9,14 +9,37 @@ import { useEffect, useState } from 'react';
 
 
 
+interface RecentBooking {
+    id: string;
+    type: 'hotel' | 'restaurant';
+    customerName: string;
+    customerEmail?: string | null;
+    date: string;
+    amount: number;
+}
+
+interface DashboardStats {
+    revenue?: { total: number; change: number };
+    activeReservations?: { total: number; change: number };
+    occupancy?: { percentage: number; change: number };
+    covers?: { total: number; change: number };
+    recentBookings?: RecentBooking[];
+}
+
+interface ContextEntity {
+    id: string;
+    name?: string;
+    restaurantId?: string | null;
+}
+
 export default function AdminDashboard() {
     const searchParams = useSearchParams();
     const contextType = searchParams.get('context') || 'hotel';
     const contextId = searchParams.get('id');
     const isGlobal = !contextId;
 
-    const [entity, setEntity] = useState<any>(null);
-    const [stats, setStats] = useState<any>(null);
+    const [entity, setEntity] = useState<ContextEntity | null>(null);
+    const [stats, setStats] = useState<DashboardStats | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -27,8 +50,10 @@ export default function AdminDashboard() {
         setLoading(true);
         try {
             const [statsData, entityData] = await Promise.all([
-                fetchAPI('/global/stats'),
-                contextId ? fetchAPI(contextType === 'hotel' ? `/property/hotels/${contextId}` : `/restaurant/${contextId}`) : Promise.resolve(null)
+                fetchAPI<DashboardStats>('/global/stats'),
+                contextId
+                    ? fetchAPI<ContextEntity>(contextType === 'hotel' ? `/property/hotels/${contextId}` : `/restaurant/${contextId}`)
+                    : Promise.resolve(null),
             ]);
             setStats(statsData);
             setEntity(entityData);
@@ -59,7 +84,7 @@ export default function AdminDashboard() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">€{stats?.revenue?.total.toLocaleString() || '0.00'}</div>
-                        <p className="text-xs text-muted-foreground">{stats?.revenue?.change >= 0 ? '+' : ''}{stats?.revenue?.change}% vs mes pasado</p>
+                        <p className="text-xs text-muted-foreground">{(stats?.revenue?.change ?? 0) >= 0 ? '+' : ''}{stats?.revenue?.change ?? 0}% vs mes pasado</p>
                     </CardContent>
                 </Card>
                 
@@ -72,7 +97,7 @@ export default function AdminDashboard() {
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-bold">+{stats?.activeReservations?.total || '0'}</div>
-                            <p className="text-xs text-muted-foreground">{stats?.activeReservations?.change >= 0 ? '+' : ''}{stats?.activeReservations?.change}% vs mes pasado</p>
+                            <p className="text-xs text-muted-foreground">{(stats?.activeReservations?.change ?? 0) >= 0 ? '+' : ''}{stats?.activeReservations?.change ?? 0}% vs mes pasado</p>
                         </CardContent>
                     </Card>
                 )}
@@ -85,7 +110,7 @@ export default function AdminDashboard() {
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-bold">{stats?.occupancy?.percentage || '0'}%</div>
-                            <p className="text-xs text-muted-foreground">{stats?.occupancy?.change >= 0 ? '+' : ''}{stats?.occupancy?.change}% vs mes pasado</p>
+                            <p className="text-xs text-muted-foreground">{(stats?.occupancy?.change ?? 0) >= 0 ? '+' : ''}{stats?.occupancy?.change ?? 0}% vs mes pasado</p>
                         </CardContent>
                     </Card>
                 )}
@@ -106,7 +131,7 @@ export default function AdminDashboard() {
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-bold">+{stats?.covers?.total || '0'}</div>
-                            <p className="text-xs text-muted-foreground">{stats?.covers?.change >= 0 ? '+' : ''}{stats?.covers?.change} última hora</p>
+                            <p className="text-xs text-muted-foreground">{(stats?.covers?.change ?? 0) >= 0 ? '+' : ''}{stats?.covers?.change ?? 0} última hora</p>
                         </CardContent>
                     </Card>
                 )}
@@ -137,7 +162,7 @@ export default function AdminDashboard() {
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-8">
-                            {stats?.recentBookings?.length > 0 ? stats.recentBookings.map((booking: any) => (
+                            {(stats?.recentBookings?.length ?? 0) > 0 ? stats!.recentBookings!.map((booking) => (
                                 <div key={booking.id} className="flex items-center">
                                     <div className="p-2 bg-blue-100 rounded-full text-blue-600 mr-2">
                                         {booking.type === 'hotel' ? <Building2 className="w-4 h-4" /> : <Utensils className="w-4 h-4" />}

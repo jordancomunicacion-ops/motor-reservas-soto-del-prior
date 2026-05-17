@@ -6,11 +6,30 @@ import { Plus, PartyPopper, Settings, Calendar, Users, Euro, Info, Building2, Ut
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+interface EventSummary {
+    id: string;
+    name: string;
+    description?: string | null;
+    date: string;
+    price?: number;
+    capacity: number;
+    isActive?: boolean;
+    hotel?: { id: string; name: string } | null;
+    restaurant?: { id: string; name: string } | null;
+    zones?: Array<{ id: string; name?: string }>;
+    _count: { bookings: number };
+    bookings?: Array<{ pax?: number }>;
+}
+
+interface HotelSummary { id: string; name: string; restaurantId?: string | null }
+interface RestaurantSummary { id: string; name: string }
+interface ZoneSummary { id: string; name?: string }
+
 export default function EventsListPage() {
-    const [events, setEvents] = useState<any[]>([]);
+    const [events, setEvents] = useState<EventSummary[]>([]);
     const [loading, setLoading] = useState(true);
     const [showCreate, setShowCreate] = useState(false);
-    
+
     // Form state
     const [formData, setFormData] = useState({
         name: '',
@@ -23,24 +42,24 @@ export default function EventsListPage() {
         zoneIds: [] as string[]
     });
 
-    const [hotels, setHotels] = useState<any[]>([]);
-    const [restaurants, setRestaurants] = useState<any[]>([]);
-    const [availableZones, setAvailableZones] = useState<any[]>([]);
+    const [hotels, setHotels] = useState<HotelSummary[]>([]);
+    const [restaurants, setRestaurants] = useState<RestaurantSummary[]>([]);
+    const [availableZones, setAvailableZones] = useState<ZoneSummary[]>([]);
 
     useEffect(() => {
         async function fetchZones() {
             if (formData.restaurantId) {
                 try {
-                    const data = await fetchAPI(`/restaurant/${formData.restaurantId}/zones`);
+                    const data = await fetchAPI<ZoneSummary[]>(`/restaurant/${formData.restaurantId}/zones`);
                     setAvailableZones(data);
-                } catch (e) {
+                } catch {
                     setAvailableZones([]);
                 }
             } else if (formData.hotelId) {
                 try {
-                    const data = await fetchAPI(`/property/hotels/${formData.hotelId}/zones`);
+                    const data = await fetchAPI<ZoneSummary[]>(`/property/hotels/${formData.hotelId}/zones`);
                     setAvailableZones(data);
-                } catch (e) {
+                } catch {
                     setAvailableZones([]);
                 }
             } else {
@@ -57,9 +76,9 @@ export default function EventsListPage() {
 
     async function loadEstablishments() {
         try {
-            const hotelsData = await fetchAPI('/property/hotels');
-            const restaurantsData = await fetchAPI('/restaurant');
-            
+            const hotelsData = await fetchAPI<HotelSummary[]>('/property/hotels');
+            const restaurantsData = await fetchAPI<RestaurantSummary[]>('/restaurant');
+
             setHotels(Array.isArray(hotelsData) ? hotelsData : []);
             setRestaurants(Array.isArray(restaurantsData) ? restaurantsData : []);
         } catch (e) {
@@ -70,7 +89,7 @@ export default function EventsListPage() {
     async function loadEvents() {
         setLoading(true);
         try {
-            const data = await fetchAPI('/event');
+            const data = await fetchAPI<EventSummary[]>('/event');
             if (Array.isArray(data)) {
                 setEvents(data);
             }

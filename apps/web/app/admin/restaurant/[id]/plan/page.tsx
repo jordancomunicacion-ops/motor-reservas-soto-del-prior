@@ -6,14 +6,16 @@ import { ArrowLeft, Layout } from 'lucide-react';
 import Link from 'next/link';
 import TablePlanEditor from '@/components/restaurant/TablePlanEditor';
 
+interface RestaurantSummary { id: string; name: string }
+
 function RestaurantPlanContent() {
     const params = useParams();
     const restaurantId = params.id as string;
-    const [restaurant, setRestaurant] = useState<any>(null);
+    const [restaurant, setRestaurant] = useState<RestaurantSummary | null>(null);
 
     useEffect(() => {
         if (restaurantId) {
-            fetchAPI(`/restaurant/${restaurantId}`).then(setRestaurant).catch(console.error);
+            fetchAPI<RestaurantSummary>(`/restaurant/${restaurantId}`).then(setRestaurant).catch(console.error);
         }
     }, [restaurantId]);
 

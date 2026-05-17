@@ -1,6 +1,12 @@
 "use client";
 import React, { useEffect, useState, useMemo, Suspense } from 'react';
 import { fetchAPI } from '@/lib/api';
+import type {
+    ZoneWithTables,
+    TableWithZone,
+    RestaurantBooking,
+    WaitlistEntry,
+} from '@/types/restaurant';
 import { Button } from '@/components/ui/button';
 import { 
     ChevronLeft, 
@@ -48,13 +54,13 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
     const [loading, setLoading] = useState(false);
 
     // Data
-    const [zones, setZones] = useState<any[]>([]);
-    const [bookings, setBookings] = useState<any[]>([]);
-    const [waitlist, setWaitlist] = useState<any[]>([]);
-    const [rawTables, setRawTables] = useState<any>([]); // Flattened tables
+    const [zones, setZones] = useState<ZoneWithTables[]>([]);
+    const [bookings, setBookings] = useState<RestaurantBooking[]>([]);
+    const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
+    const [rawTables, setRawTables] = useState<TableWithZone[]>([]); // Flattened tables
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
-    const [selectedBookingForProfile, setSelectedBookingForProfile] = useState<any>(null);
+    const [selectedBookingForProfile, setSelectedBookingForProfile] = useState<RestaurantBooking | null>(null);
 
     useEffect(() => {
         loadData();
@@ -65,14 +71,16 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
         setLoading(true);
         try {
             const [tablesRes, bookingsRes, waitlistRes] = await Promise.all([
-                fetchAPI(`/restaurant/${contextId}/tables?date=${format(date, 'yyyy-MM-dd')}`), 
-                fetchAPI(`/restaurant/${contextId}/bookings?date=${format(date, 'yyyy-MM-dd')}`),
-                fetchAPI(`/restaurant/${contextId}/waitlist`)
+                fetchAPI<ZoneWithTables[]>(`/restaurant/${contextId}/tables?date=${format(date, 'yyyy-MM-dd')}`),
+                fetchAPI<RestaurantBooking[]>(`/restaurant/${contextId}/bookings?date=${format(date, 'yyyy-MM-dd')}`),
+                fetchAPI<WaitlistEntry[]>(`/restaurant/${contextId}/waitlist`),
             ]);
 
             if (Array.isArray(tablesRes)) {
                 setZones(tablesRes);
-                const flat = tablesRes.flatMap((z: any) => z.tables.map((t: any) => ({ ...t, zoneId: z.id })));
+                const flat = tablesRes.flatMap(z =>
+                    z.tables.map(t => ({ ...t, zoneId: z.id })),
+                );
                 setRawTables(flat);
             }
             if (Array.isArray(bookingsRes)) setBookings(bookingsRes);
@@ -120,11 +128,11 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
     };
 
     const handleQuickRes = (tableId: string) => {
-        const table = rawTables.find((t: any) => t.id === tableId);
-        const isOccupied = table?.resBookings?.length > 0;
-        
+        const table = rawTables.find(t => t.id === tableId);
+        const isOccupied = (table?.resBookings?.length ?? 0) > 0;
+
         setSelectedTableId(prev => prev === tableId ? null : tableId);
-        
+
         if (!isOccupied) {
             setIsFormOpen(true);
         }
@@ -132,8 +140,7 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
 
     const totalPax = bookings.reduce((sum, b) => {
         if (b.status === 'CANCELLED') return sum;
-        const paxValue = parseInt(b.pax) || 0;
-        return sum + paxValue;
+        return sum + (b.pax ?? 0);
     }, 0);
     const totalBookings = bookings.filter(b => b.status !== 'CANCELLED').length;
 
@@ -198,15 +205,14 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
                                     >
                                         <div className="flex justify-between">
                                             <span className="font-bold">
-                                                {isNaN(new Date(b.date).getTime()) ? '--:--' : (
-                                                    <>
-                                                        {String(new Date(b.date).getUTCHours()).padStart(2, '0')}:
-                                                        {String(new Date(b.date).getUTCMinutes()).padStart(2, '0')}
-                                                    </>
-                                                )}
+                                                {(() => {
+                                                    const when = b.date ? new Date(b.date) : null;
+                                                    if (!when || isNaN(when.getTime())) return '--:--';
+                                                    return `${String(when.getUTCHours()).padStart(2, '0')}:${String(when.getUTCMinutes()).padStart(2, '0')}`;
+                                                })()}
                                             </span>
                                             <span className="bg-gray-200 dark:bg-zinc-700 px-1.5 rounded text-[10px] font-bold uppercase">
-                                                {parseInt(b.pax) || 0} Pax
+                                                {b.pax ?? 0} Pax
                                             </span>
                                         </div>
                                         <div className="truncate text-muted-foreground mt-1">{b.guestName}</div>
@@ -401,8 +407,8 @@ function CalendarContent() {
         setLoading(true);
         try {
             const [rtData, bookingsData] = await Promise.all([
-                fetchAPI(`/property/hotels/${contextId}/room-types`),
-                fetchAPI(`/bookings/${contextId}`)
+                fetchAPI<RoomType[]>(`/property/hotels/${contextId}/room-types`),
+                fetchAPI<HotelBooking[]>(`/bookings/${contextId}`),
             ]);
             setRoomTypes(rtData || []);
             setBookings(bookingsData || []);
@@ -422,10 +428,12 @@ function CalendarContent() {
     const handleNext = () => setViewDate(d => addDays(d, 7));
     const handleToday = () => setViewDate(new Date());
 
-    const [contexts, setContexts] = useState<{hotels: any[], restaurants: any[]}>({hotels: [], restaurants: []});
+    interface ContextSummary { id: string; name: string; restaurantId?: string | null }
+    interface GlobalContexts { hotels: ContextSummary[]; restaurants: ContextSummary[] }
+    const [contexts, setContexts] = useState<GlobalContexts>({ hotels: [], restaurants: [] });
 
     useEffect(() => {
-        fetchAPI('/global/contexts').then(setContexts).catch(console.error);
+        fetchAPI<GlobalContexts>('/global/contexts').then(setContexts).catch(console.error);
     }, []);
 
     const switchContext = (type: string) => {

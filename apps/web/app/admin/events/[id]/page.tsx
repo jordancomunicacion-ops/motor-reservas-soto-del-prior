@@ -7,9 +7,32 @@ import { PartyPopper, Calendar, Users, Euro, ArrowLeft, Mail, Phone, Trash2, Bui
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+interface EventBooking {
+    id: string;
+    guestName: string;
+    guestEmail?: string | null;
+    guestPhone?: string | null;
+    pax: number;
+    totalPrice?: number;
+    createdAt?: string;
+}
+
+interface EventDetail {
+    id: string;
+    name: string;
+    description?: string | null;
+    date: string;
+    capacity: number;
+    price?: number;
+    hotel?: { id: string; name: string } | null;
+    restaurant?: { id: string; name: string } | null;
+    zones?: Array<{ id: string; name?: string }>;
+    bookings?: EventBooking[];
+}
+
 export default function EventDetailPage() {
     const params = useParams();
-    const [event, setEvent] = useState<any>(null);
+    const [event, setEvent] = useState<EventDetail | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -21,7 +44,7 @@ export default function EventDetailPage() {
     async function loadEvent() {
         setLoading(true);
         try {
-            const data = await fetchAPI(`/event/${params.id}`);
+            const data = await fetchAPI<EventDetail>(`/event/${params.id}`);
             setEvent(data);
         } catch (e) {
             console.error(e);
@@ -34,7 +57,7 @@ export default function EventDetailPage() {
     if (!event) return <div className="p-8">Evento no encontrado</div>;
 
     const bookings = event.bookings || [];
-    const totalPax = bookings.reduce((sum: number, b: any) => sum + b.pax, 0);
+    const totalPax = bookings.reduce((sum, b) => sum + b.pax, 0);
 
     return (
         <div className="space-y-6 pb-12">
@@ -82,7 +105,7 @@ export default function EventDetailPage() {
                                             </td>
                                         </tr>
                                     ) : (
-                                        bookings.map((booking: any) => (
+                                        bookings.map((booking) => (
                                             <tr key={booking.id} className="hover:bg-gray-50 dark:hover:bg-zinc-900/50 transition-colors">
                                                 <td className="px-6 py-4">
                                                     <div className="font-bold">{booking.guestName}</div>
@@ -98,7 +121,7 @@ export default function EventDetailPage() {
                                                     <span className="font-bold">{booking.totalPrice}€</span>
                                                 </td>
                                                 <td className="px-6 py-4 text-sm">
-                                                    {format(new Date(booking.createdAt), "dd MMM, HH:mm", { locale: es })}
+                                                    {booking.createdAt ? format(new Date(booking.createdAt), "dd MMM, HH:mm", { locale: es }) : '—'}
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-600 hover:bg-red-50">

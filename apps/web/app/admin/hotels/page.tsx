@@ -5,8 +5,15 @@ import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { Building2, Settings, Share2, LayoutDashboard, BedDouble, Users, RefreshCw, Plus } from 'lucide-react';
 
+interface HotelRow {
+    id: string;
+    name: string;
+    currency: string;
+    timezone: string;
+}
+
 export default function HotelsPage() {
-    const [hotels, setHotels] = useState<any[]>([]);
+    const [hotels, setHotels] = useState<HotelRow[]>([]);
     const [loading, setLoading] = useState(true);
 
     // Simple Create Form State
@@ -19,7 +26,7 @@ export default function HotelsPage() {
     async function loadHotels() {
         setLoading(true);
         try {
-            const data = await fetchAPI('/property/hotels');
+            const data = await fetchAPI<HotelRow[]>('/property/hotels');
             if (Array.isArray(data)) {
                 setHotels(data);
             }

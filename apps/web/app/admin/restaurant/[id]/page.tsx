@@ -16,50 +16,12 @@ import { fetchAPI } from '@/lib/api';
 import { DateSelector } from '@/components/admin/DateSelector';
 
 import AccessManager from '@/components/admin/AccessManager';
-
-// Tipos mínimos para las respuestas que esta página consume. Los servicios
-// devuelven más campos, pero aquí solo declaramos los que se leen.
-interface ZoneWithTables {
-    id: string;
-    name?: string;
-    tables: Array<{
-        id: string;
-        name?: string;
-        resBookings?: Array<{ id: string; status?: string }>;
-        [key: string]: unknown;
-    }>;
-}
-
-interface TableWithZone {
-    id: string;
-    zoneId: string;
-    name?: string;
-    resBookings?: Array<{ id: string; status?: string }>;
-    [key: string]: unknown;
-}
-
-interface RestaurantBooking {
-    id: string;
-    guestName?: string;
-    guestEmail?: string;
-    guestPhone?: string;
-    pax?: number;
-    date?: string;
-    status?: string;
-    tableId?: string | null;
-    [key: string]: unknown;
-}
-
-interface WaitlistEntry {
-    id: string;
-    name: string;
-    email?: string | null;
-    phone?: string | null;
-    pax?: number;
-    date?: string;
-    status?: string;
-    [key: string]: unknown;
-}
+import type {
+    ZoneWithTables,
+    TableWithZone,
+    RestaurantBooking,
+    WaitlistEntry,
+} from '@/types/restaurant';
 
 function RestaurantDashboardContent() {
     const params = useParams();

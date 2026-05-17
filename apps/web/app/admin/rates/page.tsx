@@ -27,7 +27,7 @@ export default function RatesPage() {
     });
 
     useEffect(() => {
-        fetchAPI('property/hotels').then(data => {
+        fetchAPI<Hotel[]>('property/hotels').then(data => {
             setHotels(data);
             if (data.length > 0) setSelectedHotelId(data[0].id);
         });
@@ -35,8 +35,8 @@ export default function RatesPage() {
 
     useEffect(() => {
         if (!selectedHotelId) return;
-        fetchAPI(`rates/plans/${selectedHotelId}`).then(setRatePlans);
-        fetchAPI(`property/hotels/${selectedHotelId}/room-types`).then(setRoomTypes);
+        fetchAPI<RatePlan[]>(`rates/plans/${selectedHotelId}`).then(setRatePlans);
+        fetchAPI<RoomType[]>(`property/hotels/${selectedHotelId}/room-types`).then(setRoomTypes);
     }, [selectedHotelId]);
 
     const handleBulkUpdate = async () => {
