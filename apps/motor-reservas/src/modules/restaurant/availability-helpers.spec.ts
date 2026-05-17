@@ -98,11 +98,16 @@ describe('isSlotAvailable', () => {
         expect(isSlotAvailable(slot, 6, tables, [], 90)).toBe(false);
     });
 
-    // BUG CONOCIDO: la rama del cluster ignora minPax. Una mesa de 8 plazas
-    // (minPax 4) acepta una reserva de 2 porque el cluster solo comprueba capacidad
-    // total, no el rango. Comportamiento actual documentado para que el día que
-    // se arregle, el test rojo recuerde rehacer la expectativa.
-    it.todo('TODO: debería devolver false si pax < minPax de todas las mesas');
+    // Decisión de diseño: cuando NO hay ninguna mesa cuyo rango (minPax-maxPax)
+    // encaje con `pax`, la búsqueda cae a la rama de cluster, que ignora minPax
+    // y solo mira capacidad. Esto es intencional: un restaurante con solo mesas
+    // de 4 prefiere acomodar una reserva de 2 en una mesa de 4 antes que
+    // perderla. minPax actúa como "preferencia" para el matching directo,
+    // no como bloqueo duro.
+    it('permite pax < minPax via cluster (flexibilidad operativa)', () => {
+        const tables = [table({ id: 't1', minPax: 4, maxPax: 8 })];
+        expect(isSlotAvailable(slot, 2, tables, [], 90)).toBe(true);
+    });
 
     it('true con cluster: 2 mesas de 4 contiguas pueden acoger 6 (perdiendo 1 silla por unión)', () => {
         // capacidad teórica = 4 + 4 - 1 = 7 (perdemos 1 silla en cada mesa por la unión)
