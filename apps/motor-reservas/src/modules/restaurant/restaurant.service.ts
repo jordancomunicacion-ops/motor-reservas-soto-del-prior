@@ -6,8 +6,11 @@ import { CrmService } from '../crm/crm.service';
 import { CrmIntegrationService } from '../crm/crm-integration.service';
 import { MailService } from '../mail/mail.service';
 import { ShiftType, ResBookingOrigin, UserRole, ResBookingStatus } from '../../common/enums';
-import { $Enums } from '@prisma/client';
+import { $Enums, Prisma } from '@prisma/client';
 import { getUserScope, assertRestaurantAccess, ensureRestaurantAccess, ensureHotelAccess } from '../../common/scope';
+import { zonedDateToUtc, zonedDayRangeUtc, toDateOnlyString } from '../../common/timezone';
+
+type TxOrPrisma = PrismaService | Prisma.TransactionClient;
 
 @Injectable()
 export class RestaurantService {
@@ -79,6 +82,17 @@ export class RestaurantService {
         });
         if (!b) throw new NotFoundException('Reserva no encontrada');
         return b.restaurantId;
+    }
+
+    private async getRestaurantTzAndDuration(restaurantId: string): Promise<{ timezone: string; defaultDuration: number }> {
+        const r = await this.prisma.restaurant.findUnique({
+            where: { id: restaurantId },
+            select: { timezone: true, defaultDuration: true }
+        });
+        return {
+            timezone: r?.timezone || 'Europe/Madrid',
+            defaultDuration: r?.defaultDuration || 90
+        };
     }
 
     /** Resuelve el restaurantId al que pertenece un AccessProfile. */
@@ -437,18 +451,9 @@ export class RestaurantService {
 
     async getTables(restaurantId: string, dateStr?: string, user?: any) {
         if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
-        let start: Date;
-        let end: Date;
-
-        if (dateStr) {
-            start = new Date(dateStr);
-            start.setUTCHours(0, 0, 0, 0);
-            end = new Date(dateStr);
-            end.setUTCHours(23, 59, 59, 999);
-        } else {
-            start = new Date(new Date().setUTCHours(0, 0, 0, 0));
-            end = new Date(new Date().setUTCHours(23, 59, 59, 999));
-        }
+        const { timezone } = await this.getRestaurantTzAndDuration(restaurantId);
+        const dayStr = toDateOnlyString(dateStr || new Date());
+        const { start, end } = zonedDayRangeUtc(dayStr, timezone);
 
         const zones = await this.prisma.zone.findMany({
             where: { restaurantId, isActive: true },
@@ -516,26 +521,39 @@ export class RestaurantService {
 
     async createBooking(data: any, user?: any) {
         if (user && data?.restaurantId) await ensureRestaurantAccess(user, this.prisma, data.restaurantId);
-        // Basic impl, can be expanded for validation
         const { name, ...rest } = data;
-        const booking = await this.prisma.resBooking.create({ 
-            data: {
-                ...rest,
-                guestName: data.guestName || name
-            } 
-        });
 
-        // Auto-assign Table if not provided
-        if (!booking.tableId && booking.restaurantId && booking.date) {
-            const restaurant = await this.prisma.restaurant.findUnique({ where: { id: booking.restaurantId }, select: { defaultDuration: true } });
-            const tableId = await this.findAvailableTable(booking.restaurantId, new Date(booking.date), booking.pax, restaurant?.defaultDuration || 90);
-            if (tableId) {
-                await this.prisma.resBooking.update({
-                    where: { id: booking.id },
-                    data: { tableId }
-                });
+        const booking = await this.prisma.$transaction(async (tx) => {
+            const created = await tx.resBooking.create({
+                data: {
+                    ...rest,
+                    guestName: data.guestName || name
+                }
+            });
+
+            if (!created.tableId && created.restaurantId && created.date) {
+                const { defaultDuration } = await this.getRestaurantTzAndDuration(created.restaurantId);
+                const cluster = await this.findAvailableCluster(
+                    created.restaurantId,
+                    new Date(created.date),
+                    created.pax,
+                    defaultDuration,
+                    tx
+                );
+                if (cluster) {
+                    return tx.resBooking.update({
+                        where: { id: created.id },
+                        data: {
+                            tableId: cluster.tableId,
+                            metadata: { ...(created.metadata as any || {}), linkedTableIds: cluster.linkedTableIds }
+                        }
+                    });
+                }
+                this.logger.warn(`createBooking ${created.id}: sin mesa libre tras re-verificación, queda sin asignar.`);
             }
-        }
+
+            return created;
+        });
 
         // Identify Guest in CRM
         this.crmService.identify({
@@ -553,44 +571,119 @@ export class RestaurantService {
         return booking;
     }
 
-    private async findAvailableTable(restaurantId: string, date: Date, pax: number, duration: number): Promise<string | null> {
-        const startOfDay = new Date(date);
-        startOfDay.setUTCHours(0, 0, 0, 0);
-        const endOfDay = new Date(date);
-        endOfDay.setUTCHours(23, 59, 59, 999);
+    private async findAvailableCluster(
+        restaurantId: string,
+        date: Date,
+        pax: number,
+        duration: number,
+        client: TxOrPrisma = this.prisma
+    ): Promise<{ tableId: string; linkedTableIds: string[] } | null> {
+        // Use a day window aligned to the date instant for booking lookup. Day-civil
+        // alignment is unnecessary here — we only need the booking set covering the
+        // slot window. ±1 day is conservatively safe for any TZ.
+        const startOfDay = new Date(date.getTime() - 24 * 60 * 60 * 1000);
+        const endOfDay = new Date(date.getTime() + 24 * 60 * 60 * 1000);
 
-        const tables = await this.prisma.table.findMany({
-            where: { zone: { restaurantId }, isActive: true }
+        // Events that block specific zones on this date
+        const dayEvents = await client.event.findMany({
+            where: {
+                restaurantId,
+                date: { gte: startOfDay, lte: endOfDay },
+                isActive: true
+            },
+            include: { zones: { select: { id: true } } }
+        });
+        const blockedZoneIds = dayEvents.flatMap(e => e.zones.map(z => z.id));
+
+        const tables = await client.table.findMany({
+            where: {
+                zone: {
+                    restaurantId,
+                    id: blockedZoneIds.length > 0 ? { notIn: blockedZoneIds } : undefined
+                },
+                isActive: true
+            }
         });
 
-        const bookings = await this.prisma.resBooking.findMany({
+        const bookings = await client.resBooking.findMany({
             where: {
                 restaurantId,
                 date: { gte: startOfDay, lte: endOfDay },
                 status: { notIn: [ResBookingStatus.CANCELLED, ResBookingStatus.RELEASED, ResBookingStatus.NO_SHOW] }
             },
-            select: { id: true, date: true, duration: true, tableId: true }
+            select: { id: true, date: true, duration: true, tableId: true, metadata: true }
         });
 
-        // 1. Try single table
-        const freeTables = tables.filter(table => {
-            const isBooked = bookings.some(b => {
-                if (!b.tableId || b.tableId !== table.id) return false;
-                const bStart = new Date(b.date);
-                const bEnd = new Date(bStart.getTime() + (b.duration || duration) * 60000);
-                
-                const slotEnd = new Date(date.getTime() + duration * 60000);
-                return (date < bEnd && slotEnd > bStart);
-            });
-            return !isBooked;
+        const slotEnd = new Date(date.getTime() + duration * 60000);
+        const isTableBookedNow = (tableId: string) => bookings.some(b => {
+            const bStart = new Date(b.date);
+            const bEnd = new Date(bStart.getTime() + (b.duration || duration) * 60000);
+            if (!(date < bEnd && slotEnd > bStart)) return false;
+            if (b.tableId === tableId) return true;
+            const meta = (b.metadata as any) || {};
+            const linked: string[] = Array.isArray(meta.linkedTableIds) ? meta.linkedTableIds : [];
+            return linked.includes(tableId);
         });
 
-        // Find smallest table that fits
-        const bestTable = freeTables
+        const freeTables = tables.filter(t => !isTableBookedNow(t.id));
+
+        // 1) Single table — smallest that fits (and respects minPax/maxPax)
+        const singleCandidate = freeTables
             .filter(t => t.maxPax >= pax && t.minPax <= pax)
-            .sort((a, b) => (a.maxPax - b.maxPax))[0];
+            .sort((a, b) => a.maxPax - b.maxPax)[0];
+        if (singleCandidate) return { tableId: singleCandidate.id, linkedTableIds: [] };
 
-        return bestTable ? bestTable.id : null;
+        // 2) Cluster of contiguous tables
+        let best: { ids: string[]; capacity: number } | null = null;
+        for (const start of freeTables) {
+            const cluster = this.buildClusterForPax(start, freeTables, pax);
+            if (cluster && (!best || cluster.ids.length < best.ids.length)) {
+                best = cluster;
+            }
+        }
+        if (!best || best.ids.length === 0) return null;
+
+        const [head, ...rest] = best.ids;
+        return { tableId: head, linkedTableIds: rest };
+    }
+
+    private buildClusterForPax(startTable: any, freeTables: any[], targetPax: number): { ids: string[]; capacity: number } | null {
+        const visited = new Set<string>();
+        const cluster: any[] = [startTable];
+        visited.add(startTable.id);
+
+        const capacityOf = (members: any[]): number => {
+            let cap = 0;
+            for (const t of members) {
+                const meta = (t.metadata as any) || {};
+                const neighborsInCluster = (meta.contiguousTableIds || [])
+                    .filter((id: string) => members.some(m => m.id === id)).length;
+                cap += Math.max(0, t.maxPax - neighborsInCluster * (t.seatsLostPerJoin || 1));
+            }
+            return cap;
+        };
+
+        let head = 0;
+        while (head < cluster.length) {
+            if (capacityOf(cluster) >= targetPax) {
+                return { ids: cluster.map(t => t.id), capacity: capacityOf(cluster) };
+            }
+            const table = cluster[head++];
+            const meta = (table.metadata as any) || {};
+            const neighborIds: string[] = meta.contiguousTableIds || [];
+            for (const nId of neighborIds) {
+                if (visited.has(nId)) continue;
+                const neighbor = freeTables.find(t => t.id === nId);
+                if (neighbor) {
+                    visited.add(nId);
+                    cluster.push(neighbor);
+                }
+            }
+        }
+        if (capacityOf(cluster) >= targetPax) {
+            return { ids: cluster.map(t => t.id), capacity: capacityOf(cluster) };
+        }
+        return null;
     }
 
     async updateBookingStatus(bookingId: string, status: string, tableId?: string, user?: any) {
@@ -660,25 +753,16 @@ export class RestaurantService {
 
     async getBookings(restaurantId: string, dateStr?: string, startDateStr?: string, endDateStr?: string, user?: any) {
         if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
+        const { timezone } = await this.getRestaurantTzAndDuration(restaurantId);
         let start: Date;
         let end: Date;
 
         if (startDateStr && endDateStr) {
-            start = new Date(startDateStr);
-            start.setUTCHours(0, 0, 0, 0);
-            end = new Date(endDateStr);
-            end.setUTCHours(23, 59, 59, 999);
-        } else if (dateStr) {
-            start = new Date(dateStr);
-            start.setUTCHours(0, 0, 0, 0);
-            end = new Date(dateStr);
-            end.setUTCHours(23, 59, 59, 999);
+            start = zonedDayRangeUtc(toDateOnlyString(startDateStr), timezone).start;
+            end = zonedDayRangeUtc(toDateOnlyString(endDateStr), timezone).end;
         } else {
-            // Default to today
-            start = new Date();
-            start.setUTCHours(0, 0, 0, 0);
-            end = new Date();
-            end.setUTCHours(23, 59, 59, 999);
+            const day = toDateOnlyString(dateStr || new Date());
+            ({ start, end } = zonedDayRangeUtc(day, timezone));
         }
 
         const bookings = await this.prisma.resBooking.findMany({
@@ -751,18 +835,19 @@ export class RestaurantService {
     }
 
     async getAvailableSlots(restaurantId: string, dateStr: string, pax: number, type?: string) {
-        console.log('--- BUSCANDO HUECOS (PROD) --- Restaurant:', restaurantId, 'Fecha:', dateStr, 'Pax:', pax);
-        const date = new Date(dateStr);
-        const now = new Date();
-        now.setUTCHours(0, 0, 0, 0);
+        const { timezone, defaultDuration } = await this.getRestaurantTzAndDuration(restaurantId);
+        const dayStr = toDateOnlyString(dateStr);
+        const { start: startOfDay, end: endOfDay } = zonedDayRangeUtc(dayStr, timezone);
 
-        // Si la fecha es anterior a hoy, devolvemos cerrado/vacío sin más
-        if (date < now) {
-            console.log('Fecha pasada detectada:', dateStr);
+        const todayStr = toDateOnlyString(new Date());
+        if (dayStr < todayStr) {
             return { slots: [], closed: true, message: 'Fecha pasada' };
         }
 
-        const dayOfWeek = date.getDay(); // 0-6
+        // dayOfWeek según la zona del restaurante (el inicio del día UTC es el midnight local del restaurante)
+        const dayOfWeek = new Date(
+            startOfDay.toLocaleString('en-US', { timeZone: timezone })
+        ).getDay();
 
         const shifts = await this.prisma.shift.findMany({
             where: {
@@ -772,23 +857,14 @@ export class RestaurantService {
             }
         });
 
-        // Filtro manual exacto de días de la semana para evitar errores de 'contains'
         const activeShifts = shifts.filter(s => {
             const days = s.daysOfWeek.split(',').map(d => d.trim());
             return days.includes(dayOfWeek.toString());
         });
 
-        console.log('Turnos activos encontrados para este día de la semana:', activeShifts.length);
-
-        // Si no hay turnos, está CERRADO, no COMPLETO
         if (activeShifts.length === 0) {
             return { slots: [], closed: true, message: 'No hay turnos para este día' };
         }
-
-        const startOfDay = new Date(date);
-        startOfDay.setUTCHours(0, 0, 0, 0);
-        const endOfDay = new Date(date);
-        endOfDay.setUTCHours(23, 59, 59, 999);
 
         // Check for events on this date and their blocked zones
         const dayEvents = await this.prisma.event.findMany({
@@ -799,9 +875,7 @@ export class RestaurantService {
             },
             include: {
                 zones: true,
-                _count: {
-                    select: { bookings: true }
-                }
+                _count: { select: { bookings: true } }
             }
         });
 
@@ -823,42 +897,26 @@ export class RestaurantService {
                 date: { gte: startOfDay, lte: endOfDay },
                 status: { notIn: [ResBookingStatus.CANCELLED, ResBookingStatus.RELEASED, ResBookingStatus.NO_SHOW] }
             },
-            select: { id: true, date: true, duration: true, tableId: true }
+            select: { id: true, date: true, duration: true, tableId: true, metadata: true }
         });
 
         const availableSlots: string[] = [];
-
-        const restaurant = await this.prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { defaultDuration: true } });
-        const defaultDuration = restaurant?.defaultDuration || 90;
+        const now = new Date();
 
         for (const shift of activeShifts) {
             const slots = this.generateSlots(shift.startTime, shift.endTime, shift.slotInterval);
 
             for (const slot of slots) {
-                const [h, m] = slot.split(':').map(Number);
-                const slotTime = new Date(date);
-                slotTime.setUTCHours(h, m, 0, 0);
+                const slotTime = zonedDateToUtc(dayStr, slot, timezone);
 
-                // No permitir horas que ya han pasado si el día es hoy
-                const now = new Date();
-                if (date.toISOString().split('T')[0] === now.toISOString().split('T')[0] && slotTime < now) {
-                    continue;
-                }
+                if (dayStr === todayStr && slotTime < now) continue;
 
                 if (this.isSlotAvailable(slotTime, pax, tables, bookings, defaultDuration)) {
-                    // Evitar duplicados en la lista de slots
                     if (!availableSlots.includes(slot)) {
                         availableSlots.push(slot);
                     }
                 }
             }
-        }
-
-        console.log('Huecos finales encontrados:', availableSlots.length);
-
-        // Si es una fecha pasada, siempre devolvemos closed: true
-        if (date < now) {
-            return { slots: [], closed: true, message: 'Fecha pasada' };
         }
 
         return {
@@ -869,69 +927,26 @@ export class RestaurantService {
     }
 
     private isSlotAvailable(slotTime: Date, pax: number, tables: any[], bookings: any[], defaultDuration: number = 90): boolean {
-        // Find free tables at this slotTime
         const freeTables = tables.filter(table => {
-            // Check if table is booked at this time
             const isBooked = bookings.some(b => {
-                if (!b.tableId || b.tableId !== table.id) return false;
+                const matchesTable = b.tableId === table.id ||
+                    (Array.isArray(((b.metadata as any) || {}).linkedTableIds) && ((b.metadata as any).linkedTableIds as string[]).includes(table.id));
+                if (!matchesTable) return false;
                 const bStart = new Date(b.date);
                 const bEnd = new Date(bStart.getTime() + (b.duration || defaultDuration) * 60000);
-                
+
                 const slotEnd = new Date(slotTime.getTime() + defaultDuration * 60000);
                 return (slotTime < bEnd && slotEnd > bStart);
             });
             return !isBooked;
         });
 
-        // 1. Try to find a single table that fits pax
         const singleTable = freeTables.find(t => t.maxPax >= pax && t.minPax <= pax);
         if (singleTable) return true;
 
-        // 2. Try to find a connected cluster of tables that sums up to pax
         for (const startTable of freeTables) {
-            if (this.canSatisfyPaxWithCluster(startTable, freeTables, pax)) {
+            if (this.buildClusterForPax(startTable, freeTables, pax)) {
                 return true;
-            }
-        }
-
-        return false;
-    }
-
-    private canSatisfyPaxWithCluster(startTable: any, freeTables: any[], targetPax: number): boolean {
-        const visited = new Set<string>();
-        // We use a queue for BFS, but we need to calculate the total capacity of the growing cluster
-        const cluster: any[] = [startTable];
-        visited.add(startTable.id);
-
-        let head = 0;
-
-        while (head < cluster.length) {
-            const table = cluster[head++];
-            
-            // Re-calculate the total capacity of the CURRENT cluster in each step
-            // to account for new links formed
-            let tempCapacity = 0;
-            for (const t of cluster) {
-                const metadata = (t.metadata as any) || {};
-                const neighborsInCluster = (metadata.contiguousTableIds || [])
-                    .filter((id: string) => cluster.some(ct => ct.id === id)).length;
-                
-                tempCapacity += Math.max(0, t.maxPax - (neighborsInCluster * (t.seatsLostPerJoin || 1)));
-            }
-            
-            if (tempCapacity >= targetPax) return true;
-
-            const metadata = (table.metadata as any) || {};
-            const neighborIds = metadata.contiguousTableIds || [];
-
-            for (const nId of neighborIds) {
-                if (visited.has(nId)) continue;
-                const neighbor = freeTables.find(t => t.id === nId);
-                if (neighbor) {
-                    visited.add(nId);
-                    cluster.push(neighbor);
-                    // Optimization: if adding this neighbor might solve it, we'll check in next iteration
-                }
             }
         }
 
@@ -964,36 +979,40 @@ export class RestaurantService {
         email: string;
     }, user?: any) {
         if (user) await ensureRestaurantAccess(user, this.prisma, data.restaurantId);
-        const [hours, minutes] = data.time.split(':').map(Number);
-        const start = new Date(data.date);
-        start.setUTCHours(hours, minutes, 0, 0);
+        const { timezone, defaultDuration } = await this.getRestaurantTzAndDuration(data.restaurantId);
+        const dayStr = toDateOnlyString(data.date);
+        const start = zonedDateToUtc(dayStr, data.time, timezone);
 
-        const booking = await this.prisma.resBooking.create({
-            data: {
-                restaurantId: data.restaurantId,
-                hotelBookingId: data.bookingId,
-                date: start,
-                pax: data.pax,
-                guestName: data.name,
-                guestEmail: data.email,
-                isMealPlan: true,
-                status: 'CONFIRMED',
-                origin: ResBookingOrigin.MANUAL
-            }
-        });
-
-        // Auto-assign Table (only for groups of 12 or less)
-        const restaurant = await this.prisma.restaurant.findUnique({ where: { id: data.restaurantId }, select: { defaultDuration: true } });
-        let tableId: string | null = null;
-        if (data.pax <= 12) {
-            tableId = await this.findAvailableTable(data.restaurantId, start, data.pax, restaurant?.defaultDuration || 90);
-        }
-        if (tableId) {
-            await this.prisma.resBooking.update({
-                where: { id: booking.id },
-                data: { tableId }
+        const booking = await this.prisma.$transaction(async (tx) => {
+            const created = await tx.resBooking.create({
+                data: {
+                    restaurantId: data.restaurantId,
+                    hotelBookingId: data.bookingId,
+                    date: start,
+                    pax: data.pax,
+                    guestName: data.name,
+                    guestEmail: data.email,
+                    isMealPlan: true,
+                    status: 'CONFIRMED',
+                    origin: ResBookingOrigin.MANUAL
+                }
             });
-        }
+
+            if (data.pax <= 12) {
+                const cluster = await this.findAvailableCluster(data.restaurantId, start, data.pax, defaultDuration, tx);
+                if (cluster) {
+                    return tx.resBooking.update({
+                        where: { id: created.id },
+                        data: {
+                            tableId: cluster.tableId,
+                            metadata: { ...(created.metadata as any || {}), linkedTableIds: cluster.linkedTableIds }
+                        }
+                    });
+                }
+                this.logger.warn(`createLinkedReservation ${created.id}: sin mesa libre.`);
+            }
+            return created;
+        });
 
         return booking;
     }
@@ -1007,51 +1026,52 @@ export class RestaurantService {
     }
 
     async createPublicReservation(data: any) {
-        const start = new Date(data.date);
-        // Si proporciona time, usarlo; sino usar 19:00 (hora de cena por defecto)
-        if (data.time) {
-            const [hours, minutes] = data.time.split(':').map(Number);
-            start.setUTCHours(hours, minutes, 0, 0);
-        } else {
-            start.setUTCHours(19, 0, 0, 0);
-        }
+        const { timezone, defaultDuration } = await this.getRestaurantTzAndDuration(data.restaurantId);
+        const dayStr = toDateOnlyString(data.date);
+        // Si no proporciona time, usar 19:00 local del restaurante.
+        const time: string = data.time || '19:00';
+        const start = zonedDateToUtc(dayStr, time, timezone);
 
-        const booking = await this.prisma.resBooking.create({
-            data: {
-                restaurantId: data.restaurantId,
-                date: start,
-                pax: data.pax,
-                guestName: data.guestName || data.name,
-                guestEmail: data.guestEmail || data.email,
-                guestPhone: data.guestPhone || data.phone,
-                guestSurname2: data.guestSurname2 || data.surname2,
-                guestAge: data.guestAge || data.age,
-                guestGender: data.guestGender || data.gender,
-                guestWhatsapp: data.guestWhatsapp || data.whatsapp,
-                instagram: data.instagram,
-                facebook: data.facebook,
-                tiktok: data.tiktok,
-                linkedin: data.linkedin,
-                xTwitter: data.xTwitter,
-                notes: data.notes,
-                status: $Enums.ResBookingStatus.PENDING_CONFIRMATION,
-                origin: ResBookingOrigin.WEB,
-                stripePaymentMethodId: data.paymentMethodId
-            }
-        });
-
-        // Auto-assign Table (only for groups of 12 or less)
-        const restaurant = await this.prisma.restaurant.findUnique({ where: { id: data.restaurantId }, select: { defaultDuration: true } });
-        let tableId: string | null = null;
-        if (data.pax <= 12) {
-            tableId = await this.findAvailableTable(data.restaurantId, start, data.pax, restaurant?.defaultDuration || 90);
-        }
-        if (tableId) {
-            await this.prisma.resBooking.update({
-                where: { id: booking.id },
-                data: { tableId }
+        const booking = await this.prisma.$transaction(async (tx) => {
+            const created = await tx.resBooking.create({
+                data: {
+                    restaurantId: data.restaurantId,
+                    date: start,
+                    pax: data.pax,
+                    guestName: data.guestName || data.name,
+                    guestEmail: data.guestEmail || data.email,
+                    guestPhone: data.guestPhone || data.phone,
+                    guestSurname2: data.guestSurname2 || data.surname2,
+                    guestAge: data.guestAge || data.age,
+                    guestGender: data.guestGender || data.gender,
+                    guestWhatsapp: data.guestWhatsapp || data.whatsapp,
+                    instagram: data.instagram,
+                    facebook: data.facebook,
+                    tiktok: data.tiktok,
+                    linkedin: data.linkedin,
+                    xTwitter: data.xTwitter,
+                    notes: data.notes,
+                    status: $Enums.ResBookingStatus.PENDING_CONFIRMATION,
+                    origin: ResBookingOrigin.WEB,
+                    stripePaymentMethodId: data.paymentMethodId
+                }
             });
-        }
+
+            if (data.pax <= 12) {
+                const cluster = await this.findAvailableCluster(data.restaurantId, start, data.pax, defaultDuration, tx);
+                if (cluster) {
+                    return tx.resBooking.update({
+                        where: { id: created.id },
+                        data: {
+                            tableId: cluster.tableId,
+                            metadata: { ...(created.metadata as any || {}), linkedTableIds: cluster.linkedTableIds }
+                        }
+                    });
+                }
+                this.logger.warn(`createPublicReservation ${created.id}: sin mesa libre.`);
+            }
+            return created;
+        });
 
         // Identify Guest in CRM
         this.crmService.identify({
@@ -1216,10 +1236,9 @@ export class RestaurantService {
     }
 
     async autoAssignPendingBookings(restaurantId: string, date: Date) {
-        const startOfDay = new Date(date);
-        startOfDay.setUTCHours(0, 0, 0, 0);
-        const endOfDay = new Date(date);
-        endOfDay.setUTCHours(23, 59, 59, 999);
+        const { timezone, defaultDuration } = await this.getRestaurantTzAndDuration(restaurantId);
+        const dayStr = toDateOnlyString(date);
+        const { start: startOfDay, end: endOfDay } = zonedDayRangeUtc(dayStr, timezone);
 
         const pendingBookings = await this.prisma.resBooking.findMany({
             where: {
@@ -1228,26 +1247,26 @@ export class RestaurantService {
                 tableId: null,
                 status: { notIn: [ResBookingStatus.CANCELLED, ResBookingStatus.NO_SHOW] }
             },
-            orderBy: { pax: 'desc' } // Assign larger groups first for better optimization
+            orderBy: { pax: 'desc' }
         });
 
         if (pendingBookings.length === 0) return;
 
-        this.logger.log(`Attempting to auto-assign ${pendingBookings.length} pending bookings for ${date.toDateString()}`);
-
-        const restaurant = await this.prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { defaultDuration: true } });
-        const duration = restaurant?.defaultDuration || 90;
+        this.logger.log(`Attempting to auto-assign ${pendingBookings.length} pending bookings for ${dayStr}`);
 
         for (const booking of pendingBookings) {
-            if (booking.pax > 12) continue; // Manual handling for large groups
-            
-            const tableId = await this.findAvailableTable(restaurantId, new Date(booking.date), booking.pax, duration);
-            if (tableId) {
+            if (booking.pax > 12) continue;
+
+            const cluster = await this.findAvailableCluster(restaurantId, new Date(booking.date), booking.pax, defaultDuration);
+            if (cluster) {
                 await this.prisma.resBooking.update({
                     where: { id: booking.id },
-                    data: { tableId }
+                    data: {
+                        tableId: cluster.tableId,
+                        metadata: { ...(booking.metadata as any || {}), linkedTableIds: cluster.linkedTableIds }
+                    }
                 });
-                this.logger.log(`Auto-assigned booking ${booking.id} to table ${tableId}`);
+                this.logger.log(`Auto-assigned booking ${booking.id} to table ${cluster.tableId} (linked: ${cluster.linkedTableIds.length})`);
             }
         }
     }
