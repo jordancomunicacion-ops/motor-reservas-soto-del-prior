@@ -260,11 +260,13 @@ export class RestaurantService {
         });
     }
 
+    private static readonly UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
     // --- Visual Plan & Zones ---
     async syncZones(restaurantId: string, zones: any[], user?: any) {
         if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
         for (const z of zones) {
-            if (z.id && z.id.length > 10) {
+            if (z.id && RestaurantService.UUID_RE.test(z.id)) {
                 await this.prisma.zone.update({ where: { id: z.id }, data: { name: z.name, index: z.index, isActive: z.isActive } });
             } else {
                 await this.prisma.zone.create({ data: { restaurantId, name: z.name, index: z.index } });
@@ -354,7 +356,7 @@ export class RestaurantService {
     }
 
     async getGuestStats(email?: string | null, phone?: string | null) {
-        if (!email && !phone) return { visitCount: 0, firstVisit: null, cancelledCount: 0, totalBookings: 0, cancellationRate: 0 };
+        if (!email && !phone) return { visitCount: 0, firstVisit: null, cancelledCount: 0, totalBookings: 0, cancelledOrNoShowRate: 0 };
 
         const bookings = await this.prisma.resBooking.findMany({
             where: {
@@ -369,11 +371,12 @@ export class RestaurantService {
             }
         });
 
-        const totalBookings = bookings.length;
-        const visitCount = bookings.filter(b => b.status === 'SEATED').length;
-        const cancelledCount = bookings.filter(b => b.status === 'CANCELLED' || b.status === 'NO_SHOW').length;
+        // Excluimos reservas no confirmadas: no son compromisos firmes y no procede contarlas como "ratio de incumplimiento".
+        const committed = bookings.filter(b => b.status !== 'PENDING_CONFIRMATION');
+        const totalBookings = committed.length;
+        const visitCount = committed.filter(b => b.status === 'SEATED').length;
+        const cancelledCount = committed.filter(b => b.status === 'CANCELLED' || b.status === 'NO_SHOW').length;
 
-        // Find first reservation date
         let firstVisit: Date | null = null;
         if (bookings.length > 0) {
             firstVisit = bookings.reduce((prev, curr) =>
@@ -386,7 +389,7 @@ export class RestaurantService {
             firstVisit,
             cancelledCount,
             totalBookings,
-            cancellationRate: totalBookings > 0 ? Math.round((cancelledCount / totalBookings) * 100) : 0
+            cancelledOrNoShowRate: totalBookings > 0 ? Math.round((cancelledCount / totalBookings) * 100) : 0
         };
     }
 
@@ -418,7 +421,7 @@ export class RestaurantService {
         for (const guest of guests) {
             const key = guest.email || guest.phone || '';
             if (!key) {
-                statsMap.set(key, { visitCount: 0, firstVisit: null, cancelledCount: 0, totalBookings: 0, cancellationRate: 0 });
+                statsMap.set(key, { visitCount: 0, firstVisit: null, cancelledCount: 0, totalBookings: 0, cancelledOrNoShowRate: 0 });
                 continue;
             }
 
@@ -427,9 +430,10 @@ export class RestaurantService {
                 (guest.phone && b.guestPhone === guest.phone)
             );
 
-            const totalBookings = guestBookings.length;
-            const visitCount = guestBookings.filter(b => b.status === 'SEATED').length;
-            const cancelledCount = guestBookings.filter(b => b.status === 'CANCELLED' || b.status === 'NO_SHOW').length;
+            const committed = guestBookings.filter(b => b.status !== 'PENDING_CONFIRMATION');
+            const totalBookings = committed.length;
+            const visitCount = committed.filter(b => b.status === 'SEATED').length;
+            const cancelledCount = committed.filter(b => b.status === 'CANCELLED' || b.status === 'NO_SHOW').length;
 
             let firstVisit: Date | null = null;
             if (guestBookings.length > 0) {
@@ -443,7 +447,7 @@ export class RestaurantService {
                 firstVisit,
                 cancelledCount,
                 totalBookings,
-                cancellationRate: totalBookings > 0 ? Math.round((cancelledCount / totalBookings) * 100) : 0
+                cancelledOrNoShowRate: totalBookings > 0 ? Math.round((cancelledCount / totalBookings) * 100) : 0
             });
         }
 
@@ -484,7 +488,7 @@ export class RestaurantService {
         // Attach stats to bookings
         for (const booking of bookings) {
             const key = booking.guestEmail || booking.guestPhone || '';
-            const stats = guestStatsMap.get(key) || { visitCount: 0, firstVisit: null, cancelledCount: 0, totalBookings: 0, cancellationRate: 0 };
+            const stats = guestStatsMap.get(key) || { visitCount: 0, firstVisit: null, cancelledCount: 0, totalBookings: 0, cancelledOrNoShowRate: 0 };
             (booking as any).visitCount = stats.visitCount;
             (booking as any).guestStats = stats;
         }
@@ -653,40 +657,55 @@ export class RestaurantService {
     }
 
     private buildClusterForPax(startTable: any, freeTables: any[], targetPax: number): { ids: string[]; capacity: number } | null {
-        const visited = new Set<string>();
+        const visited = new Set<string>([startTable.id]);
         const cluster: any[] = [startTable];
-        visited.add(startTable.id);
+        const neighborCountInCluster = new Map<string, number>([[startTable.id, 0]]);
+        const tableById = new Map<string, any>(freeTables.map(t => [t.id, t]));
 
-        const capacityOf = (members: any[]): number => {
-            let cap = 0;
-            for (const t of members) {
-                const meta = (t.metadata as any) || {};
-                const neighborsInCluster = (meta.contiguousTableIds || [])
-                    .filter((id: string) => members.some(m => m.id === id)).length;
-                cap += Math.max(0, t.maxPax - neighborsInCluster * (t.seatsLostPerJoin || 1));
-            }
-            return cap;
+        const capacityOfMember = (t: any) => {
+            const n = neighborCountInCluster.get(t.id) || 0;
+            return Math.max(0, t.maxPax - n * (t.seatsLostPerJoin || 1));
         };
+        let totalCapacity = capacityOfMember(startTable);
+
+        if (totalCapacity >= targetPax) {
+            return { ids: [startTable.id], capacity: totalCapacity };
+        }
 
         let head = 0;
         while (head < cluster.length) {
-            if (capacityOf(cluster) >= targetPax) {
-                return { ids: cluster.map(t => t.id), capacity: capacityOf(cluster) };
-            }
             const table = cluster[head++];
             const meta = (table.metadata as any) || {};
             const neighborIds: string[] = meta.contiguousTableIds || [];
+
             for (const nId of neighborIds) {
                 if (visited.has(nId)) continue;
-                const neighbor = freeTables.find(t => t.id === nId);
-                if (neighbor) {
-                    visited.add(nId);
-                    cluster.push(neighbor);
+                const neighbor = tableById.get(nId);
+                if (!neighbor) continue;
+
+                // Quitar el aporte de los miembros del cluster que enlazan con el nuevo vecino.
+                const neighborMeta = (neighbor.metadata as any) || {};
+                const neighborLinks: string[] = neighborMeta.contiguousTableIds || [];
+                let newNeighborInClusterCount = 0;
+                for (const linkId of neighborLinks) {
+                    if (!visited.has(linkId)) continue;
+                    const linked = tableById.get(linkId);
+                    if (!linked) continue;
+                    totalCapacity -= capacityOfMember(linked);
+                    neighborCountInCluster.set(linkId, (neighborCountInCluster.get(linkId) || 0) + 1);
+                    totalCapacity += capacityOfMember(linked);
+                    newNeighborInClusterCount++;
+                }
+
+                visited.add(nId);
+                cluster.push(neighbor);
+                neighborCountInCluster.set(nId, newNeighborInClusterCount);
+                totalCapacity += capacityOfMember(neighbor);
+
+                if (totalCapacity >= targetPax) {
+                    return { ids: cluster.map(t => t.id), capacity: totalCapacity };
                 }
             }
-        }
-        if (capacityOf(cluster) >= targetPax) {
-            return { ids: cluster.map(t => t.id), capacity: capacityOf(cluster) };
         }
         return null;
     }
@@ -789,7 +808,7 @@ export class RestaurantService {
         // Attach stats to bookings
         for (const booking of bookings) {
             const key = booking.guestEmail || booking.guestPhone || '';
-            const stats = guestStatsMap.get(key) || { visitCount: 0, firstVisit: null, cancelledCount: 0, totalBookings: 0, cancellationRate: 0 };
+            const stats = guestStatsMap.get(key) || { visitCount: 0, firstVisit: null, cancelledCount: 0, totalBookings: 0, cancelledOrNoShowRate: 0 };
             (booking as any).visitCount = stats.visitCount;
             (booking as any).guestStats = stats;
         }

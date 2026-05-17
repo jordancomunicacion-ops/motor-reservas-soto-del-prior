@@ -83,8 +83,8 @@ export class CrmIntegrationService {
     }
 
     private async getGuestStats(email?: string | null, phone?: string | null) {
-        if (!email && !phone) return { visitCount: 0, firstVisit: null, cancelledCount: 0, totalBookings: 0, cancellationRate: 0 };
-        
+        if (!email && !phone) return { visitCount: 0, firstVisit: null, cancelledCount: 0, totalBookings: 0, cancelledOrNoShowRate: 0 };
+
         const bookings = await this.prisma.resBooking.findMany({
             where: {
                 OR: [
@@ -98,13 +98,14 @@ export class CrmIntegrationService {
             }
         });
 
-        const totalBookings = bookings.length;
-        const visitCount = bookings.filter(b => b.status === 'SEATED').length;
-        const cancelledCount = bookings.filter(b => b.status === 'CANCELLED' || b.status === 'NO_SHOW').length;
-        
+        const committed = bookings.filter(b => b.status !== 'PENDING_CONFIRMATION');
+        const totalBookings = committed.length;
+        const visitCount = committed.filter(b => b.status === 'SEATED').length;
+        const cancelledCount = committed.filter(b => b.status === 'CANCELLED' || b.status === 'NO_SHOW').length;
+
         let firstVisit: Date | null = null;
         if (bookings.length > 0) {
-            firstVisit = bookings.reduce((prev, curr) => 
+            firstVisit = bookings.reduce((prev, curr) =>
                 (curr.date < prev.date) ? curr : prev
             ).date;
         }
@@ -114,7 +115,7 @@ export class CrmIntegrationService {
             firstVisit,
             cancelledCount,
             totalBookings,
-            cancellationRate: totalBookings > 0 ? Math.round((cancelledCount / totalBookings) * 100) : 0
+            cancelledOrNoShowRate: totalBookings > 0 ? Math.round((cancelledCount / totalBookings) * 100) : 0
         };
     }
 
@@ -225,7 +226,7 @@ export class CrmIntegrationService {
                     visitCount: stats.visitCount,
                     totalBookings: stats.totalBookings,
                     cancelledCount: stats.cancelledCount,
-                    cancellationRate: stats.cancellationRate,
+                    cancelledOrNoShowRate: stats.cancelledOrNoShowRate,
                     firstReservationDate: stats.firstVisit
                 },
                 tracking: {

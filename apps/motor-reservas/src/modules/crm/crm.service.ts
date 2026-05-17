@@ -9,35 +9,41 @@ export class CrmService {
     constructor(private prisma: PrismaService) { }
 
     async identify(data: { email?: string; phone?: string; firstName?: string; lastName?: string }) {
-        // 1. Try to find existing profile by Email (Highest Priority)
-        let profile: any = null;
-
+        // Email es @unique en CustomerProfile, así que lo usamos como clave idempotente
+        // vía upsert: dos llamadas concurrentes con el mismo email no crean duplicados.
         if (data.email) {
-            profile = await (this.prisma as any).customerProfile.findUnique({
+            return (this.prisma as any).customerProfile.upsert({
                 where: { email: data.email },
+                update: {
+                    firstName: data.firstName || undefined,
+                    lastName: data.lastName || undefined,
+                    phone: data.phone || undefined
+                },
+                create: {
+                    email: data.email,
+                    phone: data.phone,
+                    firstName: data.firstName,
+                    lastName: data.lastName,
+                    lifecycleStage: 'LEAD'
+                }
             });
         }
 
-        // 2. If not found, try by Phone
-        if (!profile && data.phone) {
-            // Phone is not unique in schema currently, but should be treated as identity key
-            // We find the most recent one
+        // Sin email: phone no es @unique. Buscamos el más reciente y actualizamos; si no, creamos.
+        let profile: any = null;
+        if (data.phone) {
             profile = await (this.prisma as any).customerProfile.findFirst({
                 where: { phone: data.phone },
                 orderBy: { updatedAt: 'desc' }
             });
         }
 
-        // 3. If found, update basic info if missing
         if (profile) {
             const updateData: any = {};
             if (!profile.firstName && data.firstName) updateData.firstName = data.firstName;
             if (!profile.lastName && data.lastName) updateData.lastName = data.lastName;
-            if (!profile.phone && data.phone) updateData.phone = data.phone;
-            if (!profile.email && data.email) updateData.email = data.email;
-
             if (Object.keys(updateData).length > 0) {
-                profile = await (this.prisma as any).customerProfile.update({
+                return (this.prisma as any).customerProfile.update({
                     where: { id: profile.id },
                     data: updateData
                 });
@@ -45,14 +51,12 @@ export class CrmService {
             return profile;
         }
 
-        // 4. If not found, create new
         return (this.prisma as any).customerProfile.create({
             data: {
-                email: data.email,
                 phone: data.phone,
                 firstName: data.firstName,
                 lastName: data.lastName,
-                lifecycleStage: 'LEAD',
+                lifecycleStage: 'LEAD'
             }
         });
     }
@@ -171,7 +175,7 @@ export class CrmService {
                 ...p,
                 scopedStats: {
                     totalBookings: 0, seatedCount: 0, cancelledCount: 0,
-                    cancellationRate: 0, lastReservation: null, firstReservation: null, totalPax: 0
+                    cancelledOrNoShowRate: 0, lastReservation: null, firstReservation: null, totalPax: 0
                 }
             }));
         }
@@ -202,10 +206,11 @@ export class CrmService {
                 (profile.phone && b.guestPhone === profile.phone)
             );
 
-            const totalBookings = matching.length;
-            const seatedCount = matching.filter(b => b.status === 'SEATED').length;
-            const cancelledCount = matching.filter(b => b.status === 'CANCELLED' || b.status === 'NO_SHOW').length;
-            const totalPax = matching.reduce((sum, b) => sum + (b.pax || 0), 0);
+            const committed = matching.filter(b => b.status !== 'PENDING_CONFIRMATION');
+            const totalBookings = committed.length;
+            const seatedCount = committed.filter(b => b.status === 'SEATED').length;
+            const cancelledCount = committed.filter(b => b.status === 'CANCELLED' || b.status === 'NO_SHOW').length;
+            const totalPax = committed.reduce((sum, b) => sum + (b.pax || 0), 0);
 
             let firstReservation: Date | null = null;
             let lastReservation: Date | null = null;
@@ -225,7 +230,7 @@ export class CrmService {
                     totalBookings,
                     seatedCount,
                     cancelledCount,
-                    cancellationRate: totalBookings > 0 ? Math.round((cancelledCount / totalBookings) * 100) : 0,
+                    cancelledOrNoShowRate: totalBookings > 0 ? Math.round((cancelledCount / totalBookings) * 100) : 0,
                     lastReservation,
                     firstReservation,
                     totalPax
