@@ -111,24 +111,27 @@ export class RestaurantService {
         if (user) await ensureRestaurantAccess(user, this.prisma, id);
         const { hotelId, ...rest } = data;
 
-        // Si llega mailConfig sanitizado (sin pass o clientSecret), preservar los del actual
+        // Si llega mailConfig sanitizado (sin pass o clientSecret), preservar los del actual.
+        // Convención: pass === null o clientSecret === null = borrar explícitamente.
+        // pass === '' o undefined = preservar el actual (input vacío).
         if (rest.mailConfig) {
             const existing = await this.prisma.restaurant.findUnique({ where: { id }, select: { mailConfig: true } });
             const currentCfg: any = existing?.mailConfig || {};
             const incoming: any = rest.mailConfig || {};
-            // Pass SMTP: si no llega o llega vacío, mantener el actual
-            if (!incoming.pass) {
+            if (incoming.pass === null) {
+                incoming.pass = '';
+            } else if (incoming.pass === undefined || incoming.pass === '') {
                 incoming.pass = currentCfg.pass;
             }
-            // Graph clientSecret: si no llega o no se incluye el objeto graph entero, mantener
             if (incoming.graph) {
-                if (!incoming.graph.clientSecret) {
+                if (incoming.graph.clientSecret === null) {
+                    incoming.graph.clientSecret = '';
+                } else if (incoming.graph.clientSecret === undefined || incoming.graph.clientSecret === '') {
                     incoming.graph.clientSecret = currentCfg.graph?.clientSecret;
                 }
             } else if (currentCfg.graph) {
                 incoming.graph = currentCfg.graph;
             }
-            // Eliminar campos solo-lectura que vienen del sanitizer
             delete incoming.passConfigured;
             if (incoming.graph) delete incoming.graph.clientSecretConfigured;
             rest.mailConfig = incoming;

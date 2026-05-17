@@ -74,16 +74,22 @@ export class PropertyService {
         const { restaurantId: rawRestaurantId, ...rest } = data;
         const restaurantId = (rawRestaurantId === 'none' || rawRestaurantId === '') ? null : rawRestaurantId;
 
-        // Si llega mailConfig sanitizado (sin pass o clientSecret), preservar los del actual
+        // Si llega mailConfig sanitizado (sin pass o clientSecret), preservar los del actual.
+        // Convención: pass === null o clientSecret === null = borrar explícitamente.
+        // pass === '' o undefined = preservar el actual (input vacío).
         if (rest.mailConfig) {
             const existing = await this.prisma.hotel.findUnique({ where: { id }, select: { mailConfig: true } });
             const currentCfg: any = existing?.mailConfig || {};
             const incoming: any = rest.mailConfig || {};
-            if (!incoming.pass) {
+            if (incoming.pass === null) {
+                incoming.pass = '';
+            } else if (incoming.pass === undefined || incoming.pass === '') {
                 incoming.pass = currentCfg.pass;
             }
             if (incoming.graph) {
-                if (!incoming.graph.clientSecret) {
+                if (incoming.graph.clientSecret === null) {
+                    incoming.graph.clientSecret = '';
+                } else if (incoming.graph.clientSecret === undefined || incoming.graph.clientSecret === '') {
                     incoming.graph.clientSecret = currentCfg.graph?.clientSecret;
                 }
             } else if (currentCfg.graph) {

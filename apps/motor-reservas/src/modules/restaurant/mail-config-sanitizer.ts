@@ -34,26 +34,18 @@ export interface SanitizedMailConfig {
 }
 
 /**
- * Forma mínima de un Hotel/Restaurant para esta función. mailConfig viene
- * de una columna Prisma `Json`, así que el shape es `unknown` hasta que
- * lo validamos dentro.
- */
-export interface WithMailConfig {
-    mailConfig?: unknown;
-}
-
-/**
  * Sanitiza datos sensibles del mailConfig antes de devolverlos en respuestas.
  * Quita contraseñas SMTP y client secrets, manteniendo banderas booleanas
  * (`passConfigured`, `clientSecretConfigured`) para que el admin sepa si
  * están configurados sin exponer el valor.
  *
  * Si la entidad es null o no tiene mailConfig (o no es objeto), se devuelve
- * tal cual.
+ * tal cual. Acepta cualquier shape porque el campo viene de un columna
+ * Prisma `Json`.
  */
-export function sanitizeMailConfig<T extends WithMailConfig>(entity: T | null | undefined): T | null | undefined {
+export function sanitizeMailConfig<T extends object>(entity: T | null | undefined): T | null | undefined {
     if (!entity) return entity;
-    const raw = entity.mailConfig;
+    const raw = (entity as { mailConfig?: unknown }).mailConfig;
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return entity;
     const cfg = raw as RawMailConfig;
 
