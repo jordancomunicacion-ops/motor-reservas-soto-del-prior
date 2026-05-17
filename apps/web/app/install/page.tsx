@@ -60,19 +60,20 @@ export default function InstallPage() {
                 })
             });
             setStep(4); // Success (was 3, now 4 because of extra step)
-        } catch (e: any) {
-            alert('Error en instalación: ' + e.message);
+        } catch (e) {
+            const message = e instanceof Error ? e.message : 'Error desconocido';
+            alert('Error en instalación: ' + message);
         } finally {
             setLoading(false);
         }
     }
 
+    type ZoneDraft = { name: string; tables: number };
     const addZone = () => setZones([...zones, { name: 'Nueva Zona', tables: 4 }]);
     const removeZone = (idx: number) => setZones(zones.filter((_, i) => i !== idx));
-    const updateZone = (idx: number, field: string, val: any) => {
+    const updateZone = <K extends keyof ZoneDraft>(idx: number, field: K, val: ZoneDraft[K]) => {
         const newZones = [...zones];
-        // @ts-ignore
-        newZones[idx][field] = val;
+        newZones[idx] = { ...newZones[idx], [field]: val };
         setZones(newZones);
     };
 

@@ -22,6 +22,10 @@ import type {
     RestaurantBooking,
     WaitlistEntry,
 } from '@/types/restaurant';
+import type { GuestBookingProfile } from '@/components/restaurant/GuestProfileSheet';
+import type { ReservationFormPayload } from '@/components/restaurant/ReservationForm';
+import type { WaitlistFormPayload } from '@/components/restaurant/WaitlistPanel';
+import type { TableUpdates } from '@/components/restaurant/TablePlan';
 
 function RestaurantDashboardContent() {
     const params = useParams();
@@ -41,8 +45,8 @@ function RestaurantDashboardContent() {
 
     // UI State
     const [isFormOpen, setIsFormOpen] = useState(false);
-    const [editingBooking, setEditingBooking] = useState<any>(null);
-    const [selectedBookingForProfile, setSelectedBookingForProfile] = useState<any>(null);
+    const [editingBooking, setEditingBooking] = useState<GuestBookingProfile | null>(null);
+    const [selectedBookingForProfile, setSelectedBookingForProfile] = useState<GuestBookingProfile | null>(null);
 
     useEffect(() => {
         loadData();
@@ -75,7 +79,7 @@ function RestaurantDashboardContent() {
         setLoading(false);
     }
 
-    const handleCreateBooking = async (data: any) => {
+    const handleCreateBooking = async (data: ReservationFormPayload) => {
         try {
             if (editingBooking?.id) {
                 await fetchAPI(`/restaurant/bookings/${editingBooking.id}`, { method: 'PATCH', body: JSON.stringify(data) });
@@ -85,11 +89,12 @@ function RestaurantDashboardContent() {
             setEditingBooking(null);
             loadData();
         } catch (e) {
+            console.error(e);
             alert(editingBooking ? "Error guardando cambios" : "Error creando reserva");
         }
     };
 
-    const openEditBooking = (booking: any) => {
+    const openEditBooking = (booking: GuestBookingProfile) => {
         setEditingBooking(booking);
         setIsFormOpen(true);
     };
@@ -99,10 +104,10 @@ function RestaurantDashboardContent() {
         setEditingBooking(null);
     };
 
-    const handleUpdateTable = async (tableId: string, updates: any) => {
+    const handleUpdateTable = async (tableId: string, updates: TableUpdates) => {
         // If it's a status update from the manual menu
         if (updates.bookingStatus) {
-            const table = rawTables.find((t: any) => t.id === tableId);
+            const table = rawTables.find(t => t.id === tableId);
             const booking = table?.resBookings?.[0];
             if (booking) {
                 handleStatusChange(booking.id, updates.bookingStatus);
@@ -124,7 +129,7 @@ function RestaurantDashboardContent() {
         }
     };
 
-    const handleAddWaitlist = async (data: any) => {
+    const handleAddWaitlist = async (data: WaitlistFormPayload) => {
         try {
             await fetchAPI(`/restaurant/${restaurantId}/waitlist`, {
                 method: 'POST',
@@ -132,6 +137,7 @@ function RestaurantDashboardContent() {
             });
             loadData();
         } catch (e) {
+            console.error(e);
             alert("Error en lista de espera");
         }
     };

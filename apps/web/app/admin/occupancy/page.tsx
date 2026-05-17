@@ -7,6 +7,8 @@ import type {
     RestaurantBooking,
     WaitlistEntry,
 } from '@/types/restaurant';
+import type { GuestBookingProfile } from '@/components/restaurant/GuestProfileSheet';
+import type { TableUpdates } from '@/components/restaurant/TablePlan';
 import { Button } from '@/components/ui/button';
 import { 
     ChevronLeft, 
@@ -60,7 +62,7 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
     const [rawTables, setRawTables] = useState<TableWithZone[]>([]); // Flattened tables
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
-    const [selectedBookingForProfile, setSelectedBookingForProfile] = useState<RestaurantBooking | null>(null);
+    const [selectedBookingForProfile, setSelectedBookingForProfile] = useState<GuestBookingProfile | null>(null);
 
     useEffect(() => {
         loadData();
@@ -102,17 +104,17 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
         }
     };
 
-    const handleUpdateTable = async (tableId: string, updates: any) => {
+    const handleUpdateTable = async (tableId: string, updates: TableUpdates) => {
         // If it's a status update from the manual menu
         if (updates.bookingStatus) {
-            const table = rawTables.find((t: any) => t.id === tableId);
+            const table = rawTables.find(t => t.id === tableId);
             const booking = table?.resBookings?.[0];
             if (booking) {
                 handleStatusChange(booking.id, updates.bookingStatus);
             }
             return;
         }
-        setRawTables((prev: any[]) => prev.map(t => t.id === tableId ? { ...t, ...updates } : t));
+        setRawTables(prev => prev.map(t => t.id === tableId ? { ...t, ...updates } : t));
     };
 
     const handleAssignTable = async (bookingId: string, tableId: string) => {
@@ -300,15 +302,25 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
     );
 }
 function HotelPlanning({ 
-    contextId, 
-    loading, 
-    roomTypes, 
-    bookings, 
-    dates, 
-    handlePrev, 
-    handleNext, 
-    handleToday 
-}: any) {
+    contextId,
+    loading,
+    roomTypes,
+    bookings,
+    dates,
+    handlePrev,
+    handleNext,
+    handleToday
+}: {
+    contextId: string;
+    loading: boolean;
+    roomTypes: RoomType[];
+    bookings: HotelBooking[];
+    viewDate?: Date;
+    dates: Date[];
+    handlePrev: () => void;
+    handleNext: () => void;
+    handleToday: () => void;
+}) {
     return (
         <div className="flex flex-col h-full gap-4">
             <header className="flex justify-between items-center bg-white dark:bg-zinc-800 p-3 rounded-lg shadow-sm border border-gray-100 dark:border-zinc-700">
@@ -341,14 +353,14 @@ function HotelPlanning({
                             </tr>
                         </thead>
                         <tbody>
-                            {roomTypes.map((type: any) => (
+                            {roomTypes.map(type => (
                                 <React.Fragment key={type.id}>
                                     <tr className="bg-gray-100/50 dark:bg-zinc-800/50">
                                         <td colSpan={dates.length + 1} className="p-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground border-b dark:border-zinc-700">
                                             {type.name}
                                         </td>
                                     </tr>
-                                    {type.rooms?.map((room: any) => (
+                                    {type.rooms?.map(room => (
                                         <tr key={room.id} className="group hover:bg-gray-50 dark:hover:bg-zinc-700/50">
                                             <td className="p-3 border-b dark:border-zinc-700 text-sm font-medium sticky left-0 bg-white dark:bg-zinc-800 z-10">{room.name}</td>
                                             {dates.map((date: Date) => {

@@ -191,7 +191,7 @@ export default function EventDetailPage() {
                                 <div className="pt-4 border-t border-gray-100 dark:border-zinc-700">
                                     <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider mb-2">Áreas Reservadas</p>
                                     <div className="flex flex-wrap gap-2">
-                                        {event.zones.map((zone: any) => (
+                                        {event.zones.map(zone => (
                                             <span key={zone.id} className="text-[10px] font-bold px-2 py-1 bg-zinc-100 dark:bg-zinc-700 rounded uppercase">
                                                 {zone.name}
                                             </span>

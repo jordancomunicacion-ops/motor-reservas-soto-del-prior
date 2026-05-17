@@ -19,7 +19,7 @@ import {
     Unlink
 } from "lucide-react";
 import { fetchAPI } from "@/lib/api";
-import TablePlan from "./TablePlan";
+import TablePlan, { type TableUpdates } from "./TablePlan";
 import { cn } from "@/lib/utils";
 
 interface Zone {
@@ -129,15 +129,15 @@ export default function TablePlanEditor({ restaurantId }: { restaurantId: string
         setSelectedTableId(newTable.id);
     };
 
-    const handleUpdateTable = (tableId: string, updates: any) => {
+    const handleUpdateTable = (tableId: string, updates: TableUpdates) => {
         setZones(prevZones => prevZones.map(z => ({
             ...z,
-            tables: z.tables.map(t => t.id === tableId ? { ...t, ...updates } : t)
+            tables: z.tables.map(t => t.id === tableId ? { ...t, ...updates } as Table : t)
         })));
     };
 
     // New helper for multiple updates at once
-    const handleUpdateTables = (updates: { id: string, data: any }[]) => {
+    const handleUpdateTables = (updates: { id: string, data: Partial<Table> }[]) => {
         setZones(prevZones => prevZones.map(z => ({
             ...z,
             tables: z.tables.map(t => {
@@ -169,28 +169,31 @@ export default function TablePlanEditor({ restaurantId }: { restaurantId: string
                     id: t.id.startsWith('temp-') ? undefined : t.id
                 }));
 
-                const savedTables = await fetchAPI(`/restaurant/zones/${zone.id}/tables/sync`, {
+                type SavedTable = Table & {
+                    metadata?: { contiguousTableIds?: string[] } | null;
+                };
+                const savedTables = await fetchAPI<SavedTable[]>(`/restaurant/zones/${zone.id}/tables/sync`, {
                     method: 'POST',
                     body: JSON.stringify(tablesToSync)
                 });
-                
+
                 // Create a mapping of originalId (temp or real) to NEW real ID
-                // We use 'name' as a secondary correlation if originalId is lost, 
+                // We use 'name' as a secondary correlation if originalId is lost,
                 // but syncTables should return them in order or with enough info.
                 // For now, let's assume the backend returns them in same order or we match by name.
                 const idMap: Record<string, string> = {};
-                savedTables.forEach((st: any, idx: number) => {
+                savedTables.forEach((st, idx) => {
                     idMap[tablesToSync[idx].originalId] = st.id;
                 });
 
                 // Update the state tables with real IDs
-                updatedZones[i] = { 
-                    ...zone, 
-                    tables: savedTables.map((st: any) => ({
+                updatedZones[i] = {
+                    ...zone,
+                    tables: savedTables.map(st => ({
                         ...st,
                         // Fix contiguousTableIds using the map
                         contiguousTableIds: (st.metadata?.contiguousTableIds || st.contiguousTableIds || [])
-                            .map((oldId: string) => idMap[oldId] || oldId)
+                            .map(oldId => idMap[oldId] || oldId)
                     }))
                 };
             }

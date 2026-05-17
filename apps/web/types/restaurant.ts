@@ -4,11 +4,40 @@
  * realmente se leen en el frontend. El servicio devuelve más.
  */
 
+/** Reserva mínima vista desde el plano (más campos que en RestaurantBooking). */
+export interface BookingOnTable {
+    id: string;
+    status: string;
+    date: string | Date;
+    guestName: string;
+    visitCount?: number;
+    notes?: string | null;
+    tags?: string | null;
+}
+
 export interface TableSummary {
     id: string;
     name?: string;
     capacity?: number;
-    resBookings?: Array<{ id: string; status?: string }>;
+    resBookings?: BookingOnTable[];
+}
+
+/** Mesa con datos visuales para renderizar en el plano. */
+export interface TableNodeData extends TableSummary {
+    isActive?: boolean;
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+    rotation?: number;
+    shape?: 'ROUND' | 'RECTANGLE' | string;
+    minPax?: number;
+    maxPax?: number;
+    seatsLostPerJoin?: number;
+    metadata?: { contiguousTableIds?: string[] } | null;
+    /** legado: algunos shapes lo traen fuera de metadata */
+    contiguousTableIds?: string[];
+    zoneId?: string;
 }
 
 export interface ZoneWithTables {

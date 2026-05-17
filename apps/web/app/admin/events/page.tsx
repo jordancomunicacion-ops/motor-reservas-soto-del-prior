@@ -345,7 +345,7 @@ export default function EventsListPage() {
                                         <Utensils className="w-3 h-3" /> {event.restaurant.name}
                                     </div>
                                 )}
-                                {event.zones?.map((zone: any) => (
+                                {event.zones?.map(zone => (
                                     <div key={zone.id} className="px-2 py-1 bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 text-[9px] font-bold uppercase rounded">
                                         {zone.name}
                                     </div>

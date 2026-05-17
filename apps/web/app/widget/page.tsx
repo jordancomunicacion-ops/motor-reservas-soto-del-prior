@@ -40,13 +40,30 @@ function WidgetContent() {
     const [pax, setPax] = useState(2);
 
     // Results
-    const [results, setResults] = useState<any[]>([]);
+    interface HotelAvailabilityResult {
+        id: string;
+        name: string;
+        totalPrice: number;
+        description?: string;
+    }
+    interface HotelWidgetConfig {
+        primaryColor?: string | null;
+        customCss?: string | null;
+        restaurantId?: string | null;
+    }
+    interface HotelBookingResult {
+        id?: string;
+        referenceCode?: string;
+        totalPrice?: number;
+    }
 
-    const [selectedRoom, setSelectedRoom] = useState<any>(null);
+    const [results, setResults] = useState<HotelAvailabilityResult[]>([]);
+
+    const [selectedRoom, setSelectedRoom] = useState<HotelAvailabilityResult | null>(null);
     const [guest, setGuest] = useState({ name: '', email: '', phone: '' });
-    const [config, setConfig] = useState<any>(null);
+    const [config, setConfig] = useState<HotelWidgetConfig | null>(null);
     const [submitting, setSubmitting] = useState(false);
-    const [bookingResult, setBookingResult] = useState<any>(null);
+    const [bookingResult, setBookingResult] = useState<HotelBookingResult | null>(null);
 
     // Synergy State
     const [meals, setMeals] = useState({ breakfast: false, lunch: false, dinner: false });
@@ -57,24 +74,24 @@ function WidgetContent() {
 
     useEffect(() => {
         // Load Config
-        fetchAPI(`/config/${hotelId}`).then(res => {
+        fetchAPI<HotelWidgetConfig>(`/config/${hotelId}`).then(res => {
             setConfig(res);
             if (res && res.primaryColor) setStyles({ primary: res.primaryColor, css: res.customCss || '' });
-        }).catch(err => console.log('Using default styles'));
+        }).catch(() => console.log('Using default styles'));
     }, [hotelId]);
 
     useEffect(() => {
         if (meals.lunch && config?.restaurantId) {
-            fetchAPI(`/restaurant/${config.restaurantId}/slots?date=${dates.from}&pax=${pax}&type=LUNCH`)
-                .then(setLunchSlots)
+            fetchAPI<{ slots?: string[] } | string[]>(`/restaurant/${config.restaurantId}/slots?date=${dates.from}&pax=${pax}&type=LUNCH`)
+                .then(data => setLunchSlots(Array.isArray(data) ? data : (data.slots ?? [])))
                 .catch(() => setLunchSlots(["13:30", "14:00", "14:30"]));
         }
     }, [meals.lunch, config?.restaurantId, dates.from, pax]);
 
     useEffect(() => {
         if (meals.dinner && config?.restaurantId) {
-            fetchAPI(`/restaurant/${config.restaurantId}/slots?date=${dates.from}&pax=${pax}&type=DINNER`)
-                .then(setDinnerSlots)
+            fetchAPI<{ slots?: string[] } | string[]>(`/restaurant/${config.restaurantId}/slots?date=${dates.from}&pax=${pax}&type=DINNER`)
+                .then(data => setDinnerSlots(Array.isArray(data) ? data : (data.slots ?? [])))
                 .catch(() => setDinnerSlots(["20:30", "21:00", "21:30"]));
         }
     }, [meals.dinner, config?.restaurantId, dates.from, pax]);
@@ -83,11 +100,11 @@ function WidgetContent() {
     async function handleSearch() {
         setLoading(true);
         try {
-            const res = await fetchAPI(`/bookings/availability?hotelId=${hotelId}&from=${dates.from}&to=${dates.to}&pax=${pax}`);
+            const res = await fetchAPI<HotelAvailabilityResult[]>(`/bookings/availability?hotelId=${hotelId}&from=${dates.from}&to=${dates.to}&pax=${pax}`);
             if (!Array.isArray(res)) throw new Error('API Error');
             setResults(res);
             setStep(2);
-        } catch (e) {
+        } catch {
             setResults([
                 { id: '1', name: 'Demo Deluxe Room', totalPrice: 250, description: 'Ocean view (Mock)' },
                 { id: '2', name: 'Demo Standard Room', totalPrice: 150, description: 'Cozy stay (Mock)' }
@@ -304,7 +321,7 @@ function WidgetContent() {
                                                     guestPhone: guest.phone,
                                                     checkInDate: dates.from,
                                                     checkOutDate: dates.to,
-                                                    roomTypeId: selectedRoom.id,
+                                                    roomTypeId: selectedRoom?.id,
                                                     pax
                                                 })
                                             });
@@ -333,7 +350,7 @@ function WidgetContent() {
                                         }
                                     }}
                                 >
-                                    {submitting ? 'Procesando...' : `Confirmar y Reservar €${selectedRoom?.totalPrice + (meals.breakfast ? 12 * 4 : 0)}`}
+                                    {submitting ? 'Procesando...' : `Confirmar y Reservar €${(selectedRoom?.totalPrice ?? 0) + (meals.breakfast ? 12 * 4 : 0)}`}
                                 </Button>
                                 <button onClick={() => setStep(3)} className="w-full text-center text-xs text-muted-foreground mt-2">Revisar extras</button>
                             </div>

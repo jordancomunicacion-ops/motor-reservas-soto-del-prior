@@ -6,15 +6,19 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Users, Clock, Edit2, RotateCw, GripHorizontal, Armchair, Ban, LayoutGrid, Link as LinkIcon, MessageSquare, GlassWater, UserCheck, Coffee, FileText, LogOut, UserCircle, Cake } from "lucide-react";
+import type { BookingOnTable, TableNodeData, ZoneWithTables } from '@/types/restaurant';
+import type { GuestBookingProfile } from './GuestProfileSheet';
+
+export type TableUpdates = Partial<TableNodeData> & { bookingStatus?: string };
 
 interface TableProps {
-    data: any;
-    onUpdate?: (id: string, updates: any) => void;
-    onDropReservation: (tableId: string, bookingData: any) => void;
+    data: TableNodeData;
+    onUpdate?: (id: string, updates: TableUpdates) => void;
+    onDropReservation: (tableId: string, bookingData: { id: string }) => void;
     onSelect?: (id: string) => void;
     mode: 'VIEW' | 'EDIT' | 'SERVICE';
     isSelected?: boolean;
-    onSelectProfile?: (booking: any) => void;
+    onSelectProfile?: (booking: GuestBookingProfile) => void;
 }
 
 function TableNode({ data, onUpdate, onDropReservation, onSelect, onSelectProfile, mode, isSelected }: TableProps) {
@@ -40,10 +44,10 @@ function TableNode({ data, onUpdate, onDropReservation, onSelect, onSelectProfil
         if (mode === 'EDIT') return "bg-zinc-50 border-zinc-300 text-zinc-900 shadow-sm";
         if (!data.isActive) return "bg-gray-100 border-gray-200 text-gray-400";
 
-        const bookings = data.resBookings || [];
-        
+        const bookings: BookingOnTable[] = data.resBookings || [];
+
         // Find the "most active" booking (the one that should define the color)
-        const activeBooking = bookings.find((b: any) => 
+        const activeBooking = bookings.find(b =>
             ['SEATED', 'BAR_ARRIVAL', 'DESSERT', 'BILL_REQUESTED', 'CLEANING', 'TO_REVIEW'].includes(b.status)
         ) || bookings[0];
 
@@ -54,7 +58,7 @@ function TableNode({ data, onUpdate, onDropReservation, onSelect, onSelectProfil
 
         // --- Turnover Warning (YELLOW) ---
         // If the table is currently occupied but there's another reservation starting in less than 45 mins
-        const nextBooking = bookings.find((b: any) => 
+        const nextBooking = bookings.find(b =>
             new Date(b.date).getTime() > new Date().getTime() && b.id !== activeBooking.id
         );
         
@@ -180,16 +184,16 @@ function TableNode({ data, onUpdate, onDropReservation, onSelect, onSelectProfil
             {mode !== 'EDIT' && activeBooking && (
                 <>
                     {/* Visit Count Badge */}
-                    {activeBooking.visitCount > 1 && (
+                    {(activeBooking.visitCount ?? 0) > 1 && (
                         <div className="absolute top-0.5 left-0.5 bg-yellow-400 text-black text-[7px] h-3.5 w-3.5 flex items-center justify-center rounded-full border border-black/20 font-black shadow-sm" title={`Visitas: ${activeBooking.visitCount}`}>
                             {activeBooking.visitCount}
                         </div>
                     )}
-                    
+
                     {/* Consecutive Bookings Badge */}
-                    {data.resBookings.length > 1 && (
+                    {(data.resBookings?.length ?? 0) > 1 && (
                         <div className="absolute bottom-0.5 right-0.5 bg-white/90 text-zinc-900 text-[7px] px-1 rounded-sm border border-zinc-200 font-bold shadow-xs">
-                            +{data.resBookings.length - 1}
+                            +{data.resBookings!.length - 1}
                         </div>
                     )}
 
@@ -210,7 +214,7 @@ function TableNode({ data, onUpdate, onDropReservation, onSelect, onSelectProfil
             )}
 
             {/* Indicator if table has contiguous links */}
-            {mode === 'EDIT' && (data.metadata?.contiguousTableIds?.length > 0 || data.contiguousTableIds?.length > 0) && (
+            {mode === 'EDIT' && ((data.metadata?.contiguousTableIds?.length ?? 0) > 0 || (data.contiguousTableIds?.length ?? 0) > 0) && (
                 <div className="absolute -bottom-1.5 -left-1.5 bg-blue-500 rounded-full p-0.5 shadow-sm">
                     <LinkIcon className="w-2 h-2 text-white" />
                 </div>
@@ -249,11 +253,11 @@ function TableNode({ data, onUpdate, onDropReservation, onSelect, onSelectProfil
                 <div className="absolute -bottom-8 flex bg-white dark:bg-zinc-800 border rounded shadow p-1 gap-1 z-50">
                     <RotateCw className="w-3.5 h-3.5 text-gray-500 cursor-pointer hover:text-blue-600" onClick={(e) => {
                         e.stopPropagation();
-                        onUpdate(data.id, { rotation: (data.rotation + 45) % 360 });
+                        onUpdate(data.id, { rotation: ((data.rotation ?? 0) + 45) % 360 });
                     }} />
                     <Armchair className="w-3.5 h-3.5 text-gray-500 cursor-pointer hover:text-blue-600" onClick={(e) => {
                         e.stopPropagation();
-                        onUpdate(data.id, { capacity: (data.capacity % 8) + 1 });
+                        onUpdate(data.id, { capacity: ((data.capacity ?? 0) % 8) + 1 });
                     }} />
                 </div>
             )}
@@ -276,12 +280,12 @@ export default function TablePlan({
     onActiveZoneChange,
     className
 }: {
-    zones: any[],
-    tables: any[],
-    onTableUpdate?: (tableId: string, data: any) => void,
+    zones: ZoneWithTables[],
+    tables: TableNodeData[],
+    onTableUpdate?: (tableId: string, data: TableUpdates) => void,
     onBookingMove: (bookingId: string, targetTableId: string) => void,
     onTableSelect?: (id: string) => void,
-    onSelectProfile?: (booking: any) => void,
+    onSelectProfile?: (booking: GuestBookingProfile) => void,
     selectedTableId?: string | null,
     restaurantId?: string,
     hideToolbar?: boolean,
