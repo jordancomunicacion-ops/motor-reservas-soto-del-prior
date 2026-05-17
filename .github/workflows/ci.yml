@@ -10,6 +10,11 @@ jobs:
   validate:
     name: Lint, typecheck, prisma validate
     runs-on: ubuntu-latest
+    # DATABASE_URL ficticio: prisma validate / generate cargan el datasource y
+    # exigen la variable aunque no abren conexión. Antes el CI pasaba porque
+    # el schema fallaba en validación sintáctica antes de leer env.
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
     steps:
       - uses: actions/checkout@v4
 
