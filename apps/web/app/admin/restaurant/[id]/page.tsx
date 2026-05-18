@@ -3,7 +3,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { CalendarIcon, ChevronLeft, ChevronRight, Plus, RefreshCw, LayoutGrid, List, Users } from 'lucide-react';
+import { CalendarIcon, ChevronLeft, ChevronRight, Plus, RefreshCw, LayoutGrid, List, Users, Star } from 'lucide-react';
 import { format, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -16,6 +16,7 @@ import { fetchAPI } from '@/lib/api';
 import { DateSelector } from '@/components/admin/DateSelector';
 
 import AccessManager from '@/components/admin/AccessManager';
+import ReviewsPanel from '@/components/admin/ReviewsPanel';
 import type {
     ZoneWithTables,
     TableWithZone,
@@ -253,6 +254,12 @@ function RestaurantDashboardContent() {
                             >
                                 <List className="w-4 h-4" /> Lista
                             </button>
+                            <button
+                                onClick={() => setView('REVIEWS')}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${view === 'REVIEWS' ? 'bg-white dark:bg-zinc-800 shadow text-black dark:text-white' : 'text-gray-500 hover:text-black dark:hover:text-white'}`}
+                            >
+                                <Star className="w-4 h-4" /> Valoraciones
+                            </button>
                         </div>
 
                         <div className="flex gap-2">
@@ -296,6 +303,12 @@ function RestaurantDashboardContent() {
                                     onSelectProfile={(b) => setSelectedBookingForProfile(b)}
                                     onEdit={openEditBooking}
                                 />
+                            </div>
+                        )}
+
+                        {view === 'REVIEWS' && (
+                            <div className="h-full overflow-auto p-4">
+                                <ReviewsPanel endpoint={`/restaurant/${restaurantId}/reviews`} />
                             </div>
                         )}
                     </div>

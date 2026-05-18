@@ -147,6 +147,19 @@ export default function ReservationList({ bookings, zones = [], onStatusChange, 
                                                     <Utensils className="w-2.5 h-2.5" /> MP
                                                 </Badge>
                                             )}
+                                            {booking.review && (() => {
+                                                const avg = (booking.review.serviceScore + booking.review.ambianceScore + booking.review.foodScore) / 3;
+                                                return (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => { e.stopPropagation(); onSelectProfile?.(booking); }}
+                                                        title={`Atención ${booking.review.serviceScore}/5 · Entorno ${booking.review.ambianceScore}/5 · Comida ${booking.review.foodScore}/5${booking.review.advice ? `\n"${booking.review.advice}"` : ''}`}
+                                                        className="inline-flex items-center gap-0.5 bg-amber-100 text-amber-800 border border-amber-200 text-[9px] h-4 px-1 rounded hover:bg-amber-200 transition-colors"
+                                                    >
+                                                        <Star className="w-2.5 h-2.5 fill-current" /> {avg.toFixed(1)}
+                                                    </button>
+                                                );
+                                            })()}
                                         </div>
                                         <div className="flex flex-col gap-0">
                                             {booking.guestPhone && <span className="text-xs text-gray-500">{booking.guestPhone}</span>}

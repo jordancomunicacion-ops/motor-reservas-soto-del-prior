@@ -9,7 +9,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { fetchAPI } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
-import { CalendarDays, Clock, Users, Receipt, ChevronRight, Loader2, Calendar as CalendarIcon, Filter, Phone, Mail, MessageSquare } from 'lucide-react';
+import { CalendarDays, Clock, Users, Receipt, ChevronRight, Loader2, Calendar as CalendarIcon, Filter, Phone, Mail, MessageSquare, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { 
@@ -38,6 +38,14 @@ interface Booking {
     phone?: string;
     email?: string;
     notes?: string;
+    review?: {
+        serviceScore: number;
+        ambianceScore: number;
+        foodScore: number;
+        advice: string | null;
+        redirectedToGoogle?: boolean;
+        createdAt: string;
+    } | null;
 }
 
 function CalendarReservationsContent() {
@@ -365,6 +373,17 @@ function CalendarReservationsContent() {
                                                     <Badge variant="outline" className={cn("text-[9px] px-1.5 py-0 uppercase font-bold", getStatusColor(booking.status))}>
                                                         {booking.status}
                                                     </Badge>
+                                                    {booking.review && (() => {
+                                                        const avg = (booking.review.serviceScore + booking.review.ambianceScore + booking.review.foodScore) / 3;
+                                                        return (
+                                                            <span
+                                                                className="inline-flex items-center gap-0.5 bg-amber-100 text-amber-800 border border-amber-200 text-[10px] px-1.5 py-0 rounded font-bold"
+                                                                title={`Atención ${booking.review.serviceScore}/5 · Entorno ${booking.review.ambianceScore}/5 · Comida ${booking.review.foodScore}/5${booking.review.advice ? `\n"${booking.review.advice}"` : ''}`}
+                                                            >
+                                                                <Star className="w-2.5 h-2.5 fill-current" /> {avg.toFixed(1)}
+                                                            </span>
+                                                        );
+                                                    })()}
                                                 </div>
                                                 <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                                                     <span className="flex items-center gap-1.5 font-medium text-zinc-600 dark:text-zinc-400">

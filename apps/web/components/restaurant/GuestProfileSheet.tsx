@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { Stars } from "@/components/admin/ReviewsPanel";
 
 export interface GuestBookingProfile {
     id: string;
@@ -50,6 +51,14 @@ export interface GuestBookingProfile {
         totalBookings: number;
         cancelledOrNoShowRate: number;
     };
+    review?: {
+        serviceScore: number;
+        ambianceScore: number;
+        foodScore: number;
+        advice: string | null;
+        redirectedToGoogle?: boolean;
+        createdAt: string | Date;
+    } | null;
 }
 
 interface GuestProfileSheetProps {
@@ -293,6 +302,43 @@ export default function GuestProfileSheet({ booking, isOpen, onClose }: GuestPro
                             )}
                         </div>
                     </section>
+
+                    {booking.review && (
+                        <section>
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-3 flex items-center gap-1">
+                                <Star className="w-3 h-3 text-amber-500" /> Valoración recibida
+                            </h3>
+                            <div className="bg-amber-50/40 border border-amber-100 rounded-lg p-3 space-y-2 text-sm">
+                                <div className="grid grid-cols-1 gap-1.5">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs text-stone-500">Atención</span>
+                                        <Stars value={booking.review.serviceScore} />
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs text-stone-500">Entorno</span>
+                                        <Stars value={booking.review.ambianceScore} />
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs text-stone-500">Comida</span>
+                                        <Stars value={booking.review.foodScore} />
+                                    </div>
+                                </div>
+                                {booking.review.advice && (
+                                    <blockquote className="text-xs italic text-stone-600 border-l-2 border-amber-300 pl-2 mt-2">
+                                        {booking.review.advice}
+                                    </blockquote>
+                                )}
+                                <div className="flex items-center justify-between text-[10px] text-stone-400 pt-1">
+                                    <span>Enviada {fmtDate(booking.review.createdAt, true)}</span>
+                                    {booking.review.redirectedToGoogle && (
+                                        <span className="inline-flex items-center gap-1 bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold uppercase">
+                                            <ExternalLink className="w-2.5 h-2.5" /> Google
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        </section>
+                    )}
 
                     <section>
                         <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-3">Notificaciones enviadas</h3>

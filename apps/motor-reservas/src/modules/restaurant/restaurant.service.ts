@@ -630,7 +630,10 @@ export class RestaurantService {
                 restaurantId,
                 date: { gte: start, lte: end }
             },
-            include: { table: { include: { zone: true } } },
+            include: {
+                table: { include: { zone: true } },
+                review: { select: { serviceScore: true, ambianceScore: true, foodScore: true, advice: true, createdAt: true, redirectedToGoogle: true } },
+            },
             orderBy: { date: 'asc' }
         });
 
