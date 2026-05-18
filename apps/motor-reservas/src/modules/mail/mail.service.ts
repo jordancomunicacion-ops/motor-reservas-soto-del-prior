@@ -277,13 +277,19 @@ export class MailService {
         let html = '';
         let subject = '';
 
+        const publicUrl = process.env.PUBLIC_WEB_URL || 'https://reservas.sotodelprior.com';
+        const manageLink = booking.modifyToken
+            ? `${publicUrl}/restaurant/modify?id=${booking.id}&token=${booking.modifyToken}`
+            : `${publicUrl}/restaurant/modify?id=${booking.id}`;
+
         const data = {
             name: booking.guestName,
             date: new Date(booking.date).toLocaleDateString(),
             time: new Date(booking.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             pax: booking.pax,
             restaurant_name: restaurant.name,
-            modify_link: `https://motor.sotodelprior.com/restaurant/modify?id=${booking.id}`,
+            modify_link: manageLink,
+            cancel_link: manageLink,
             ...extraData
         };
 

@@ -133,10 +133,43 @@ export class RestaurantController {
         return this.service.confirmReservation(id);
     }
 
+    // --- Self-service público (enlace desde email) ---
+
     @Public()
-    @Post('reservation/:id/cancel')
-    cancelReservation(@Param('id') id: string) {
-        return this.service.cancelReservation(id);
+    @Get('public/reservation/:id')
+    async getPublicReservation(@Param('id') id: string, @Query('token') token: string) {
+        try {
+            return await this.service.getPublicReservation(id, token);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            return { error: true, message };
+        }
+    }
+
+    @Public()
+    @Patch('public/reservation/:id')
+    async updatePublicReservation(
+        @Param('id') id: string,
+        @Query('token') token: string,
+        @Body() body: { date?: string; time?: string; pax?: number; notes?: string }
+    ) {
+        try {
+            return await this.service.updatePublicReservation(id, token, body);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            return { error: true, message };
+        }
+    }
+
+    @Public()
+    @Post('public/reservation/:id/cancel')
+    async cancelPublicReservation(@Param('id') id: string, @Query('token') token: string) {
+        try {
+            return await this.service.cancelPublicReservation(id, token);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            return { error: true, message };
+        }
     }
 
     @Roles('ADMIN')

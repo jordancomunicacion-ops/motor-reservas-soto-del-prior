@@ -670,6 +670,9 @@ model ResBooking {
   channelId      String?
   channel        RestaurantChannel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
 
+  // Token para auto-gestión pública (modificar/cancelar desde email)
+  modifyToken String? @unique
+
   metadata Json? @default("{}")
 
   @@index([restaurantId, status])

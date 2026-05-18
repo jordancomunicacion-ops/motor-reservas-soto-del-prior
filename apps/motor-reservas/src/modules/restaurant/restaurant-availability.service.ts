@@ -191,6 +191,7 @@ export class RestaurantAvailabilityService {
         duration: number,
         client: TxOrPrisma = this.prisma,
         bufferMinutes = 0,
+        excludeBookingId?: string,
     ): Promise<{ tableId: string; linkedTableIds: string[] } | null> {
         const blockedZoneIds = await this.blockedZoneIdsFor(restaurantId, date, client);
 
@@ -204,7 +205,7 @@ export class RestaurantAvailabilityService {
             },
         });
 
-        const bookings = await this.loadDayBookings(restaurantId, date, client);
+        const bookings = await this.loadDayBookings(restaurantId, date, client, excludeBookingId);
         return selectTableOrCluster(date, pax, tables as SlotTable[], bookings, duration, bufferMinutes);
     }
 
@@ -219,7 +220,7 @@ export class RestaurantAvailabilityService {
         return events.flatMap(e => e.zones.map(z => z.id));
     }
 
-    private async loadDayBookings(restaurantId: string, date: Date, client: TxOrPrisma): Promise<SlotBooking[]> {
+    private async loadDayBookings(restaurantId: string, date: Date, client: TxOrPrisma, excludeBookingId?: string): Promise<SlotBooking[]> {
         const startOfDay = new Date(date.getTime() - 24 * 60 * 60 * 1000);
         const endOfDay = new Date(date.getTime() + 24 * 60 * 60 * 1000);
         const raws = await client.resBooking.findMany({
@@ -227,6 +228,7 @@ export class RestaurantAvailabilityService {
                 restaurantId,
                 date: { gte: startOfDay, lte: endOfDay },
                 status: { notIn: [ResBookingStatus.CANCELLED, ResBookingStatus.RELEASED, ResBookingStatus.NO_SHOW] },
+                ...(excludeBookingId ? { id: { not: excludeBookingId } } : {}),
             },
             select: bookingProjection,
         });

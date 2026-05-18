@@ -1,4 +1,5 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { randomBytes } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { WaitlistService } from './waitlist.service';
 import { CrmService } from '../crm/crm.service';
@@ -11,6 +12,9 @@ import { RestaurantAvailabilityService } from './restaurant-availability.service
 import { RestaurantAccessService } from './restaurant-access.service';
 import { sanitizeMailConfig } from './mail-config-sanitizer';
 import { toDateOnlyString, zonedDateToUtc, zonedDayRangeUtc } from '../../common/timezone';
+
+// Margen mínimo (en minutos) antes de la reserva para permitir modificar/cancelar desde la web pública.
+const PUBLIC_EDIT_CUTOFF_MINUTES = 120;
 
 @Injectable()
 export class RestaurantService {
@@ -749,6 +753,148 @@ export class RestaurantService {
         return this.updateBookingStatus(id, 'CANCELLED');
     }
 
+    // --- Public self-service (modify / cancel desde el email) ---
+
+    private async findBookingByIdAndToken(id: string, token: string) {
+        if (!id || !token) throw new BadRequestException('Faltan parámetros.');
+        const booking = await this.prisma.resBooking.findUnique({
+            where: { id },
+            include: { restaurant: { select: { id: true, name: true, contactEmail: true } } }
+        });
+        if (!booking || !booking.modifyToken || booking.modifyToken !== token) {
+            throw new NotFoundException('Reserva no encontrada.');
+        }
+        return booking;
+    }
+
+    private ensureWithinEditCutoff(date: Date) {
+        const minutesUntil = (new Date(date).getTime() - Date.now()) / 60000;
+        if (minutesUntil < PUBLIC_EDIT_CUTOFF_MINUTES) {
+            throw new ForbiddenException(`Las reservas solo pueden modificarse o cancelarse con al menos ${PUBLIC_EDIT_CUTOFF_MINUTES / 60}h de antelación.`);
+        }
+    }
+
+    async getPublicReservation(id: string, token: string) {
+        const booking = await this.findBookingByIdAndToken(id, token);
+        const { timezone } = await this.getRestaurantConfig(booking.restaurantId);
+
+        const isCancelled = booking.status === $Enums.ResBookingStatus.CANCELLED;
+        const minutesUntil = (booking.date.getTime() - Date.now()) / 60000;
+        const editable = !isCancelled && minutesUntil >= PUBLIC_EDIT_CUTOFF_MINUTES;
+
+        return {
+            id: booking.id,
+            status: booking.status,
+            date: booking.date,
+            pax: booking.pax,
+            notes: booking.notes,
+            guestName: booking.guestName,
+            guestEmail: booking.guestEmail,
+            restaurantId: booking.restaurantId,
+            restaurantName: booking.restaurant.name,
+            restaurantTimezone: timezone,
+            editable,
+            editCutoffMinutes: PUBLIC_EDIT_CUTOFF_MINUTES
+        };
+    }
+
+    async updatePublicReservation(id: string, token: string, body: { date?: string; time?: string; pax?: number; notes?: string }) {
+        const booking = await this.findBookingByIdAndToken(id, token);
+        if (booking.status === $Enums.ResBookingStatus.CANCELLED) {
+            throw new BadRequestException('La reserva está cancelada.');
+        }
+        this.ensureWithinEditCutoff(booking.date);
+
+        const { timezone, defaultDuration, bufferMinutes } = await this.getRestaurantConfig(booking.restaurantId);
+
+        const changingSlot = body.date != null || body.time != null || (body.pax != null && body.pax !== booking.pax);
+        let newStart = booking.date;
+        const newPax = body.pax ?? booking.pax;
+
+        if (changingSlot) {
+            if (!body.date || !body.time) {
+                throw new BadRequestException('Para cambiar el horario hay que enviar date y time.');
+            }
+            const dayStr = toDateOnlyString(body.date);
+            newStart = zonedDateToUtc(dayStr, body.time, timezone);
+            this.ensureWithinEditCutoff(newStart);
+
+            const closures = await this.prisma.restaurantClosure.findMany({
+                where: {
+                    restaurantId: booking.restaurantId,
+                    date: { lte: newStart },
+                    OR: [
+                        { endDate: null, date: { equals: newStart } },
+                        { endDate: { gte: newStart } }
+                    ]
+                }
+            });
+            if (closures.length > 0) {
+                throw new BadRequestException('Restaurante cerrado en la nueva fecha.');
+            }
+
+            if (newPax <= 12) {
+                const preCheck = await this.availability.findAvailableCluster(
+                    booking.restaurantId, newStart, newPax, defaultDuration, this.prisma, bufferMinutes, booking.id
+                );
+                if (!preCheck) {
+                    throw new BadRequestException('No hay disponibilidad para la nueva fecha/hora.');
+                }
+            }
+        }
+
+        const updated = await this.prisma.$transaction(async (tx) => {
+            const data: any = {};
+            if (changingSlot) {
+                data.date = newStart;
+                data.tableId = null;
+                data.metadata = { ...((booking.metadata as any) || {}), linkedTableIds: [] };
+            }
+            if (body.pax != null) data.pax = body.pax;
+            if (body.notes !== undefined) data.notes = body.notes;
+
+            const result = await tx.resBooking.update({ where: { id: booking.id }, data });
+
+            if (changingSlot && newPax <= 12) {
+                const cluster = await this.availability.findAvailableCluster(
+                    booking.restaurantId, newStart, newPax, defaultDuration, tx, bufferMinutes, booking.id
+                );
+                if (cluster) {
+                    return tx.resBooking.update({
+                        where: { id: booking.id },
+                        data: {
+                            tableId: cluster.tableId,
+                            metadata: { ...((result.metadata as any) || {}), linkedTableIds: cluster.linkedTableIds }
+                        }
+                    });
+                }
+                this.logger.warn(`updatePublicReservation ${booking.id}: sin mesa libre tras pre-check (race).`);
+            }
+            return result;
+        });
+
+        this.crmIntegrationService.syncRestaurantBooking(updated.id, 'UPDATED').catch(err => {
+            this.logger.error(`Error syncing updated booking ${updated.id} to CRM:`, err);
+        });
+
+        if (updated.guestEmail) {
+            this.mailService.sendRestaurantNotification(updated, 'modified').catch(err => {
+                this.logger.error(`Error sending modified email for booking ${updated.id}:`, err);
+            });
+        }
+
+        return updated;
+    }
+
+    async cancelPublicReservation(id: string, token: string) {
+        const booking = await this.findBookingByIdAndToken(id, token);
+        if (booking.status === $Enums.ResBookingStatus.CANCELLED) {
+            return booking;
+        }
+        this.ensureWithinEditCutoff(booking.date);
+        return this.updateBookingStatus(booking.id, 'CANCELLED');
+    }
+
     async createPublicReservation(data: any) {
         if (!data?.time) {
             throw new BadRequestException('Falta el campo "time" (HH:mm) en la reserva.');
@@ -803,7 +949,8 @@ export class RestaurantService {
                     notes: data.notes,
                     status: $Enums.ResBookingStatus.PENDING_CONFIRMATION,
                     origin: ResBookingOrigin.WEB,
-                    stripePaymentMethodId: data.paymentMethodId
+                    stripePaymentMethodId: data.paymentMethodId,
+                    modifyToken: randomBytes(24).toString('hex')
                 }
             });
 
