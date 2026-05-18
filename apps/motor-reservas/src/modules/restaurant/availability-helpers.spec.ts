@@ -3,6 +3,8 @@ import {
     isTableBooked,
     isSlotAvailable,
     canSatisfyPaxWithCluster,
+    findClusterForPax,
+    selectTableOrCluster,
     type SlotTable,
     type SlotBooking,
 } from './availability-helpers';
@@ -15,11 +17,18 @@ const table = (overrides: Partial<SlotTable> & Pick<SlotTable, 'id'>): SlotTable
     metadata: overrides.metadata ?? {},
 });
 
-const booking = (id: string, tableId: string | null, isoDate: string, duration = 90): SlotBooking => ({
+const booking = (
+    id: string,
+    tableId: string | null,
+    isoDate: string,
+    duration = 90,
+    linkedTableIds?: string[],
+): SlotBooking => ({
     id,
     tableId,
     date: new Date(isoDate),
     duration,
+    ...(linkedTableIds ? { linkedTableIds } : {}),
 });
 
 describe('generateSlots', () => {
@@ -73,9 +82,69 @@ describe('isTableBooked', () => {
         expect(isTableBooked(t1, new Date('2026-05-20T15:30:00Z'), 90, bookings)).toBe(true);
     });
 
-    it('ignora bookings con tableId null', () => {
+    it('ignora bookings con tableId null y sin cluster enlazado', () => {
         const bookings = [booking('b1', null, '2026-05-20T13:00:00Z')];
         expect(isTableBooked(t1, new Date('2026-05-20T13:00:00Z'), 90, bookings)).toBe(false);
+    });
+
+    it('true cuando la reserva ocupa la mesa vía linkedTableIds del cluster', () => {
+        // reserva cabecera en t2 con t1 enlazada
+        const bookings = [booking('b1', 't2', '2026-05-20T13:00:00Z', 90, ['t1'])];
+        expect(isTableBooked(t1, new Date('2026-05-20T13:30:00Z'), 90, bookings)).toBe(true);
+    });
+});
+
+describe('findClusterForPax', () => {
+    it('devuelve [start] si la mesa única ya cubre el pax', () => {
+        const t1 = table({ id: 't1', maxPax: 6 });
+        expect(findClusterForPax(t1, [t1], 4)).toEqual(['t1']);
+    });
+
+    it('expande BFS y devuelve los IDs del cluster que cubre el pax', () => {
+        const t1 = table({ id: 't1', maxPax: 4, metadata: { contiguousTableIds: ['t2'] } });
+        const t2 = table({ id: 't2', maxPax: 4, metadata: { contiguousTableIds: ['t1'] } });
+        expect(findClusterForPax(t1, [t1, t2], 6)).toEqual(['t1', 't2']);
+    });
+
+    it('null si ningún cluster posible cubre el pax', () => {
+        const t1 = table({ id: 't1', maxPax: 2 });
+        expect(findClusterForPax(t1, [t1], 10)).toBeNull();
+    });
+});
+
+describe('selectTableOrCluster', () => {
+    const slot = new Date('2026-05-20T13:00:00Z');
+
+    it('escoge la mesa única más pequeña que encaja', () => {
+        const tables = [
+            table({ id: 't1', minPax: 1, maxPax: 8 }),
+            table({ id: 't2', minPax: 1, maxPax: 4 }),
+        ];
+        expect(selectTableOrCluster(slot, 3, tables, [], 90)).toEqual({ tableId: 't2', linkedTableIds: [] });
+    });
+
+    it('cae a cluster y devuelve los enlazados aparte del head', () => {
+        const tables = [
+            table({ id: 't1', minPax: 1, maxPax: 4, metadata: { contiguousTableIds: ['t2'] } }),
+            table({ id: 't2', minPax: 1, maxPax: 4, metadata: { contiguousTableIds: ['t1'] } }),
+        ];
+        const res = selectTableOrCluster(slot, 6, tables, [], 90);
+        expect(res).toEqual({ tableId: 't1', linkedTableIds: ['t2'] });
+    });
+
+    it('null si ninguna mesa libre encaja ni hay cluster suficiente', () => {
+        const tables = [table({ id: 't1', minPax: 1, maxPax: 2 })];
+        expect(selectTableOrCluster(slot, 10, tables, [], 90)).toBeNull();
+    });
+
+    it('respeta linkedTableIds en bookings al detectar mesas ocupadas', () => {
+        const tables = [
+            table({ id: 't1', minPax: 1, maxPax: 4, metadata: { contiguousTableIds: ['t2'] } }),
+            table({ id: 't2', minPax: 1, maxPax: 4, metadata: { contiguousTableIds: ['t1'] } }),
+        ];
+        const bookings = [booking('b1', 't1', '2026-05-20T13:00:00Z', 90, ['t2'])];
+        // ambas mesas bloqueadas por la reserva existente
+        expect(selectTableOrCluster(slot, 2, tables, bookings, 90)).toBeNull();
     });
 });
 

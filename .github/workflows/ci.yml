@@ -10,6 +10,11 @@ jobs:
   validate:
     name: Lint, typecheck, prisma validate
     runs-on: ubuntu-latest
+    # DATABASE_URL ficticio: prisma validate / generate cargan el datasource y
+    # exigen la variable aunque no abren conexión. Antes el CI pasaba porque
+    # el schema fallaba en validación sintáctica antes de leer env.
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
     steps:
       - uses: actions/checkout@v4
 
@@ -20,6 +25,12 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # Workaround para https://github.com/npm/cli/issues/4828:
+      # npm ci omite optional deps específicas de plataforma. rolldown (usado por vitest)
+      # depende de @rolldown/binding-<plataforma> como optional. Lo instalamos a mano.
+      - name: Install rolldown linux binding (npm optional deps bug)
+        run: npm install @rolldown/binding-linux-x64-gnu --no-save --no-audit --no-fund
 
       - name: Prisma generate (motor-reservas)
         run: npx prisma generate --schema=apps/motor-reservas/prisma/schema.prisma

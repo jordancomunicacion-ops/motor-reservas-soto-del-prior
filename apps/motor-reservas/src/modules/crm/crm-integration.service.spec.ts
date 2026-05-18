@@ -18,7 +18,7 @@ const makePrisma = (): PrismaMock => ({
 // Mock global fetch para que NO haga red real.
 const fetchMock: jest.Mock = jest.fn();
 beforeAll(() => {
-    (globalThis as { fetch: jest.Mock }).fetch = fetchMock;
+    (globalThis as unknown as { fetch: jest.Mock }).fetch = fetchMock;
 });
 beforeEach(() => {
     fetchMock.mockReset();
