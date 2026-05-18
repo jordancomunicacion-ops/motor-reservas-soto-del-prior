@@ -223,11 +223,13 @@ export class RestaurantService {
         });
     }
 
+    private static readonly UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
     // --- Visual Plan & Zones ---
     async syncZones(restaurantId: string, zones: any[], user?: AuthenticatedUser) {
         if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
         for (const z of zones) {
-            if (z.id && z.id.length > 10) {
+            if (z.id && RestaurantService.UUID_RE.test(z.id)) {
                 await this.prisma.zone.update({ where: { id: z.id }, data: { name: z.name, index: z.index, isActive: z.isActive } });
             } else {
                 await this.prisma.zone.create({ data: { restaurantId, name: z.name, index: z.index } });
@@ -317,7 +319,7 @@ export class RestaurantService {
     }
 
     async getGuestStats(email?: string | null, phone?: string | null) {
-        if (!email && !phone) return { visitCount: 0, firstVisit: null, cancelledCount: 0, totalBookings: 0, cancellationRate: 0 };
+        if (!email && !phone) return { visitCount: 0, firstVisit: null, cancelledCount: 0, totalBookings: 0, cancelledOrNoShowRate: 0 };
 
         const bookings = await this.prisma.resBooking.findMany({
             where: {
@@ -332,11 +334,12 @@ export class RestaurantService {
             }
         });
 
-        const totalBookings = bookings.length;
-        const visitCount = bookings.filter(b => b.status === 'SEATED').length;
-        const cancelledCount = bookings.filter(b => b.status === 'CANCELLED' || b.status === 'NO_SHOW').length;
+        // Excluimos reservas no confirmadas: no son compromisos firmes y no procede contarlas como "ratio de incumplimiento".
+        const committed = bookings.filter(b => b.status !== 'PENDING_CONFIRMATION');
+        const totalBookings = committed.length;
+        const visitCount = committed.filter(b => b.status === 'SEATED').length;
+        const cancelledCount = committed.filter(b => b.status === 'CANCELLED' || b.status === 'NO_SHOW').length;
 
-        // Find first reservation date
         let firstVisit: Date | null = null;
         if (bookings.length > 0) {
             firstVisit = bookings.reduce((prev, curr) =>
@@ -349,7 +352,7 @@ export class RestaurantService {
             firstVisit,
             cancelledCount,
             totalBookings,
-            cancellationRate: totalBookings > 0 ? Math.round((cancelledCount / totalBookings) * 100) : 0
+            cancelledOrNoShowRate: totalBookings > 0 ? Math.round((cancelledCount / totalBookings) * 100) : 0
         };
     }
 
@@ -381,7 +384,7 @@ export class RestaurantService {
         for (const guest of guests) {
             const key = guest.email || guest.phone || '';
             if (!key) {
-                statsMap.set(key, { visitCount: 0, firstVisit: null, cancelledCount: 0, totalBookings: 0, cancellationRate: 0 });
+                statsMap.set(key, { visitCount: 0, firstVisit: null, cancelledCount: 0, totalBookings: 0, cancelledOrNoShowRate: 0 });
                 continue;
             }
 
@@ -390,9 +393,10 @@ export class RestaurantService {
                 (guest.phone && b.guestPhone === guest.phone)
             );
 
-            const totalBookings = guestBookings.length;
-            const visitCount = guestBookings.filter(b => b.status === 'SEATED').length;
-            const cancelledCount = guestBookings.filter(b => b.status === 'CANCELLED' || b.status === 'NO_SHOW').length;
+            const committed = guestBookings.filter(b => b.status !== 'PENDING_CONFIRMATION');
+            const totalBookings = committed.length;
+            const visitCount = committed.filter(b => b.status === 'SEATED').length;
+            const cancelledCount = committed.filter(b => b.status === 'CANCELLED' || b.status === 'NO_SHOW').length;
 
             let firstVisit: Date | null = null;
             if (guestBookings.length > 0) {
@@ -406,7 +410,7 @@ export class RestaurantService {
                 firstVisit,
                 cancelledCount,
                 totalBookings,
-                cancellationRate: totalBookings > 0 ? Math.round((cancelledCount / totalBookings) * 100) : 0
+                cancelledOrNoShowRate: totalBookings > 0 ? Math.round((cancelledCount / totalBookings) * 100) : 0
             });
         }
 
@@ -447,7 +451,7 @@ export class RestaurantService {
         // Attach stats to bookings
         for (const booking of bookings) {
             const key = booking.guestEmail || booking.guestPhone || '';
-            const stats = guestStatsMap.get(key) || { visitCount: 0, firstVisit: null, cancelledCount: 0, totalBookings: 0, cancellationRate: 0 };
+            const stats = guestStatsMap.get(key) || { visitCount: 0, firstVisit: null, cancelledCount: 0, totalBookings: 0, cancelledOrNoShowRate: 0 };
             (booking as any).visitCount = stats.visitCount;
             (booking as any).guestStats = stats;
         }
@@ -634,7 +638,7 @@ export class RestaurantService {
         // Attach stats to bookings
         for (const booking of bookings) {
             const key = booking.guestEmail || booking.guestPhone || '';
-            const stats = guestStatsMap.get(key) || { visitCount: 0, firstVisit: null, cancelledCount: 0, totalBookings: 0, cancellationRate: 0 };
+            const stats = guestStatsMap.get(key) || { visitCount: 0, firstVisit: null, cancelledCount: 0, totalBookings: 0, cancelledOrNoShowRate: 0 };
             (booking as any).visitCount = stats.visitCount;
             (booking as any).guestStats = stats;
         }
