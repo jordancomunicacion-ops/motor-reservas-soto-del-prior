@@ -39,7 +39,9 @@ echo ==========================================
 echo.
 
 echo [1/5] Empaquetando App Reservas...
-tar --exclude="node_modules" --exclude=".next" --exclude=".git" --exclude=".idea" --exclude=".vscode" --exclude=".claude" --exclude="dist" --exclude="build" --exclude="db_data" --exclude="pg_data" --exclude="*.log" --exclude="*.db" --exclude="*.db-journal" --exclude="deploy.tar.gz" --exclude="deploy.env" -czvf deploy.tar.gz .
+REM Excluimos .env porque vive solo en el servidor (DB_PASS, JWT_SECRET, AUTH_SECRET, SMTP, etc.)
+REM Subir el .env local lo machacaria; el paso 3 ya lo preserva con un find !.env.
+tar --exclude="node_modules" --exclude=".next" --exclude=".git" --exclude=".idea" --exclude=".vscode" --exclude=".claude" --exclude="dist" --exclude="build" --exclude="db_data" --exclude="pg_data" --exclude="*.log" --exclude="*.db" --exclude="*.db-journal" --exclude="deploy.tar.gz" --exclude="deploy.env" --exclude="./.env" -czvf deploy.tar.gz .
 
 echo.
 echo [2/5] Verificando espacio en disco del servidor...
