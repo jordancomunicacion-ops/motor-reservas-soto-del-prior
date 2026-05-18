@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Save, Building2, Trash2, Hotel, Users, Sparkles, Mail } from 'lucide-react';
+import { ArrowLeft, Save, Building2, Trash2, Hotel, Users, Sparkles, Mail, Star } from 'lucide-react';
 import Link from 'next/link';
 import { ShiftsManager } from '@/components/admin/ShiftsManager';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -24,6 +24,8 @@ interface RestaurantDetail {
     contactEmail?: string | null;
     emailTemplates?: typeof DEFAULT_EMAIL_TEMPLATES | null;
     mailConfig?: MailConfigValue | null;
+    googleReviewUrl?: string | null;
+    reviewMinScoreForGoogle?: number | null;
 }
 
 interface HotelOption {
@@ -39,6 +41,7 @@ const DEFAULT_EMAIL_TEMPLATES = {
     reminder: '<h1>Recordatorio de Reserva</h1><p>Hola {{name}}, te recordamos tu reserva para el {{date}} a las {{time}}. Por favor, confirma tu asistencia o cancela si no puedes venir.</p>',
     waitlist_join: '<h1>Estás en lista de espera</h1><p>Hola {{name}}, te hemos añadido a la lista de espera para el {{date}}.</p>',
     waitlist_available: '<h1>¡Hay un hueco libre!</h1><p>Hola {{name}}, se ha liberado una mesa para tu solicitud del {{date}}. Por favor, confirma para reservarla.</p>',
+    review: '<h1>¿Cómo fue tu experiencia, {{name}}?</h1><p>Nos encantaría conocer tu opinión sobre tu visita del {{date}}. Solo te robará un minuto: <a href="{{review_link}}">déjanos tu valoración aquí</a>.</p>',
 };
 
 const DEFAULT_MAIL_CONFIG: MailConfigValue = {
@@ -58,7 +61,7 @@ function RestaurantConfigContent() {
     const restaurantId = params.id as string;
     const searchParams = useSearchParams();
     const tab = searchParams.get('tab') || 'general';
-    const [activeTemplate, setActiveTemplate] = useState<'created' | 'confirmed' | 'cancelled' | 'modified' | 'reminder'>('created');
+    const [activeTemplate, setActiveTemplate] = useState<'created' | 'confirmed' | 'cancelled' | 'modified' | 'reminder' | 'review'>('created');
     
     const [restaurant, setRestaurant] = useState<RestaurantDetail | null>(null);
     const [hotels, setHotels] = useState<HotelOption[]>([]);
@@ -73,6 +76,8 @@ function RestaurantConfigContent() {
         hotelId: '',
         defaultDuration: 90,
         contactEmail: '',
+        googleReviewUrl: '',
+        reviewMinScoreForGoogle: 4,
         emailTemplates: {
             created: '<h1>¡Hola {{name}}!</h1><p>Hemos recibido tu reserva para el día {{date}} a las {{time}}.</p>',
             confirmed: '<h1>Reserva Confirmada</h1><p>Tu mesa está lista para el {{date}}.</p>',
@@ -80,7 +85,8 @@ function RestaurantConfigContent() {
             modified: '<h1>Reserva Modificada</h1><p>Hola {{name}}, tu reserva para el día {{date}} a las {{time}} ha sido modificada.</p>',
             reminder: '<h1>Recordatorio de Reserva</h1><p>Hola {{name}}, te recordamos tu reserva para el {{date}} a las {{time}}. Por favor, confirma tu asistencia o cancela si no puedes venir.</p>',
             waitlist_join: '<h1>Estás en lista de espera</h1><p>Hola {{name}}, te hemos añadido a la lista de espera para el {{date}}.</p>',
-            waitlist_available: '<h1>¡Hay un hueco libre!</h1><p>Hola {{name}}, se ha liberado una mesa para tu solicitud del {{date}}. Por favor, confirma para reservarla.</p>'
+            waitlist_available: '<h1>¡Hay un hueco libre!</h1><p>Hola {{name}}, se ha liberado una mesa para tu solicitud del {{date}}. Por favor, confirma para reservarla.</p>',
+            review: '<h1>¿Cómo fue tu experiencia, {{name}}?</h1><p>Nos encantaría conocer tu opinión sobre tu visita del {{date}}. Solo te robará un minuto: <a href="{{review_link}}">déjanos tu valoración aquí</a>.</p>'
         },
         mailConfig: {
             host: '',
@@ -111,7 +117,9 @@ function RestaurantConfigContent() {
                 hotelId: data.hotel?.id || '',
                 defaultDuration: data.defaultDuration || 90,
                 contactEmail: data.contactEmail || '',
-                emailTemplates: data.emailTemplates || formData.emailTemplates,
+                googleReviewUrl: data.googleReviewUrl || '',
+                reviewMinScoreForGoogle: data.reviewMinScoreForGoogle ?? 4,
+                emailTemplates: { ...formData.emailTemplates, ...(data.emailTemplates || {}) },
                 mailConfig: data.mailConfig || DEFAULT_MAIL_CONFIG,
             });
         } catch (e) {
@@ -141,12 +149,14 @@ function RestaurantConfigContent() {
         try {
             await fetchAPI(`/restaurant/${restaurantId}`, {
                 method: 'PATCH',
-                body: JSON.stringify({ 
-                    name: formData.name, 
+                body: JSON.stringify({
+                    name: formData.name,
                     currency: formData.currency,
                     hotelId: formData.hotelId,
                     defaultDuration: Number(formData.defaultDuration),
                     contactEmail: formData.contactEmail,
+                    googleReviewUrl: formData.googleReviewUrl?.trim() || null,
+                    reviewMinScoreForGoogle: Number(formData.reviewMinScoreForGoogle) || 4,
                     emailTemplates: formData.emailTemplates,
                     mailConfig: formData.mailConfig
                 })
@@ -339,20 +349,22 @@ function RestaurantConfigContent() {
 
                     <div className="space-y-8">
                         <div className="flex flex-wrap gap-2">
-                                {['created', 'confirmed', 'cancelled', 'modified', 'reminder', 'waitlist_join', 'waitlist_available'].map((t) => (
-                                    <Button 
+                                {['created', 'confirmed', 'cancelled', 'modified', 'reminder', 'waitlist_join', 'waitlist_available', 'review'].map((t) => (
+                                    <Button
                                         key={t}
                                         variant={activeTemplate === t ? 'default' : 'outline'}
                                         size="sm"
                                         onClick={() => setActiveTemplate(t as any)}
                                         className="capitalize"
                                     >
-                                        {t === 'created' ? 'Nueva Reserva' : 
-                                         t === 'confirmed' ? 'Confirmación' : 
-                                         t === 'cancelled' ? 'Cancelación' : 
-                                         t === 'modified' ? 'Modificación' : 
+                                        {t === 'created' ? 'Nueva Reserva' :
+                                         t === 'confirmed' ? 'Confirmación' :
+                                         t === 'cancelled' ? 'Cancelación' :
+                                         t === 'modified' ? 'Modificación' :
                                          t === 'reminder' ? 'Recordatorio' :
-                                         t === 'waitlist_join' ? 'L. Espera (Unirse)' : 'L. Espera (Disponible)'}
+                                         t === 'waitlist_join' ? 'L. Espera (Unirse)' :
+                                         t === 'waitlist_available' ? 'L. Espera (Disponible)' :
+                                         'Valoración (24h)'}
                                     </Button>
                                 ))}
                                 <div className="flex-1" />
@@ -381,6 +393,51 @@ function RestaurantConfigContent() {
                                 })}
                             />
                         </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg text-yellow-600">
+                            <Star className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <CardTitle>Valoraciones y Google Reseñas</CardTitle>
+                            <CardDescription>El email de valoración se envía automáticamente 24h después de la reserva. Si la puntuación es alta, redirigimos al cliente a tu página de Google Reseñas.</CardDescription>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="review-google-url">URL de Google Reseñas</Label>
+                        <Input
+                            id="review-google-url"
+                            type="url"
+                            value={formData.googleReviewUrl}
+                            onChange={(e) => setFormData({ ...formData, googleReviewUrl: e.target.value })}
+                            placeholder="https://g.page/r/.../review"
+                        />
+                        <p className="text-xs text-muted-foreground">Pega el enlace corto de Google Maps → Compartir → “Obtener más reseñas”. Si lo dejas vacío, el cliente solo verá el mensaje de agradecimiento.</p>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="review-min-score">Puntuación mínima para redirigir a Google (1-5)</Label>
+                        <Input
+                            id="review-min-score"
+                            type="number"
+                            min={1}
+                            max={5}
+                            value={formData.reviewMinScoreForGoogle}
+                            onChange={(e) => setFormData({ ...formData, reviewMinScoreForGoogle: parseInt(e.target.value) || 4 })}
+                            className="w-32"
+                        />
+                        <p className="text-xs text-muted-foreground">Por defecto 4: si Atención, Entorno y Comida son ≥ 4, redirigimos a Google al enviar.</p>
+                    </div>
+                    <div className="pt-2">
+                        <Link href={`/admin/restaurant/${restaurantId}/reviews`} className="text-sm font-medium text-blue-600 hover:underline inline-flex items-center gap-1">
+                            <Star className="w-4 h-4" /> Ver valoraciones recibidas →
+                        </Link>
                     </div>
                 </CardContent>
             </Card>

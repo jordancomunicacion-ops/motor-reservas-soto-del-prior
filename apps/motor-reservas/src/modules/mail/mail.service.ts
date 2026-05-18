@@ -67,7 +67,7 @@ export class MailService {
         if (!html) return '';
         let processed = html;
         // Allow a small whitelist of "raw" placeholders (already-safe URLs we generate).
-        const rawAllowed = new Set(['modify_link', 'cancel_link', 'confirm_link']);
+        const rawAllowed = new Set(['modify_link', 'cancel_link', 'confirm_link', 'review_link']);
         Object.keys(data || {}).forEach(key => {
             const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
             const replacement = rawAllowed.has(key) ? String(data[key] ?? '') : this.escapeHtml(data[key]);
@@ -250,6 +250,21 @@ export class MailService {
         return 'Verifica host, puerto, usuario y contraseña. Para Gmail/Outlook, usa una contraseña de aplicación, no la contraseña normal.';
     }
 
+    private buildDefaultReviewHtml(restaurantName: string, guestName: string, reviewLink: string): string {
+        const name = this.escapeHtml(guestName.split(' ')[0] || guestName);
+        const safeRest = this.escapeHtml(restaurantName);
+        return `
+<div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; color: #0A0A0A;">
+  <h1 style="font-size: 22px; margin: 0 0 8px;">${safeRest}</h1>
+  <p style="font-size: 15px; line-height: 1.5; margin: 0 0 16px;">Hola ${name},</p>
+  <p style="font-size: 15px; line-height: 1.5; margin: 0 0 16px;">Esperamos que disfrutaras tu visita. Nos encantaría conocer tu opinión: solo te robará un minuto.</p>
+  <p style="text-align:center; margin: 24px 0;">
+    <a href="${reviewLink}" style="background:#C59D5F;color:#fff;text-decoration:none;padding:12px 24px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;display:inline-block;">Dejar mi valoración</a>
+  </p>
+  <p style="font-size: 13px; color: #666; line-height: 1.5; margin: 24px 0 0;">Gracias por tu tiempo. Tu feedback nos ayuda a mejorar.</p>
+</div>`.trim();
+    }
+
     // --- RESTAURANT NOTIFICATIONS ---
 
     async sendRestaurantNotification(booking: any, type: string, extraData: any = {}) {
@@ -281,6 +296,9 @@ export class MailService {
         const manageLink = booking.modifyToken
             ? `${publicUrl}/restaurant/modify?id=${booking.id}&token=${booking.modifyToken}`
             : `${publicUrl}/restaurant/modify?id=${booking.id}`;
+        const reviewLink = booking.reviewToken
+            ? `${publicUrl}/restaurant/review?id=${booking.id}&token=${booking.reviewToken}`
+            : `${publicUrl}/restaurant/review?id=${booking.id}`;
 
         const data = {
             name: booking.guestName,
@@ -290,18 +308,23 @@ export class MailService {
             restaurant_name: restaurant.name,
             modify_link: manageLink,
             cancel_link: manageLink,
+            review_link: reviewLink,
             ...extraData
         };
 
         if (customHtml && customHtml.trim() !== '') {
             html = this.processTemplate(customHtml, data);
-            subject = type === 'created' ? `Nueva reserva en ${restaurant.name}` : 
-                      type === 'confirmed' ? `Reserva confirmada - ${restaurant.name}` : 
+            subject = type === 'created' ? `Nueva reserva en ${restaurant.name}` :
+                      type === 'confirmed' ? `Reserva confirmada - ${restaurant.name}` :
                       type === 'cancelled' ? `Reserva cancelada - ${restaurant.name}` :
                       type === 'reminder' ? `Recordatorio de reserva - ${restaurant.name}` :
                       type === 'waitlist_join' ? `En lista de espera - ${restaurant.name}` :
                       type === 'waitlist_available' ? `Mesa disponible - ${restaurant.name}` :
+                      type === 'review' ? `¿Cómo fue tu experiencia en ${restaurant.name}?` :
                       `Reserva modificada - ${restaurant.name}`;
+        } else if (type === 'review') {
+            html = this.buildDefaultReviewHtml(restaurant.name, booking.guestName, reviewLink);
+            subject = `¿Cómo fue tu experiencia en ${restaurant.name}?`;
         } else {
             const statusText = type === 'created' ? 'recibida' : type === 'confirmed' ? 'confirmada' : type === 'cancelled' ? 'cancelada' : type === 'reminder' ? 'recordada' : 'procesada';
             html = `<h1>${this.escapeHtml(restaurant.name)}</h1><p>Hola ${this.escapeHtml(booking.guestName)}, tu solicitud para el ${this.escapeHtml(data.date)} ha sido ${statusText}.</p>`;

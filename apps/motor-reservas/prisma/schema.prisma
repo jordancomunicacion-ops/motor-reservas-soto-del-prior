@@ -529,8 +529,13 @@ model Restaurant {
   // Notifications
   contactEmail String?
 
-  emailTemplates Json? @default("{\"created\": \"\", \"confirmed\": \"\", \"cancelled\": \"\", \"modified\": \"\", \"reminder\": \"\", \"waitlist_join\": \"\", \"waitlist_available\": \"\"}")
+  emailTemplates Json? @default("{\"created\": \"\", \"confirmed\": \"\", \"cancelled\": \"\", \"modified\": \"\", \"reminder\": \"\", \"waitlist_join\": \"\", \"waitlist_available\": \"\", \"review\": \"\"}")
   mailConfig     Json?
+
+  // Reviews (valoración post-experiencia)
+  googleReviewUrl          String?
+  reviewMinScoreForGoogle  Int      @default(4) // Si la media de las 3 puntuaciones ≥ este valor → redirigir a Google
+  reviews                  ResReview[]
 
   users User[]
 
@@ -673,12 +678,37 @@ model ResBooking {
   // Token para auto-gestión pública (modificar/cancelar desde email)
   modifyToken String? @unique
 
+  // Valoración post-experiencia (email a las 24h)
+  reviewToken String?    @unique
+  reviewSent  Boolean    @default(false)
+  review      ResReview?
+
   metadata Json? @default("{}")
 
   @@index([restaurantId, status])
   @@index([restaurantId, date])
   @@index([tableId])
   @@index([status])
+  @@index([reviewSent, date])
+}
+
+model ResReview {
+  id           String     @id @default(uuid())
+  bookingId    String     @unique
+  booking      ResBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  // Valoraciones 1-5
+  serviceScore     Int // Atención
+  ambianceScore    Int // Entorno
+  foodScore        Int // Comida
+  advice           String? // "Consejos" en texto libre
+
+  redirectedToGoogle Boolean  @default(false) // ¿El usuario fue redirigido a Google Reviews al enviar?
+  createdAt          DateTime @default(now())
+
+  @@index([restaurantId, createdAt])
 }
 
 model RestaurantChannel {

@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Body, Param, Query, Patch, Delete, Req, Logger } from '@nestjs/common';
 import { RestaurantService } from './restaurant.service';
 import { WaitlistService } from './waitlist.service';
+import { RestaurantReviewService } from './restaurant-review.service';
 import { Public } from '../../auth/public.decorator';
 import { Roles } from '../../auth/roles.decorator';
 import { CreateRestaurantDto, CreatePublicReservationDto, UpdateBookingStatusDto, AuthorizeUserDto, CreateAccessProfileDto, UpdateAccessProfileDto } from './restaurant.dto';
@@ -12,7 +13,8 @@ export class RestaurantController {
 
     constructor(
         private readonly service: RestaurantService,
-        private readonly waitlistService: WaitlistService
+        private readonly waitlistService: WaitlistService,
+        private readonly reviewService: RestaurantReviewService,
     ) { }
 
     @Roles('ADMIN')
@@ -170,6 +172,46 @@ export class RestaurantController {
             const message = error instanceof Error ? error.message : 'Unknown error';
             return { error: true, message };
         }
+    }
+
+    // --- Valoración post-experiencia ---
+
+    @Public()
+    @Get('public/reservation/:id/review')
+    async getPublicReviewForm(@Param('id') id: string, @Query('token') token: string) {
+        try {
+            return await this.reviewService.getReviewForm(id, token);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            return { error: true, message };
+        }
+    }
+
+    @Public()
+    @Post('public/reservation/:id/review')
+    async submitPublicReview(
+        @Param('id') id: string,
+        @Query('token') token: string,
+        @Body() body: { serviceScore: number; ambianceScore: number; foodScore: number; advice?: string }
+    ) {
+        try {
+            return await this.reviewService.submitReview(id, token, body);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            return { error: true, message };
+        }
+    }
+
+    @Roles('ADMIN')
+    @Get(':id/reviews')
+    listRestaurantReviews(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+        return this.reviewService.listReviewsForRestaurant(id, req?.user);
+    }
+
+    @Roles('ADMIN')
+    @Get('hotel/:hotelId/reviews')
+    listHotelReviews(@Param('hotelId') hotelId: string, @Req() req: AuthenticatedRequest) {
+        return this.reviewService.listReviewsForHotel(hotelId, req?.user);
     }
 
     @Roles('ADMIN')
