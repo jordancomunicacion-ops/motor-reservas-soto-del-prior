@@ -1,11 +1,15 @@
-import { Controller, Post, Get, Delete, Body, Param, Query, Req, ForbiddenException } from '@nestjs/common';
-import { ConnectionsService } from './connections.service';
+import { Controller, Post, Get, Delete, Body, Param, Query, Req, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { ConnectionsService, HOTEL_INTEGRATION_KINDS, type HotelIntegrationKind } from './connections.service';
 import { Roles } from '../../auth/roles.decorator';
-import type { AuthenticatedRequest } from '../../common/scope';
+import { ensureHotelAccess, type AuthenticatedRequest } from '../../common/scope';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Controller('connections')
 export class ConnectionsController {
-    constructor(private readonly connectionsService: ConnectionsService) { }
+    constructor(
+        private readonly connectionsService: ConnectionsService,
+        private readonly prisma: PrismaService
+    ) { }
 
     /**
      * Si el usuario no es super-admin global, ignora los params y fuerza a usar su propio
@@ -102,5 +106,27 @@ export class ConnectionsController {
     @Delete(':connectionId')
     async deleteConnection(@Param('connectionId') connectionId: string) {
         return this.connectionsService.deleteConnection(connectionId);
+    }
+
+    /**
+     * Test específico por tipo OTA/Stripe.
+     * - Si llega `credentials` en el body, se testean esas (útil para "probar antes de guardar").
+     * - Si no, se cargan del hotel con dual-source (tabla → JSON fallback).
+     */
+    @Roles('ADMIN')
+    @Post('test-ota')
+    async testOta(
+        @Req() req: AuthenticatedRequest,
+        @Body() body: { hotelId: string; kind: HotelIntegrationKind; credentials?: any }
+    ) {
+        if (!body?.hotelId) throw new BadRequestException('hotelId requerido');
+        if (!HOTEL_INTEGRATION_KINDS.includes(body.kind)) {
+            throw new BadRequestException(`kind inválido. Permitidos: ${HOTEL_INTEGRATION_KINDS.join(', ')}`);
+        }
+        if (req?.user) await ensureHotelAccess(req.user, this.prisma, body.hotelId);
+
+        const credentials = body.credentials ?? await this.connectionsService.getOtaConfig(body.hotelId, body.kind);
+        if (!credentials) return { ok: false, message: `No hay configuración para ${body.kind} en este hotel` };
+        return this.connectionsService.testOtaCredentials(body.kind, credentials);
     }
 }

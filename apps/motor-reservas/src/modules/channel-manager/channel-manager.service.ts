@@ -1,10 +1,10 @@
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma/prisma.service';
 import * as ical from 'node-ical';
 import { BookingStatus, BookingSource } from '../../common/constants';
-import { getUserScope } from '../../common/scope';
+import { getUserScope, type AuthenticatedUser } from '../../common/scope';
 
 @Injectable()
 export class ChannelManagerService {
@@ -22,7 +22,7 @@ export class ChannelManagerService {
 
     // --- LEVEL 1: iCal Sync ---
 
-    async getFeeds(user?: any) {
+    async getFeeds(user?: AuthenticatedUser | null) {
         const scope = await getUserScope(user, this.prisma);
         // Los iCalFeed cuelgan de RoomType, que a su vez pertenece a un Hotel.
         // Si el usuario está atado a un hotel, solo se muestran los feeds de habitaciones de ese hotel.
@@ -30,11 +30,88 @@ export class ChannelManagerService {
         const where = scope.hotelIds === null
             ? {}
             : { roomType: { hotelId: { in: scope.hotelIds } } };
-        return this.prisma.iCalFeed.findMany({ where, include: { roomType: true } });
+        return this.prisma.iCalFeed.findMany({
+            where,
+            include: { roomType: { select: { id: true, name: true, hotelId: true } } },
+            orderBy: { id: 'desc' }
+        });
     }
 
-    async createFeed(data: { roomTypeId: string; url: string; name: string; source: string }) {
-        return this.prisma.iCalFeed.create({ data });
+    /**
+     * Crea un feed iCal validando primero la URL contra el origen.
+     * Si la URL no es alcanzable o no es un iCalendar válido, lanza BadRequestException.
+     */
+    async createFeed(
+        data: { roomTypeId: string; url: string; name?: string; source: string },
+        user?: AuthenticatedUser | null
+    ) {
+        await this.assertRoomTypeAccess(data.roomTypeId, user);
+        await this.validateICalUrl(data.url);
+
+        return this.prisma.iCalFeed.create({
+            data: {
+                roomTypeId: data.roomTypeId,
+                url: data.url,
+                name: data.name ?? null,
+                source: data.source
+            },
+            include: { roomType: { select: { id: true, name: true, hotelId: true } } }
+        });
+    }
+
+    /** Elimina un feed; respeta scoping. */
+    async deleteFeed(feedId: string, user?: AuthenticatedUser | null) {
+        const feed = await this.prisma.iCalFeed.findUnique({
+            where: { id: feedId },
+            include: { roomType: { select: { hotelId: true } } }
+        });
+        if (!feed) throw new NotFoundException('Feed no encontrado');
+        await this.assertHotelScope(feed.roomType.hotelId, user);
+        await this.prisma.iCalFeed.delete({ where: { id: feedId } });
+        return { ok: true };
+    }
+
+    /** Sincroniza un único feed bajo demanda. Devuelve nº de bookings importadas y errores. */
+    async syncFeed(feedId: string, user?: AuthenticatedUser | null) {
+        const feed = await this.prisma.iCalFeed.findUnique({
+            where: { id: feedId },
+            include: { roomType: true }
+        });
+        if (!feed) throw new NotFoundException('Feed no encontrado');
+        await this.assertHotelScope(feed.roomType.hotelId, user);
+        return this.processICalUrl(feed);
+    }
+
+    /** Valida que la URL devuelva un calendario iCalendar parseable. No persiste nada. */
+    async validateICalUrl(url: string): Promise<{ ok: true; eventCount: number }> {
+        if (!/^https?:\/\//i.test(url)) {
+            throw new BadRequestException('La URL iCal debe empezar por http(s)://');
+        }
+        try {
+            const events = await ical.async.fromURL(url);
+            const eventCount = Object.values(events).filter((e: any) => e?.type === 'VEVENT').length;
+            return { ok: true, eventCount };
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : 'No se pudo descargar el iCal';
+            throw new BadRequestException(`URL iCal inválida: ${msg}`);
+        }
+    }
+
+    private async assertRoomTypeAccess(roomTypeId: string, user?: AuthenticatedUser | null) {
+        const rt = await this.prisma.roomType.findUnique({
+            where: { id: roomTypeId },
+            select: { hotelId: true }
+        });
+        if (!rt) throw new BadRequestException('RoomType no existe');
+        await this.assertHotelScope(rt.hotelId, user);
+    }
+
+    private async assertHotelScope(hotelId: string, user?: AuthenticatedUser | null) {
+        const scope = await getUserScope(user, this.prisma);
+        if (scope.isGlobalAdmin) return;
+        if (!scope.hotelIds?.includes(hotelId)) {
+            throw new ForbiddenException('Sin acceso a este hotel');
+        }
     }
 
     async syncAllFeeds() {
@@ -45,16 +122,14 @@ export class ChannelManagerService {
         }
     }
 
-    private async processICalUrl(feed: any) {
+    private async processICalUrl(feed: any): Promise<{ imported: number; overbooked: number; skipped: number; error?: string }> {
+        const result = { imported: 0, overbooked: 0, skipped: 0 };
         try {
             const events = await ical.async.fromURL(feed.url);
 
             for (const k in events) {
                 const event = events[k];
                 if (event.type !== 'VEVENT') continue;
-
-                // Handle Booking.com Cancelled Events (often have STATUS:CANCELLED or SUMMARY:Cancelled)
-                // if (event.status === 'CANCELLED') ...
 
                 const uid = event.uid;
                 const start = new Date(event.start);
@@ -67,17 +142,11 @@ export class ChannelManagerService {
                 });
 
                 if (existing) {
-                    // TODO: Check if dates changed and update
+                    result.skipped++;
                     continue;
                 }
 
-                // New Booking from OTA
-                // Logic: Find the mapped RoomType from the feed
                 const roomTypeId = feed.roomTypeId;
-
-                // Allocate Room (First Available)
-                // In a real Channel Manager, we might map to a specific Room if the feed is per-room.
-                // Here our feeds are per-RoomType usually.
                 const room = await this.allocateRoomForOTA(roomTypeId, start, end);
 
                 if (room) {
@@ -88,7 +157,7 @@ export class ChannelManagerService {
                             checkInDate: start,
                             checkOutDate: end,
                             nights: Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)),
-                            totalPrice: 0, // iCal doesn't verify price
+                            totalPrice: 0,
                             status: BookingStatus.CONFIRMED,
                             source: feed.source === 'BOOKING' ? BookingSource.BOOKING_COM : BookingSource.AIRBNB,
                             referenceCode: `EXT-${Date.now()}`,
@@ -102,18 +171,62 @@ export class ChannelManagerService {
                             }
                         }
                     });
-                    this.logger.log(`imported iCal event ${uid} for RoomType ${roomTypeId}`);
+                    result.imported++;
                 } else {
+                    result.overbooked++;
                     this.logger.error(`OVERBOOKING ALERT: No room available for OTA event ${uid} on dates ${start.toDateString()}`);
-                    // Notify Admin via Email (TODO)
                 }
             }
 
             await this.prisma.iCalFeed.update({ where: { id: feed.id }, data: { lastSync: new Date() } });
+            await this.prisma.syncLog.create({
+                data: {
+                    channel: feed.source,
+                    action: 'PULL_ICAL',
+                    status: 'SUCCESS',
+                    details: JSON.stringify({ feedId: feed.id, ...result })
+                }
+            });
 
+            return result;
         } catch (e) {
-            this.logger.error(`Error syncing feed ${feed.id}`, e);
+            const error = e instanceof Error ? e.message : 'unknown error';
+            this.logger.error(`Error syncing feed ${feed.id}: ${error}`);
+            await this.prisma.syncLog.create({
+                data: {
+                    channel: feed.source,
+                    action: 'PULL_ICAL',
+                    status: 'ERROR',
+                    details: JSON.stringify({ feedId: feed.id, error })
+                }
+            });
+            return { ...result, error };
         }
+    }
+
+    /** Últimos N logs de sincronización filtrados por scope. */
+    async getRecentLogs(user?: AuthenticatedUser | null, limit = 20) {
+        const scope = await getUserScope(user, this.prisma);
+        // SyncLog no tiene FK a hotel — devolvemos últimos N globales si admin global,
+        // o filtrados por canal asociado a un feed del hotel del usuario en otro caso.
+        if (scope.isGlobalAdmin) {
+            return this.prisma.syncLog.findMany({ orderBy: { timestamp: 'desc' }, take: limit });
+        }
+        // Para usuarios con scope: buscamos los feedIds del hotel y filtramos por details que los contenga.
+        const feeds = await this.prisma.iCalFeed.findMany({
+            where: { roomType: { hotelId: { in: scope.hotelIds ?? [] } } },
+            select: { id: true }
+        });
+        const feedIds = new Set(feeds.map(f => f.id));
+        const logs = await this.prisma.syncLog.findMany({ orderBy: { timestamp: 'desc' }, take: limit * 5 });
+        return logs.filter(l => {
+            try {
+                const parsed = JSON.parse(l.details || '{}');
+                return feedIds.has(parsed.feedId);
+            } catch {
+                return false;
+            }
+        }).slice(0, limit);
     }
 
     private async allocateRoomForOTA(roomTypeId: string, start: Date, end: Date) {

@@ -2,10 +2,14 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ShiftType } from '../../common/enums';
 import { getUserScope, assertHotelAccess, ensureHotelAccess } from '../../common/scope';
+import { ConnectionsService } from '../connections/connections.service';
 
 @Injectable()
 export class PropertyService {
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        private prisma: PrismaService,
+        private connections: ConnectionsService
+    ) { }
 
     // HOTEL
     async createHotel(data: { name: string; currency: string; timezone: string }) {
@@ -100,7 +104,7 @@ export class PropertyService {
             rest.mailConfig = incoming;
         }
 
-        return this.prisma.$transaction(async (tx) => {
+        const updated = await this.prisma.$transaction(async (tx) => {
             // 1. If we are linking a restaurant, clear it from any other hotel first
             if (restaurantId) {
                 await tx.hotel.updateMany({
@@ -169,6 +173,20 @@ export class PropertyService {
 
             return hotel;
         });
+
+        // Replicar credenciales OTA/Stripe del JSON `integrations` a IntegrationConnection
+        // (dual-source pattern). Fuera de la transacción: si falla, no revertimos el update.
+        if (rest.integrations) {
+            try {
+                await this.connections.syncFromHotelIntegrations(id, rest.integrations);
+            } catch (err) {
+                // No es bloqueante — el JSON ya está guardado y los servicios pueden leerlo como fallback.
+                // eslint-disable-next-line no-console
+                console.warn(`[PropertyService] syncFromHotelIntegrations failed for ${id}:`, err);
+            }
+        }
+
+        return updated;
     }
 
     async deleteHotel(id: string, user?: any) {

@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ConfidentialClientApplication } from '@azure/msal-node';
 import 'isomorphic-fetch';
 import { Client as GraphClient } from '@microsoft/microsoft-graph-client';
+import { resolveMailConfig } from './mail-config-resolver';
 
 type GraphConfig = {
     tenantId: string;
@@ -253,13 +254,15 @@ export class MailService {
 
     async sendRestaurantNotification(booking: any, type: string, extraData: any = {}) {
         const restaurant = await this.prisma.restaurant.findUnique({
-            where: { id: booking.restaurantId }
+            where: { id: booking.restaurantId },
+            include: { hotel: true }
         });
 
         if (!restaurant) return;
 
-        const mailConfig: any = restaurant.mailConfig || {};
-        
+        // mailConfig con fallback al hotel vinculado (mismo correo de salida si Soto del Prior hotel+restaurante)
+        const mailConfig: any = resolveMailConfig(restaurant.mailConfig as any, restaurant.hotel?.mailConfig as any);
+
         // NEW: Check if notifications are enabled (stored in mailConfig to avoid schema changes)
         if (mailConfig.notificationsEnabled === false) {
             this.logger.log(`Skipping email notification for restaurant ${restaurant.name}: Notifications are disabled.`);
@@ -312,12 +315,14 @@ export class MailService {
     // --- HOTEL NOTIFICATIONS ---
     async sendHotelNotification(booking: any, type: string) {
         const hotel = await this.prisma.hotel.findUnique({
-            where: { id: booking.hotelId }
+            where: { id: booking.hotelId },
+            include: { restaurant: true }
         });
 
         if (!hotel) return;
 
-        const mailConfig: any = hotel.mailConfig || {};
+        // mailConfig con fallback al restaurante vinculado (mismo correo de salida, p.ej. info@sotodelprior.com)
+        const mailConfig: any = resolveMailConfig(hotel.mailConfig as any, hotel.restaurant?.mailConfig as any);
 
         // NEW: Check if notifications are enabled (stored in mailConfig to avoid schema changes)
         if (mailConfig.notificationsEnabled === false) {

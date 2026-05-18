@@ -115,8 +115,8 @@ model Hotel {
 
   // Integrations
   crmIntegration CrmIntegration?
-  connections IntegrationConnection[]
-  integrations Json? @default("{}")
+  connections    IntegrationConnection[]
+  integrations   Json?                   @default("{}")
 
   // Notifications
   contactEmail String?
@@ -407,29 +407,29 @@ model ICalFeed {
 // --- Integration Connections ---
 
 model IntegrationConnection {
-  id                String   @id @default(uuid())
+  id String @id @default(uuid())
 
   // Connection Type
-  type              String   // "GOOGLE_ANALYTICS", "CRM", "MAIL", "STRIPE", etc.
-  name              String   // "Soto del Prior - GA", "CRM Principal", etc.
+  type String // "GOOGLE_ANALYTICS", "CRM", "MAIL", "STRIPE", etc.
+  name String // "Soto del Prior - GA", "CRM Principal", etc.
 
   // Entity Association
-  hotelId           String?
-  hotel             Hotel?   @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  restaurantId      String?
-  restaurant        Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  hotelId      String?
+  hotel        Hotel?      @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  restaurantId String?
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
   // Credentials (encrypted in production)
-  credentials       Json     // Almacena: { propertyId, apiKey, token, etc. }
+  credentials Json // Almacena: { propertyId, apiKey, token, etc. }
 
   // Status
-  enabled           Boolean  @default(true)
-  isActive          Boolean  @default(false)  // Último test exitoso
-  lastTestedAt      DateTime?
-  testError         String?
+  enabled      Boolean   @default(true)
+  isActive     Boolean   @default(false) // Último test exitoso
+  lastTestedAt DateTime?
+  testError    String?
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([type, hotelId, restaurantId])
   @@index([type, enabled])
@@ -438,34 +438,34 @@ model IntegrationConnection {
 // --- CRM Integration ---
 
 model CrmIntegration {
-  id                String   @id @default(uuid())
+  id String @id @default(uuid())
 
   // Target
-  hotelId           String?  @unique
-  hotel             Hotel?   @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  restaurantId      String?  @unique
-  restaurant        Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  hotelId      String?     @unique
+  hotel        Hotel?      @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  restaurantId String?     @unique
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
   // Connection Details
-  enabled           Boolean  @default(false)
-  url               String
-  token             String?
+  enabled Boolean @default(false)
+  url     String
+  token   String?
 
   // Naming & Tracking
-  sourceLabel       String   @default("Direct") // "Web Soto del Prior", "Widget Google", etc.
-  trackingId        String?  // Para correlacionar con Google Analytics
-  campaignSource    String?  // UTM source
-  campaignMedium    String?  // UTM medium
-  campaignName      String?  // UTM campaign
+  sourceLabel    String  @default("Direct") // "Web Soto del Prior", "Widget Google", etc.
+  trackingId     String? // Para correlacionar con Google Analytics
+  campaignSource String? // UTM source
+  campaignMedium String? // UTM medium
+  campaignName   String? // UTM campaign
 
   // Activity
-  lastSync          DateTime?
-  syncCount         Int      @default(0)
-  failureCount      Int      @default(0)
-  lastError         String?
+  lastSync     DateTime?
+  syncCount    Int       @default(0)
+  failureCount Int       @default(0)
+  lastError    String?
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([hotelId, restaurantId]) // Solo uno puede estar presente
 }
@@ -523,8 +523,8 @@ model Restaurant {
 
   // Integrations
   crmIntegration CrmIntegration?
-  connections IntegrationConnection[]
-  integrations Json? @default("{}")
+  connections    IntegrationConnection[]
+  integrations   Json?                   @default("{}")
 
   // Notifications
   contactEmail String?

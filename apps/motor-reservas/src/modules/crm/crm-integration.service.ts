@@ -1,22 +1,86 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
+/**
+ * Identidad combinada cuando un Hotel y un Restaurant están vinculados (Hotel.restaurantId).
+ * El CRM y analytics tratan ambas entidades como un mismo centro/unidad.
+ *  - unitId: identificador estable de la unidad — usa hotelId si existe, sino restaurantId.
+ *  - unitName: nombre legible (hotel si existe, sino restaurant).
+ *  - hotelId/restaurantId: las entidades concretas que componen la unidad.
+ */
+export interface UnitInfo {
+    unitId: string;
+    unitName: string;
+    hotelId: string | null;
+    restaurantId: string | null;
+    linked: boolean; // true si la unidad agrega hotel+restaurante
+}
+
 @Injectable()
 export class CrmIntegrationService {
     private readonly logger = new Logger(CrmIntegrationService.name);
 
     constructor(private prisma: PrismaService) { }
 
+    /**
+     * Resuelve la unidad combinada desde un hotel.
+     * Si el hotel tiene `restaurantId`, la unidad agrega ambos.
+     */
+    private buildUnitFromHotel(hotel: { id: string; name: string; restaurantId?: string | null; restaurant?: { id: string; name: string } | null }): UnitInfo {
+        const linked = !!hotel.restaurant;
+        return {
+            unitId: hotel.id,
+            unitName: hotel.name,
+            hotelId: hotel.id,
+            restaurantId: hotel.restaurant?.id ?? hotel.restaurantId ?? null,
+            linked
+        };
+    }
+
+    /**
+     * Resuelve la unidad combinada desde un restaurante.
+     * Si existe un hotel que apunta a este restaurante, la unidad agrega ambos
+     * y la "cara visible" del unitId es la del hotel (para consistencia con buildUnitFromHotel).
+     */
+    private buildUnitFromRestaurant(restaurant: { id: string; name: string; hotel?: { id: string; name: string } | null }): UnitInfo {
+        if (restaurant.hotel) {
+            return {
+                unitId: restaurant.hotel.id,
+                unitName: restaurant.hotel.name,
+                hotelId: restaurant.hotel.id,
+                restaurantId: restaurant.id,
+                linked: true
+            };
+        }
+        return {
+            unitId: restaurant.id,
+            unitName: restaurant.name,
+            hotelId: null,
+            restaurantId: restaurant.id,
+            linked: false
+        };
+    }
+
+    /**
+     * Cuando hotel y restaurante están vinculados, el `sourceLabel` efectivo es el primero no vacío
+     * entre [CRM del hotel, CRM del restaurante, "Direct"]. Esto evita que un mismo centro
+     * mande tags distintos al CRM dependiendo de si el evento vino del hotel o del restaurante.
+     */
+    private resolveSourceLabel(primaryCrm: any, linkedCrm: any): string {
+        return primaryCrm?.sourceLabel || linkedCrm?.sourceLabel || 'Direct';
+    }
+
     async syncHotelBooking(bookingId: string, event: 'CREATED' | 'UPDATED' | 'CANCELLED' = 'CREATED') {
         try {
             const booking = await this.prisma.booking.findUnique({
                 where: { id: bookingId },
-                include: { hotel: { include: { restaurant: true, crmIntegration: true } }, guest: true }
+                include: { hotel: { include: { restaurant: { include: { crmIntegration: true } }, crmIntegration: true } }, guest: true }
             });
 
             if (!booking || !booking.hotel) return;
 
             let crm: any = booking.hotel.crmIntegration;
+            let linkedCrm: any = booking.hotel.restaurant?.crmIntegration ?? null;
 
             if (!crm || !crm.enabled) {
                 const hotelIntegrations = (booking.hotel.integrations as any) || {};
@@ -26,9 +90,7 @@ export class CrmIntegrationService {
             }
 
             if ((!crm || !crm.enabled) && booking.hotel.restaurant) {
-                crm = await (this.prisma as any).crmIntegration.findUnique({
-                    where: { restaurantId: booking.hotel.restaurant.id }
-                });
+                crm = linkedCrm;
                 if (crm && !crm.enabled) crm = null;
                 if (!crm) {
                     const restIntegrations = (booking.hotel.restaurant.integrations as any) || {};
@@ -40,13 +102,19 @@ export class CrmIntegrationService {
 
             if (!crm || !crm.enabled || !crm.url) return;
 
+            const unit = this.buildUnitFromHotel(booking.hotel);
+            const sourceLabel = unit.linked
+                ? this.resolveSourceLabel(crm, linkedCrm)
+                : (crm.sourceLabel || 'Direct');
+
             const [firstName, ...rest] = booking.guestName.split(' ');
             const lastName = rest.join(' ') || '';
 
             const payload = {
                 source: 'HOTEL_RESERVATIONS',
-                sourceLabel: crm.sourceLabel,
+                sourceLabel,
                 event: `BOOKING_${event}`,
+                unit,
                 guest: {
                     email: booking.guestEmail || booking.guest?.email,
                     phone: booking.guestPhone || booking.guest?.phone,
@@ -124,7 +192,7 @@ export class CrmIntegrationService {
         try {
             const booking = await this.prisma.resBooking.findUnique({
                 where: { id: bookingId },
-                include: { restaurant: { include: { hotel: true, crmIntegration: true } } }
+                include: { restaurant: { include: { hotel: { include: { crmIntegration: true } }, crmIntegration: true } } }
             });
 
             if (!booking) {
@@ -137,6 +205,7 @@ export class CrmIntegrationService {
             }
 
             let crm: any = booking.restaurant.crmIntegration;
+            const linkedCrm: any = booking.restaurant.hotel?.crmIntegration ?? null;
 
             this.logger.log(`[CRM-DEBUG] Restaurant CRM table config: ${JSON.stringify(crm)}`);
 
@@ -150,9 +219,7 @@ export class CrmIntegrationService {
 
             if ((!crm || !crm.enabled) && booking.restaurant.hotel) {
                 this.logger.log(`[CRM-DEBUG] CRM not enabled on restaurant, checking hotel...`);
-                crm = await (this.prisma as any).crmIntegration.findUnique({
-                    where: { hotelId: booking.restaurant.hotel.id }
-                });
+                crm = linkedCrm;
                 if (!crm || !crm.enabled) {
                     const hotelIntegrations = (booking.restaurant.hotel.integrations as any) || {};
                     if (hotelIntegrations.crm?.enabled && hotelIntegrations.crm?.url) {
@@ -188,10 +255,16 @@ export class CrmIntegrationService {
             const [firstName, ...rest] = booking.guestName.split(' ');
             const lastName = rest.join(' ') || '';
 
+            const unit = this.buildUnitFromRestaurant(booking.restaurant);
+            const sourceLabel = unit.linked
+                ? this.resolveSourceLabel(crm, linkedCrm)
+                : (crm.sourceLabel || 'Direct');
+
             const payload = {
                 source: 'RESTAURANT_RESERVATIONS',
-                sourceLabel: crm.sourceLabel,
+                sourceLabel,
                 event: `RESERVATION_${event}`,
+                unit,
                 guest: {
                     email: booking.guestEmail,
                     phone: booking.guestPhone,
@@ -252,8 +325,8 @@ export class CrmIntegrationService {
                 include: {
                     event: {
                         include: {
-                            hotel: { include: { restaurant: true, crmIntegration: true } },
-                            restaurant: { include: { hotel: true, crmIntegration: true } }
+                            hotel: { include: { restaurant: { include: { crmIntegration: true } }, crmIntegration: true } },
+                            restaurant: { include: { hotel: { include: { crmIntegration: true } }, crmIntegration: true } }
                         }
                     }
                 }
@@ -265,23 +338,31 @@ export class CrmIntegrationService {
             if (!primaryEntity) return;
 
             let crm = (primaryEntity as any).crmIntegration;
+            const linkedEntity: any = booking.event.hotel?.restaurant || booking.event.restaurant?.hotel || null;
+            const linkedCrm: any = linkedEntity?.crmIntegration ?? null;
 
             if (!crm || !crm.enabled) {
-                const linkedEntity = booking.event.hotel?.restaurant || booking.event.restaurant?.hotel;
-                if (linkedEntity) {
-                    crm = (linkedEntity as any).crmIntegration;
-                }
+                if (linkedCrm?.enabled) crm = linkedCrm;
             }
 
             if (!crm || !crm.enabled || !crm.url) return;
+
+            const unit: UnitInfo = booking.event.hotel
+                ? this.buildUnitFromHotel(booking.event.hotel)
+                : this.buildUnitFromRestaurant(booking.event.restaurant!);
+
+            const sourceLabel = unit.linked
+                ? this.resolveSourceLabel(crm, linkedCrm)
+                : (crm.sourceLabel || 'Direct');
 
             const [firstName, ...rest] = booking.guestName.split(' ');
             const lastName = rest.join(' ') || '';
 
             const payload = {
                 source: 'EVENT_RESERVATIONS',
-                sourceLabel: crm.sourceLabel,
+                sourceLabel,
                 event: `EVENT_BOOKING_${event}`,
+                unit,
                 guest: {
                     email: booking.guestEmail,
                     phone: booking.guestPhone,

@@ -138,24 +138,35 @@ describe('CrmIntegrationService', () => {
             expect(fetchMock.mock.calls[0][0]).toBe('https://json-fallback.x');
         });
 
-        it('cae al CRM del restaurante en sinergia si el hotel no tiene CRM activo', async () => {
+        it('cae al CRM del restaurante vinculado si el hotel no tiene CRM activo', async () => {
+            // El restaurante vinculado se carga vía include (hotel.restaurant.crmIntegration),
+            // no mediante una findUnique extra. La unidad debe reportarse como linked.
             prisma.booking.findUnique.mockResolvedValue({
                 ...baseHotelBooking,
                 hotel: {
                     ...baseHotel,
                     crmIntegration: null,
-                    restaurant: { id: 'r1', integrations: null },
+                    restaurant: {
+                        id: 'r1',
+                        name: 'SOTO Resto',
+                        integrations: null,
+                        crmIntegration: {
+                            id: 'crm-rest',
+                            enabled: true,
+                            url: 'https://crm-restaurant.x',
+                            token: 'r-token',
+                            sourceLabel: 'SOTO Resto label',
+                        },
+                    },
                 },
             });
-            prisma.crmIntegration.findUnique.mockResolvedValue({
-                id: 'crm-rest',
-                enabled: true,
-                url: 'https://crm-restaurant.x',
-                token: 'r-token',
-            });
+            prisma.crmIntegration.update.mockResolvedValue({});
             await service.syncHotelBooking('b1');
-            expect(prisma.crmIntegration.findUnique).toHaveBeenCalledWith({ where: { restaurantId: 'r1' } });
             expect(fetchMock.mock.calls[0][0]).toBe('https://crm-restaurant.x');
+            const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+            expect(body.unit).toMatchObject({ unitId: baseHotel.id, hotelId: baseHotel.id, restaurantId: 'r1', linked: true });
+            // sourceLabel viene del CRM del restaurante porque el hotel no tiene CRM
+            expect(body.sourceLabel).toBe('SOTO Resto label');
         });
 
         it('no lanza si fetch falla (catch interno)', async () => {
