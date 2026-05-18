@@ -40,20 +40,21 @@ export class RestaurantAvailabilityService {
 
     constructor(private readonly prisma: PrismaService) {}
 
-    private async getRestaurantConfig(restaurantId: string): Promise<{ timezone: string; defaultDuration: number }> {
+    private async getRestaurantConfig(restaurantId: string): Promise<{ timezone: string; defaultDuration: number; bufferMinutes: number }> {
         const r = await this.prisma.restaurant.findUnique({
             where: { id: restaurantId },
-            select: { timezone: true, defaultDuration: true },
+            select: { timezone: true, defaultDuration: true, bufferMinutes: true },
         });
         return {
             timezone: r?.timezone || 'Europe/Madrid',
             defaultDuration: r?.defaultDuration || 90,
+            bufferMinutes: r?.bufferMinutes ?? 15,
         };
     }
 
     async getAvailableSlots(restaurantId: string, dateStr: string, pax: number, type?: string) {
         this.logger.debug(`Buscando huecos restaurant=${restaurantId} fecha=${dateStr} pax=${pax}`);
-        const { timezone, defaultDuration } = await this.getRestaurantConfig(restaurantId);
+        const { timezone, defaultDuration, bufferMinutes } = await this.getRestaurantConfig(restaurantId);
         const dayStr = toDateOnlyString(dateStr);
         const todayStr = toDateOnlyString(new Date());
 
@@ -127,7 +128,7 @@ export class RestaurantAvailabilityService {
 
                 if (dayStr === todayStr && slotTime < now) continue;
 
-                if (isSlotAvailable(slotTime, pax, tables as SlotTable[], bookings, defaultDuration)) {
+                if (isSlotAvailable(slotTime, pax, tables as SlotTable[], bookings, defaultDuration, bufferMinutes)) {
                     if (!availableSlots.includes(slot)) {
                         availableSlots.push(slot);
                     }
@@ -153,6 +154,7 @@ export class RestaurantAvailabilityService {
         pax: number,
         duration: number,
         client: TxOrPrisma = this.prisma,
+        bufferMinutes = 0,
     ): Promise<string | null> {
         const blockedZoneIds = await this.blockedZoneIdsFor(restaurantId, date, client);
 
@@ -172,7 +174,7 @@ export class RestaurantAvailabilityService {
         const bookings = await this.loadDayBookings(restaurantId, date, client);
 
         for (const t of tables) {
-            if (!isTableBooked(t as SlotTable, date, duration, bookings)) return t.id;
+            if (!isTableBooked(t as SlotTable, date, duration, bookings, bufferMinutes)) return t.id;
         }
         return null;
     }
@@ -188,6 +190,7 @@ export class RestaurantAvailabilityService {
         pax: number,
         duration: number,
         client: TxOrPrisma = this.prisma,
+        bufferMinutes = 0,
     ): Promise<{ tableId: string; linkedTableIds: string[] } | null> {
         const blockedZoneIds = await this.blockedZoneIdsFor(restaurantId, date, client);
 
@@ -202,7 +205,7 @@ export class RestaurantAvailabilityService {
         });
 
         const bookings = await this.loadDayBookings(restaurantId, date, client);
-        return selectTableOrCluster(date, pax, tables as SlotTable[], bookings, duration);
+        return selectTableOrCluster(date, pax, tables as SlotTable[], bookings, duration, bufferMinutes);
     }
 
     private async blockedZoneIdsFor(restaurantId: string, date: Date, client: TxOrPrisma): Promise<string[]> {
