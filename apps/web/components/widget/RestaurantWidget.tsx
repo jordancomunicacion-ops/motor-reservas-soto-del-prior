@@ -433,8 +433,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
                                                 style = { backgroundColor: '#F3F4F6', color: '#9CA3AF' };
                                                 className += "cursor-not-allowed";
                                             } else if (status === 'event') {
-                                                style = { backgroundColor: '#EEF2FF', color: '#4F46E5', border: '1px solid #C7D2FE' };
-                                                className += "cursor-pointer hover:bg-[#E0E7FF]";
+                                                className += "bg-white text-[#C59D5F] border-2 border-[#C59D5F] cursor-pointer hover:bg-[#C59D5F]/10";
                                             } else {
                                                 className += "bg-white text-gray-700 hover:bg-[#F9F9F9] hover:text-[#C59D5F] cursor-pointer border border-transparent hover:border-[#C59D5F]";
                                             }
@@ -456,7 +455,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
                                 <div className="flex flex-wrap gap-x-4 gap-y-2 mb-4 text-[10px] uppercase font-bold tracking-wider text-gray-500">
                                     <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded" style={{ backgroundColor: colors.white, border: '1px solid #CCC' }}></div> Disponible</div>
                                     <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-gray-100 border border-gray-200"></div> Cerrado</div>
-                                    <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-indigo-50 border border-indigo-100"></div> Evento</div>
+                                    <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-white border-2 border-[#C59D5F]"></div> Evento</div>
                                     <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded flex justify-center items-center text-white" style={{ backgroundColor: colors.accent }}></div> Seleccionado</div>
                                 </div>
                                 {!selectedDate && (
@@ -487,13 +486,13 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
                                                     const endStr = end ? format(end, 'HH:mm') : null;
                                                     const franja = endStr ? `${startStr} – ${endStr}` : startStr;
                                                     return (
-                                                        <div key={evt.id} className="p-4 bg-indigo-50 border-2 border-indigo-100 rounded-xl animate-in zoom-in duration-300">
+                                                        <div key={evt.id} className="p-4 bg-gray-50 border-l-4 border-[#C59D5F] rounded-none animate-in zoom-in duration-300 shadow-sm">
                                                             <div className="flex items-center justify-between gap-2 mb-1">
-                                                                <div className="flex items-center gap-2 text-indigo-600">
+                                                                <div className="flex items-center gap-2 text-[#C59D5F]">
                                                                     <PartyPopper className="w-4 h-4" />
-                                                                    <span className="text-[10px] font-bold uppercase tracking-widest">Evento Especial</span>
+                                                                    <span className="text-[10px] font-bold uppercase tracking-widest" style={{ fontFamily: "'Oswald', sans-serif" }}>Evento Especial</span>
                                                                 </div>
-                                                                <span className="text-[11px] font-bold text-indigo-600 tabular-nums">{franja}</span>
+                                                                <span className="text-[11px] font-bold text-[#C59D5F] tabular-nums">{franja}</span>
                                                             </div>
                                                             <h4 className="font-bold text-base mb-1" style={{ fontFamily: "'Oswald', sans-serif" }}>{evt.name}</h4>
                                                             {evt.description && (
@@ -504,10 +503,11 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
                                                                     <span className="text-sm font-bold text-rose-600 uppercase italic tracking-tighter">Evento Completo</span>
                                                                 ) : (
                                                                     <>
-                                                                        <span className="text-lg font-black text-indigo-600 tracking-tighter">{evt.price}€</span>
+                                                                        <span className="text-lg font-black text-[#C59D5F] tracking-tighter" style={{ fontFamily: "'Oswald', sans-serif" }}>{evt.price}€</span>
                                                                         <Button
                                                                             size="sm"
-                                                                            className="bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold uppercase h-8 px-4"
+                                                                            className="text-white text-[10px] font-bold uppercase tracking-wider h-8 px-4 rounded-none shadow-sm"
+                                                                            style={{ backgroundColor: colors.accent, fontFamily: "'Oswald', sans-serif" }}
                                                                             onClick={() => handleSelectEvent(evt)}
                                                                         >
                                                                             Reservar Evento
