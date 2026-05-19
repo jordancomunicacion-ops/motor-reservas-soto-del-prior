@@ -22,7 +22,8 @@ import {
     LayoutGrid,
     List,
     LayoutDashboard,
-    Users
+    Users,
+    Star
 } from 'lucide-react';
 import { addDays, format, isSameDay, isWithinInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -37,6 +38,7 @@ import WaitlistPanel from '@/components/restaurant/WaitlistPanel';
 import ReservationForm from '@/components/restaurant/ReservationForm';
 import GuestProfileSheet from '@/components/restaurant/GuestProfileSheet';
 import { DateSelector } from '@/components/admin/DateSelector';
+import ReviewsPanel from '@/components/admin/ReviewsPanel';
 
 interface RoomType { id: string; name: string; rooms: Room[] }
 interface Room { id: string; name: string; }
@@ -52,7 +54,7 @@ interface HotelBooking {
 
 function RestaurantPlanning({ contextId }: { contextId: string }) {
     const [date, setDate] = useState(new Date());
-    const [view, setView] = useState("PLAN"); // PLAN, LIST
+    const [view, setView] = useState("PLAN"); // PLAN, LIST, REVIEWS
     const [loading, setLoading] = useState(false);
 
     // Data
@@ -240,6 +242,12 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
                             >
                                 <List className="w-4 h-4" /> Lista
                             </button>
+                            <button
+                                onClick={() => setView('REVIEWS')}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${view === 'REVIEWS' ? 'bg-white dark:bg-zinc-800 shadow text-black dark:text-white' : 'text-gray-500 hover:text-black dark:hover:text-white'}`}
+                            >
+                                <Star className="w-4 h-4" /> Valoraciones
+                            </button>
                         </div>
                     </div>
 
@@ -269,6 +277,12 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
                                     onEdit={() => {}}
                                     onSelectProfile={(b) => setSelectedBookingForProfile(b)}
                                 />
+                            </div>
+                        )}
+
+                        {view === 'REVIEWS' && (
+                            <div className="h-full overflow-auto p-4">
+                                <ReviewsPanel endpoint={`/restaurant/${contextId}/reviews`} />
                             </div>
                         )}
                     </div>
