@@ -121,8 +121,13 @@ model Hotel {
   // Notifications
   contactEmail String?
 
-  emailTemplates Json? @default("{\"created\": \"\", \"confirmed\": \"\", \"cancelled\": \"\", \"modified\": \"\", \"reminder\": \"\", \"waitlist_join\": \"\", \"waitlist_available\": \"\"}")
+  emailTemplates Json? @default("{\"created\": \"\", \"confirmed\": \"\", \"cancelled\": \"\", \"modified\": \"\", \"reminder\": \"\", \"waitlist_join\": \"\", \"waitlist_available\": \"\", \"review\": \"\"}")
   mailConfig     Json?
+
+  // Reviews (valoración post-estancia)
+  googleReviewUrl          String?
+  reviewMinScoreForGoogle  Int           @default(4)
+  reviews                  HotelReview[]
 
   events Event[]
   zones  Zone[]
@@ -325,10 +330,16 @@ model Booking {
   otaId      String? // Booking.com ID
   otaRawData String? // JSON debug
 
+  // Valoración post-estancia (email a las 24h del checkOut)
+  reviewToken String?      @unique
+  reviewSent  Boolean      @default(false)
+  review      HotelReview?
+
   @@index([hotelId, status])
   @@index([hotelId, checkInDate, checkOutDate])
   @@index([status])
   @@index([source])
+  @@index([reviewSent, checkOutDate])
 }
 
 // Specific Unit Assignment
@@ -690,6 +701,25 @@ model ResBooking {
   @@index([tableId])
   @@index([status])
   @@index([reviewSent, date])
+}
+
+model HotelReview {
+  id        String  @id @default(uuid())
+  bookingId String  @unique
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  hotelId   String
+  hotel     Hotel   @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  // Valoraciones 1-5
+  serviceScore     Int // Atención
+  roomScore        Int // Habitación
+  cleanlinessScore Int // Limpieza
+  advice           String? // "Consejos" en texto libre
+
+  redirectedToGoogle Boolean  @default(false)
+  createdAt          DateTime @default(now())
+
+  @@index([hotelId, createdAt])
 }
 
 model ResReview {

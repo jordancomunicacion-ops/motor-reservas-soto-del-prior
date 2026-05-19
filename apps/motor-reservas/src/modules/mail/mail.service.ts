@@ -250,6 +250,21 @@ export class MailService {
         return 'Verifica host, puerto, usuario y contraseña. Para Gmail/Outlook, usa una contraseña de aplicación, no la contraseña normal.';
     }
 
+    private buildDefaultHotelReviewHtml(hotelName: string, guestName: string, reviewLink: string): string {
+        const name = this.escapeHtml(guestName.split(' ')[0] || guestName);
+        const safeHotel = this.escapeHtml(hotelName);
+        return `
+<div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; color: #0A0A0A;">
+  <h1 style="font-size: 22px; margin: 0 0 8px;">${safeHotel}</h1>
+  <p style="font-size: 15px; line-height: 1.5; margin: 0 0 16px;">Hola ${name},</p>
+  <p style="font-size: 15px; line-height: 1.5; margin: 0 0 16px;">Esperamos que disfrutaras tu estancia con nosotros. Nos encantaría conocer tu opinión: solo te robará un minuto.</p>
+  <p style="text-align:center; margin: 24px 0;">
+    <a href="${reviewLink}" style="background:#C59D5F;color:#fff;text-decoration:none;padding:12px 24px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;display:inline-block;">Dejar mi valoración</a>
+  </p>
+  <p style="font-size: 13px; color: #666; line-height: 1.5; margin: 24px 0 0;">Gracias por tu tiempo. Tu feedback nos ayuda a mejorar.</p>
+</div>`.trim();
+    }
+
     private buildDefaultReviewHtml(restaurantName: string, guestName: string, reviewLink: string): string {
         const name = this.escapeHtml(guestName.split(' ')[0] || guestName);
         const safeRest = this.escapeHtml(restaurantName);
@@ -367,6 +382,11 @@ export class MailService {
         let html = '';
         let subject = '';
 
+        const publicUrl = process.env.PUBLIC_WEB_URL || 'https://reservas.sotodelprior.com';
+        const reviewLink = booking.reviewToken
+            ? `${publicUrl}/hotel/review?id=${booking.id}&token=${booking.reviewToken}`
+            : `${publicUrl}/hotel/review?id=${booking.id}`;
+
         const data = {
             name: booking.guestName,
             hotel_name: hotel.name,
@@ -376,16 +396,21 @@ export class MailService {
             nights: booking.nights,
             total_price: `${booking.totalPrice} ${booking.currency}`,
             room_type: booking.roomType?.name || 'Habitación',
-            modify_link: `https://motor.sotodelprior.com/hotel/modify?id=${booking.id}`
+            modify_link: `https://motor.sotodelprior.com/hotel/modify?id=${booking.id}`,
+            review_link: reviewLink
         };
 
         if (customHtml && customHtml.trim() !== '') {
             html = this.processTemplate(customHtml, data);
-            subject = type === 'created' ? `Solicitud de estancia en ${hotel.name}` : 
-                      type === 'confirmed' ? `Estancia confirmada - ${hotel.name}` : 
+            subject = type === 'created' ? `Solicitud de estancia en ${hotel.name}` :
+                      type === 'confirmed' ? `Estancia confirmada - ${hotel.name}` :
                       type === 'cancelled' ? `Estancia cancelada - ${hotel.name}` :
                       type === 'reminder' ? `Recordatorio de estancia - ${hotel.name}` :
+                      type === 'review' ? `¿Cómo fue tu estancia en ${hotel.name}?` :
                       `Estancia modificada - ${hotel.name}`;
+        } else if (type === 'review') {
+            html = this.buildDefaultHotelReviewHtml(hotel.name, booking.guestName, reviewLink);
+            subject = `¿Cómo fue tu estancia en ${hotel.name}?`;
         } else {
             const statusText = type === 'created' ? 'recibida' : type === 'confirmed' ? 'confirmada' : type === 'cancelled' ? 'cancelada' : type === 'reminder' ? 'recordada' : 'modificada';
             html = `<h1>${this.escapeHtml(hotel.name)}</h1><p>Hola ${this.escapeHtml(booking.guestName)}, tu estancia del ${this.escapeHtml(data.check_in)} al ${this.escapeHtml(data.check_out)} ha sido ${statusText}.</p>`;

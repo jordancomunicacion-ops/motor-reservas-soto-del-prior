@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Save, Building2, Trash2, Utensils, Sparkles, Settings, CreditCard } from 'lucide-react';
+import { ArrowLeft, Save, Building2, Trash2, Utensils, Sparkles, Settings, CreditCard, Star } from 'lucide-react';
 import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { WidgetConfigSection } from '@/components/admin/WidgetConfigSection';
@@ -32,6 +32,7 @@ interface EmailTemplates {
     cancelled: string;
     modified: string;
     reminder: string;
+    review?: string;
 }
 
 interface HotelDetail {
@@ -43,6 +44,8 @@ interface HotelDetail {
     contactEmail?: string | null;
     emailTemplates?: EmailTemplates | null;
     mailConfig?: MailConfig | null;
+    googleReviewUrl?: string | null;
+    reviewMinScoreForGoogle?: number | null;
     integrations?: {
         stripeEnabled?: boolean;
         noShowFee?: number;
@@ -62,7 +65,7 @@ function HotelConfigContent() {
     
     const searchParams = useSearchParams();
     const tab = searchParams.get('tab') || 'general';
-    const [activeTemplate, setActiveTemplate] = useState<'created' | 'confirmed' | 'cancelled' | 'modified' | 'reminder'>('created');
+    const [activeTemplate, setActiveTemplate] = useState<'created' | 'confirmed' | 'cancelled' | 'modified' | 'reminder' | 'review'>('created');
     
     const [hotel, setHotel] = useState<HotelDetail | null>(null);
     const [restaurants, setRestaurants] = useState<RestaurantOption[]>([]);
@@ -76,12 +79,15 @@ function HotelConfigContent() {
         timezone: 'Europe/Madrid',
         restaurantId: '',
         contactEmail: '',
+        googleReviewUrl: '',
+        reviewMinScoreForGoogle: 4,
         emailTemplates: {
             created: '<h1>¡Bienvenido a {{hotel_name}}!</h1><p>Hola {{name}}, hemos recibido tu solicitud de reserva para la habitación {{room_type}}.</p>',
             confirmed: '<h1>Reserva Confirmada en {{hotel_name}}</h1><p>Tu estancia está confirmada del {{check_in}} al {{check_out}}.</p>',
             cancelled: '<h1>Reserva Cancelada</h1><p>Tu reserva en {{hotel_name}} ha sido cancelada.</p>',
             modified: '<h1>Reserva Modificada</h1><p>Hola {{name}}, tu reserva en {{hotel_name}} ha sido actualizada correctamente.</p>',
-            reminder: '<h1>Recordatorio de Estancia</h1><p>Hola {{name}}, te recordamos tu próxima estancia en {{hotel_name}} para el día {{check_in}}.</p>'
+            reminder: '<h1>Recordatorio de Estancia</h1><p>Hola {{name}}, te recordamos tu próxima estancia en {{hotel_name}} para el día {{check_in}}.</p>',
+            review: '<h1>¿Cómo fue tu estancia, {{name}}?</h1><p>Nos encantaría conocer tu opinión sobre tu estancia del {{check_in}} al {{check_out}} en {{hotel_name}}. Solo te robará un minuto: <a href="{{review_link}}">déjanos tu valoración aquí</a>.</p>'
         },
         stripeEnabled: false,
         noShowFee: 0,
@@ -114,7 +120,9 @@ function HotelConfigContent() {
                 timezone: data.timezone || 'Europe/Madrid',
                 restaurantId: data.restaurantId || '',
                 contactEmail: data.contactEmail || '',
-                emailTemplates: data.emailTemplates || formData.emailTemplates,
+                googleReviewUrl: data.googleReviewUrl || '',
+                reviewMinScoreForGoogle: data.reviewMinScoreForGoogle ?? 4,
+                emailTemplates: { ...formData.emailTemplates, ...(data.emailTemplates || {}) },
                 stripeEnabled: data.integrations?.stripeEnabled || false,
                 noShowFee: data.integrations?.noShowFee || 0,
                 cancelHours: data.integrations?.cancelHours || 48,
@@ -163,6 +171,8 @@ function HotelConfigContent() {
                     timezone: formData.timezone,
                     restaurantId: formData.restaurantId,
                     contactEmail: formData.contactEmail,
+                    googleReviewUrl: formData.googleReviewUrl?.trim() || null,
+                    reviewMinScoreForGoogle: Number(formData.reviewMinScoreForGoogle) || 4,
                     emailTemplates: formData.emailTemplates,
                     integrations: {
                         stripeEnabled: formData.stripeEnabled,
@@ -412,15 +422,20 @@ function HotelConfigContent() {
                     <CardContent>
                         <div className="space-y-8">
                             <div className="flex flex-wrap gap-2">
-                                {['created', 'confirmed', 'cancelled', 'modified', 'reminder'].map((t) => (
-                                    <Button 
+                                {['created', 'confirmed', 'cancelled', 'modified', 'reminder', 'review'].map((t) => (
+                                    <Button
                                         key={t}
                                         variant={activeTemplate === t ? 'default' : 'outline'}
                                         size="sm"
                                         onClick={() => setActiveTemplate(t as any)}
                                         className="capitalize"
                                     >
-                                        {t === 'created' ? 'Nueva Reserva' : t === 'confirmed' ? 'Confirmación' : t === 'cancelled' ? 'Cancelación' : t === 'modified' ? 'Modificación' : 'Recordatorio'}
+                                        {t === 'created' ? 'Nueva Reserva' :
+                                         t === 'confirmed' ? 'Confirmación' :
+                                         t === 'cancelled' ? 'Cancelación' :
+                                         t === 'modified' ? 'Modificación' :
+                                         t === 'reminder' ? 'Recordatorio' :
+                                         'Valoración (24h)'}
                                     </Button>
                                 ))}
                                 <div className="flex-1" />
@@ -486,6 +501,53 @@ function HotelConfigContent() {
                     </div>
                     <WidgetConfigSection entityId={hotelId} type="hotel" />
                 </div>
+            )}
+
+            {tab === 'general' && (
+                <Card>
+                    <CardHeader>
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg text-yellow-600">
+                                <Star className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <CardTitle>Valoraciones y Google Reseñas</CardTitle>
+                                <CardDescription>El email de valoración se envía automáticamente 24h después del checkOut. Si la puntuación es alta, redirigimos al huésped a tu página de Google Reseñas.</CardDescription>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="hotel-google-url">URL de Google Reseñas</Label>
+                            <Input
+                                id="hotel-google-url"
+                                type="url"
+                                value={formData.googleReviewUrl}
+                                onChange={(e) => setFormData({ ...formData, googleReviewUrl: e.target.value })}
+                                placeholder="https://g.page/r/.../review"
+                            />
+                            <p className="text-xs text-muted-foreground">Pega el enlace corto de Google Maps → Compartir → "Obtener más reseñas". Si lo dejas vacío, el huésped solo verá el mensaje de agradecimiento.</p>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="hotel-review-min-score">Puntuación mínima para redirigir a Google (1-5)</Label>
+                            <Input
+                                id="hotel-review-min-score"
+                                type="number"
+                                min={1}
+                                max={5}
+                                value={formData.reviewMinScoreForGoogle}
+                                onChange={(e) => setFormData({ ...formData, reviewMinScoreForGoogle: parseInt(e.target.value) || 4 })}
+                                className="w-32"
+                            />
+                            <p className="text-xs text-muted-foreground">Por defecto 4: si Atención, Habitación y Limpieza son ≥ 4, redirigimos a Google al enviar.</p>
+                        </div>
+                        <div className="pt-2">
+                            <Link href={`/admin/hotels/${hotelId}/reviews`} className="text-sm font-medium text-blue-600 hover:underline inline-flex items-center gap-1">
+                                <Star className="w-4 h-4" /> Ver valoraciones recibidas →
+                            </Link>
+                        </div>
+                    </CardContent>
+                </Card>
             )}
 
             {tab === 'general' && (
