@@ -11,11 +11,10 @@ interface Props {
     amount: number;
 }
 
-export function WidgetCardForm({ onSuccess, submitting, colors, amount }: Props) {
+export function WidgetCardForm({ onSuccess, submitting, amount }: Props) {
     const stripe = useStripe();
     const elements = useElements();
     const [error, setError] = useState<string | null>(null);
-    const accent = colors?.accent ?? '#C59D5F';
 
     const handleSubmit = async (e?: React.MouseEvent) => {
         if (e) e.preventDefault();
@@ -39,7 +38,7 @@ export function WidgetCardForm({ onSuccess, submitting, colors, amount }: Props)
     return (
         <div className="space-y-4">
             <div className="p-4 bg-gray-50 border rounded-none">
-                <p className="text-[10px] font-bold uppercase tracking-widest mb-4" style={{ color: accent }}>Datos de la Tarjeta</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-[#C59D5F] mb-4">Datos de la Tarjeta</p>
                 <CardElement options={{
                     style: {
                         base: {

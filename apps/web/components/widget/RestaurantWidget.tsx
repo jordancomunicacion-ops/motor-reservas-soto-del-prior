@@ -379,7 +379,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
                             <div className="flex flex-col">
                                 <div className="max-w-[280px] mx-auto w-full">
                                     {/* Pax Selector */}
-                                    <div className="mb-6 bg-gray-50 p-3 rounded-none border-l-4" style={{ borderColor: colors.accent }}>
+                                    <div className="mb-6 bg-gray-50 p-3 rounded-none border-l-4 border-[#C59D5F]">
                                         <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2 block" style={{ fontFamily: "'Oswald', sans-serif" }}>¿Cuántos sois?</label>
                                         <div className="flex items-center justify-between">
                                             <button
@@ -389,7 +389,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
                                                 -
                                             </button>
                                             <div className="flex items-center gap-2">
-                                                <Users className="w-4 h-4" style={{ color: colors.accent }} />
+                                                <Users className="w-4 h-4 text-[#C59D5F]" />
                                                 <span className="text-xl font-black italic tracking-tighter" style={{ fontFamily: "'Oswald', sans-serif" }}>{pax} PERSONAS</span>
                                             </div>
                                             <button
@@ -414,7 +414,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
                                     </div>
                                     <div className="grid grid-cols-7 gap-1 mb-2 text-center border-b pb-2">
                                         {weekDays.map(d => (
-                                            <div key={d} className="font-black text-[10px] uppercase tracking-widest" style={{ color: colors.accent }}>{d}</div>
+                                            <div key={d} className="font-black text-[10px] uppercase tracking-widest text-[#C59D5F]">{d}</div>
                                         ))}
                                     </div>
                                     <div className="grid grid-cols-7 gap-1">
@@ -473,7 +473,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
                                 {selectedDate && !loadingSlots && timeSlots && (
                                     <div className="animate-in fade-in slide-in-from-right-4 duration-500">
                                         <h3 className="font-bold text-lg mb-4 flex items-center gap-2" style={{ fontFamily: "'Oswald', sans-serif" }}>
-                                            <span style={{ color: colors.accent }}>Disponibilidad:</span> {format(selectedDate, "d 'de' MMMM", { locale: es })}
+                                            <span className="text-[#C59D5F]">Disponibilidad:</span> {format(selectedDate, "d 'de' MMMM", { locale: es })}
                                         </h3>
 
                                         {dayEvents.length > 0 && (
@@ -568,7 +568,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
                     {/* STEP 2: INFORMATION */}
                     {currentStep === 2 && selectedDate && (
                         <div className="animate-in fade-in slide-in-from-right-8 duration-500 max-w-2xl mx-auto">
-                            <div className="bg-gray-50 p-4 border-l-4 mb-6 shadow-sm" style={{ borderColor: colors.accent }}>
+                            <div className="bg-gray-50 p-4 border-l-4 border-[#C59D5F] mb-6 shadow-sm">
                                 <h3 className="text-lg font-bold mb-3" style={{ fontFamily: "'Oswald', sans-serif" }}>Resumen de Reserva</h3>
                                 <div className="grid grid-cols-2 gap-4 text-sm">
                                     <div className="flex items-center gap-2">
@@ -671,7 +671,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
                             <div className="text-left max-w-lg mx-auto space-y-5">
                                 {widgetConfig?.showCrmFields !== false && (
                                     <div className="border-b border-gray-100 pb-4">
-                                        <h4 className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: colors.accent, fontFamily: "'Oswald', sans-serif" }}>Datos opcionales</h4>
+                                        <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#C59D5F] mb-3" style={{ fontFamily: "'Oswald', sans-serif" }}>Datos opcionales</h4>
                                         <div className="grid grid-cols-2 gap-3">
                                             <input type="number" className="border p-2.5 text-sm rounded-none focus:outline-none" placeholder="Edad" value={additionalData.age} onChange={e => setAdditionalData({ ...additionalData, age: e.target.value })} />
                                             <select className="border p-2.5 text-sm rounded-none focus:outline-none" value={additionalData.gender} onChange={e => setAdditionalData({ ...additionalData, gender: e.target.value })}>
@@ -721,10 +721,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
                     {currentStep === 4 && (
                         <div className="animate-in fade-in zoom-in duration-500 h-full pt-4 text-center">
                             <div className="flex flex-col items-center justify-center pb-8 border-b border-gray-100 mb-8">
-                                <div
-                                    className="w-20 h-20 rounded-full flex items-center justify-center shadow-lg mb-6"
-                                    style={{ backgroundColor: createdBooking?.isWaitlist ? '#f59e0b' : colors.accent }}
-                                >
+                                <div className={`w-20 h-20 rounded-full flex items-center justify-center shadow-lg mb-6 ${createdBooking?.isWaitlist ? 'bg-amber-500' : 'bg-[#C59D5F]'}`}>
                                     {createdBooking?.isWaitlist ? <Clock className="w-10 h-10 text-white" /> : <Check className="w-10 h-10 text-white" strokeWidth={4} />}
                                 </div>
                                 <h2 className="text-3xl font-bold uppercase tracking-wide" style={{ fontFamily: "'Oswald', sans-serif" }}>
