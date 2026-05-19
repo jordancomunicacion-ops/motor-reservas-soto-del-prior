@@ -1,10 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { EventBookingStatus } from '../../common/enums';
+import { CrmIntegrationService } from '../crm/crm-integration.service';
 
 @Injectable()
 export class EventService {
   constructor(
-    private prisma: PrismaService
+    private prisma: PrismaService,
+    private crmIntegrationService: CrmIntegrationService,
   ) {}
 
   async findAll() {
@@ -75,11 +78,12 @@ export class EventService {
 
   async createBooking(eventId: string, data: any) {
     const event = await this.findOne(eventId);
-    
-    // Check capacity
-    const currentPax = event.bookings.reduce((sum, b) => sum + b.pax, 0);
+
+    // Solo cuentan las bookings que ocupan plaza (no las canceladas)
+    const activeBookings = event.bookings.filter(b => b.status !== EventBookingStatus.CANCELLED);
+    const currentPax = activeBookings.reduce((sum, b) => sum + b.pax, 0);
     if (currentPax + data.pax > event.capacity) {
-      throw new Error('Not enough capacity for this event');
+      throw new BadRequestException('No hay capacidad suficiente para este evento');
     }
 
     const booking = await this.prisma.eventBooking.create({
@@ -90,23 +94,31 @@ export class EventService {
         guestPhone: data.guestPhone,
         pax: data.pax,
         totalPrice: event.price.toNumber() * data.pax,
-        status: 'CONFIRMED',
+        status: EventBookingStatus.CONFIRMED,
+        ...(data.stripePaymentMethodId ? { stripePaymentMethodId: data.stripePaymentMethodId } : {}),
+        ...(data.stripeCustomerId ? { stripeCustomerId: data.stripeCustomerId } : {}),
       },
     });
 
-    // Sync with CRM removed for now
+    // Sync con CRM (no bloquea el flujo si falla)
+    void this.crmIntegrationService.syncEventBooking(booking.id, 'CREATED');
 
     return booking;
   }
 
-  async cancelBooking(bookingId: string) {
-    const booking = await this.prisma.eventBooking.update({
+  async cancelBooking(eventId: string, bookingId: string) {
+    const booking = await this.prisma.eventBooking.findUnique({ where: { id: bookingId } });
+    if (!booking) throw new NotFoundException(`EventBooking ${bookingId} no encontrada`);
+    if (booking.eventId !== eventId) {
+      throw new BadRequestException('La reserva no pertenece a este evento');
+    }
+    const updated = await this.prisma.eventBooking.update({
       where: { id: bookingId },
-      data: { status: 'CANCELLED' },
+      data: { status: EventBookingStatus.CANCELLED },
     });
 
-    // Sync with CRM removed
-    
-    return booking;
+    void this.crmIntegrationService.syncEventBooking(updated.id, 'CANCELLED');
+
+    return updated;
   }
 }

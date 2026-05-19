@@ -17,6 +17,7 @@ interface EventDetail {
     id: string;
     name: string;
     date: string;
+    duration: number;
     capacity: number;
     price: number;
     description?: string | null;
@@ -39,6 +40,7 @@ export default function EventConfigPage() {
     const [formData, setFormData] = useState({
         name: '',
         date: '',
+        duration: 120,
         capacity: 50,
         price: 0,
         description: '',
@@ -57,10 +59,14 @@ export default function EventConfigPage() {
             fetchAPI<ZoneSummary[]>(`/restaurant/${formData.restaurantId}/zones`)
                 .then(setAvailableZones)
                 .catch(() => setAvailableZones([]));
+        } else if (formData.hotelId) {
+            fetchAPI<ZoneSummary[]>(`/property/hotels/${formData.hotelId}/zones`)
+                .then(setAvailableZones)
+                .catch(() => setAvailableZones([]));
         } else {
             setAvailableZones([]);
         }
-    }, [formData.restaurantId]);
+    }, [formData.restaurantId, formData.hotelId]);
 
     useEffect(() => {
         if (params.id) {
@@ -71,7 +77,6 @@ export default function EventConfigPage() {
     async function loadData() {
         setLoading(true);
         try {
-            console.log('Loading data for event:', params.id);
             const [event, hotelsData, restaurantsData] = await Promise.all([
                 fetchAPI<EventDetail | EventDetail[]>(`/event/${params.id}`),
                 fetchAPI<HotelSummary[]>('/property/hotels'),
@@ -92,6 +97,7 @@ export default function EventConfigPage() {
                     setFormData({
                         name: eventObj.name,
                         date: formattedDate,
+                        duration: eventObj.duration || 120,
                         capacity: eventObj.capacity,
                         price: Number(eventObj.price),
                         description: eventObj.description || '',
@@ -113,6 +119,18 @@ export default function EventConfigPage() {
     }
 
     async function handleSave() {
+        if (!formData.hotelId && !formData.restaurantId) {
+            alert('Debes vincular el evento a un hotel o restaurante');
+            return;
+        }
+        if (formData.zoneIds.length === 0) {
+            alert('Debes seleccionar al menos una sala/zona para el evento');
+            return;
+        }
+        if (!formData.duration || formData.duration < 15) {
+            alert('La duración debe ser de al menos 15 minutos');
+            return;
+        }
         setSaving(true);
         try {
             await fetchAPI(`/event/${params.id}`, {

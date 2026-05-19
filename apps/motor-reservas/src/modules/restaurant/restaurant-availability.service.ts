@@ -90,21 +90,24 @@ export class RestaurantAvailabilityService {
                 isActive: true,
             },
             include: {
-                zones: true,
+                zones: { select: { id: true, name: true } },
                 _count: { select: { bookings: true } },
             },
         });
 
-        const blockedZoneIds = dayEvents.flatMap(e => e.zones.map(z => z.id));
+        // Pre-calcula la franja de cada evento [start, end) y las zonas que ocupa
+        const eventRanges = dayEvents.map(e => ({
+            start: e.date.getTime(),
+            end: e.date.getTime() + (e.duration || 120) * 60000,
+            zoneIds: new Set(e.zones.map(z => z.id)),
+        }));
 
-        const tables = await this.prisma.table.findMany({
+        const allTables = await this.prisma.table.findMany({
             where: {
-                zone: {
-                    restaurantId,
-                    id: blockedZoneIds.length > 0 ? { notIn: blockedZoneIds } : undefined,
-                },
+                zone: { restaurantId },
                 isActive: true,
             },
+            include: { zone: { select: { id: true } } },
         });
 
         const bookingsRaw = await this.prisma.resBooking.findMany({
@@ -128,7 +131,21 @@ export class RestaurantAvailabilityService {
 
                 if (dayStr === todayStr && slotTime < now) continue;
 
-                if (isSlotAvailable(slotTime, pax, tables as SlotTable[], bookings, defaultDuration, bufferMinutes)) {
+                // Zonas bloqueadas solo si el slot solapa con la franja del evento
+                const slotStartMs = slotTime.getTime();
+                const slotEndMs = slotStartMs + defaultDuration * 60000;
+                const blockedZoneIds = new Set<string>();
+                for (const range of eventRanges) {
+                    if (range.start < slotEndMs && range.end > slotStartMs) {
+                        for (const zId of range.zoneIds) blockedZoneIds.add(zId);
+                    }
+                }
+
+                const candidateTables = blockedZoneIds.size > 0
+                    ? allTables.filter(t => !blockedZoneIds.has(t.zone.id))
+                    : allTables;
+
+                if (isSlotAvailable(slotTime, pax, candidateTables as SlotTable[], bookings, defaultDuration, bufferMinutes)) {
                     if (!availableSlots.includes(slot)) {
                         availableSlots.push(slot);
                     }
@@ -139,7 +156,7 @@ export class RestaurantAvailabilityService {
         return {
             slots: availableSlots,
             closed: activeShifts.length === 0,
-            event: dayEvents[0] || null,
+            events: dayEvents,
         };
     }
 
@@ -156,7 +173,7 @@ export class RestaurantAvailabilityService {
         client: TxOrPrisma = this.prisma,
         bufferMinutes = 0,
     ): Promise<string | null> {
-        const blockedZoneIds = await this.blockedZoneIdsFor(restaurantId, date, client);
+        const blockedZoneIds = await this.blockedZoneIdsForRange(restaurantId, date, duration, client);
 
         const tables = await client.table.findMany({
             where: {
@@ -193,7 +210,7 @@ export class RestaurantAvailabilityService {
         bufferMinutes = 0,
         excludeBookingId?: string,
     ): Promise<{ tableId: string; linkedTableIds: string[] } | null> {
-        const blockedZoneIds = await this.blockedZoneIdsFor(restaurantId, date, client);
+        const blockedZoneIds = await this.blockedZoneIdsForRange(restaurantId, date, duration, client);
 
         const tables = await client.table.findMany({
             where: {
@@ -209,15 +226,35 @@ export class RestaurantAvailabilityService {
         return selectTableOrCluster(date, pax, tables as SlotTable[], bookings, duration, bufferMinutes);
     }
 
-    private async blockedZoneIdsFor(restaurantId: string, date: Date, client: TxOrPrisma): Promise<string[]> {
-        // Day window conservador (±1 día sobre la instante) para cubrir todas las TZs
-        const startOfDay = new Date(date.getTime() - 24 * 60 * 60 * 1000);
-        const endOfDay = new Date(date.getTime() + 24 * 60 * 60 * 1000);
+    /**
+     * Zonas bloqueadas por eventos cuya franja [event.date, event.date+duration)
+     * solapa con la franja [date, date+durationMinutes) de la reserva candidata.
+     */
+    private async blockedZoneIdsForRange(
+        restaurantId: string,
+        date: Date,
+        durationMinutes: number,
+        client: TxOrPrisma,
+    ): Promise<string[]> {
+        // Ventana amplia para que el filtro inicial atrape todos los eventos relevantes;
+        // el solape exacto se comprueba en memoria.
+        const windowStart = new Date(date.getTime() - 24 * 60 * 60 * 1000);
+        const windowEnd = new Date(date.getTime() + 24 * 60 * 60 * 1000);
         const events = await client.event.findMany({
-            where: { restaurantId, date: { gte: startOfDay, lte: endOfDay }, isActive: true },
+            where: { restaurantId, date: { gte: windowStart, lte: windowEnd }, isActive: true },
             include: { zones: { select: { id: true } } },
         });
-        return events.flatMap(e => e.zones.map(z => z.id));
+        const reservationStart = date.getTime();
+        const reservationEnd = reservationStart + durationMinutes * 60000;
+        const blocked = new Set<string>();
+        for (const e of events) {
+            const eStart = e.date.getTime();
+            const eEnd = eStart + (e.duration || 120) * 60000;
+            if (eStart < reservationEnd && eEnd > reservationStart) {
+                for (const z of e.zones) blocked.add(z.id);
+            }
+        }
+        return Array.from(blocked);
     }
 
     private async loadDayBookings(restaurantId: string, date: Date, client: TxOrPrisma, excludeBookingId?: string): Promise<SlotBooking[]> {

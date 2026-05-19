@@ -97,6 +97,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
     const [closures, setClosures] = useState<{ date: string; endDate?: string | null }[]>([]);
     const [restaurantName, setRestaurantName] = useState('');
     const [createdBooking, setCreatedBooking] = useState<CreatedBooking | null>(null);
+    const [dayEvents, setDayEvents] = useState<RestaurantEvent[]>([]);
     const [selectedEvent, setSelectedEvent] = useState<RestaurantEvent | null>(null);
     const [eventDates, setEventDates] = useState<string[]>([]);
 
@@ -180,13 +181,28 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
                 lunch: lunchData?.slots || [],
                 dinner: dinnerData?.slots || [],
             });
-            setSelectedEvent(lunchData?.event || dinnerData?.event || null);
+            // Backend nuevo: `events[]`. Fallback al campo legacy `event` mientras se despliega.
+            const eventsFromResponse =
+                lunchData?.events ??
+                dinnerData?.events ??
+                ((lunchData?.event || dinnerData?.event) ? [(lunchData?.event || dinnerData?.event) as RestaurantEvent] : []);
+            // Dedupe por id (lunch y dinner devuelven el mismo set)
+            const uniqueEvents = Array.from(new Map(eventsFromResponse.map(e => [e.id, e])).values());
+            setDayEvents(uniqueEvents);
+            setSelectedEvent(null);
         } catch (e) {
             console.error('Error fetching slots:', e);
             setTimeSlots({ lunch: [], dinner: [] });
+            setDayEvents([]);
         } finally {
             setLoadingSlots(false);
         }
+    };
+
+    const handleSelectEvent = (event: RestaurantEvent) => {
+        setSelectedEvent(event);
+        setSelectedTime(format(new Date(event.date), 'HH:mm'));
+        setCurrentStep(2);
     };
 
     const handleTimeSelect = (time: string) => {

@@ -31,6 +31,7 @@ interface EventBooking {
     guestPhone?: string | null;
     pax: number;
     totalPrice?: number;
+    status?: 'PENDING' | 'CONFIRMED' | 'CANCELLED';
     createdAt?: string;
 }
 
@@ -51,6 +52,9 @@ export default function EventDetailPage() {
     const params = useParams();
     const [event, setEvent] = useState<EventDetail | null>(null);
     const [loading, setLoading] = useState(true);
+    const [showAddManual, setShowAddManual] = useState(false);
+    const [manualForm, setManualForm] = useState({ guestName: '', guestEmail: '', guestPhone: '', pax: 1 });
+    const [savingManual, setSavingManual] = useState(false);
 
     useEffect(() => {
         if (params.id) loadEvent();
@@ -87,7 +91,8 @@ export default function EventDetailPage() {
         );
     }
 
-    const bookings = event.bookings || [];
+    const allBookings = event.bookings || [];
+    const bookings = allBookings.filter(b => b.status !== 'CANCELLED');
     const totalPax = bookings.reduce((sum, b) => sum + b.pax, 0);
 
     return (
@@ -245,6 +250,65 @@ export default function EventDetailPage() {
                     </Button>
                 </div>
             </div>
+
+            {showAddManual && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAddManual(false)}>
+                    <div className="bg-white dark:bg-zinc-800 rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                            <Users className="w-5 h-5 text-purple-500" /> Nueva reserva manual
+                        </h3>
+                        <div className="space-y-3">
+                            <div>
+                                <label className="text-xs font-medium text-muted-foreground">Nombre del cliente *</label>
+                                <input
+                                    className="border p-2 rounded w-full dark:bg-zinc-900 focus:ring-2 focus:ring-purple-500 outline-none mt-1"
+                                    value={manualForm.guestName}
+                                    onChange={e => setManualForm({ ...manualForm, guestName: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs font-medium text-muted-foreground">Email</label>
+                                <input
+                                    type="email"
+                                    className="border p-2 rounded w-full dark:bg-zinc-900 focus:ring-2 focus:ring-purple-500 outline-none mt-1"
+                                    value={manualForm.guestEmail}
+                                    onChange={e => setManualForm({ ...manualForm, guestEmail: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs font-medium text-muted-foreground">Teléfono</label>
+                                <input
+                                    className="border p-2 rounded w-full dark:bg-zinc-900 focus:ring-2 focus:ring-purple-500 outline-none mt-1"
+                                    value={manualForm.guestPhone}
+                                    onChange={e => setManualForm({ ...manualForm, guestPhone: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs font-medium text-muted-foreground">Pax *</label>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    className="border p-2 rounded w-full dark:bg-zinc-900 focus:ring-2 focus:ring-purple-500 outline-none mt-1"
+                                    value={manualForm.pax}
+                                    onChange={e => setManualForm({ ...manualForm, pax: Number(e.target.value) })}
+                                />
+                            </div>
+                        </div>
+                        <div className="mt-6 flex justify-end gap-2">
+                            <Button variant="ghost" onClick={() => setShowAddManual(false)} disabled={savingManual}>
+                                Cancelar
+                            </Button>
+                            <Button
+                                className="bg-purple-600 hover:bg-purple-700"
+                                onClick={handleAddManual}
+                                disabled={savingManual}
+                            >
+                                {savingManual ? 'Guardando...' : 'Crear reserva'}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
