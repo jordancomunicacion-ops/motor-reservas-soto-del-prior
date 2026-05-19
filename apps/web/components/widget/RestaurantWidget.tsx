@@ -75,6 +75,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
     const [closures, setClosures] = useState<{ date: string; endDate?: string | null }[]>([]);
     const [restaurantName, setRestaurantName] = useState('');
     const [createdBooking, setCreatedBooking] = useState<CreatedBooking | null>(null);
+    const [dayEvents, setDayEvents] = useState<RestaurantEvent[]>([]);
     const [selectedEvent, setSelectedEvent] = useState<RestaurantEvent | null>(null);
     const [eventDates, setEventDates] = useState<string[]>([]);
 
@@ -183,13 +184,28 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
                 lunch: lunchData?.slots || [],
                 dinner: dinnerData?.slots || []
             });
-            setSelectedEvent(lunchData?.event || dinnerData?.event || null);
+            // Backend nuevo: `events[]`. Fallback al campo legacy `event` mientras se despliega.
+            const eventsFromResponse =
+                lunchData?.events ??
+                dinnerData?.events ??
+                ((lunchData?.event || dinnerData?.event) ? [(lunchData?.event || dinnerData?.event) as RestaurantEvent] : []);
+            // Dedupe por id (lunch y dinner devuelven el mismo set)
+            const uniqueEvents = Array.from(new Map(eventsFromResponse.map(e => [e.id, e])).values());
+            setDayEvents(uniqueEvents);
+            setSelectedEvent(null);
         } catch (e) {
             console.error('Error fetching slots:', e);
             setTimeSlots({ lunch: [], dinner: [] });
+            setDayEvents([]);
         } finally {
             setLoadingSlots(false);
         }
+    };
+
+    const handleSelectEvent = (event: RestaurantEvent) => {
+        setSelectedEvent(event);
+        setSelectedTime(format(new Date(event.date), 'HH:mm'));
+        setCurrentStep(2);
     };
 
     const handleTimeSelect = (time: string) => {
@@ -209,30 +225,47 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
 
         setSubmitting(true);
         try {
-            const dateStr = format(selectedDate, 'yyyy-MM-dd');
-            const result = await fetchAPI('/restaurant/public/reservation', {
-                method: 'POST',
-                body: JSON.stringify({
-                    restaurantId,
-                    date: dateStr,
-                    time: selectedTime,
-                    pax,
-                    name: `${formData.name} ${formData.surname} ${additionalData.surname2}`.trim(),
-                    email: formData.email,
-                    phone: formData.prefix + formData.phone,
-                    notes: [comment, bonusCode ? `Bono: ${bonusCode}` : '', hasAllergy ? 'Tiene alergias/intolerancias' : ''].filter(Boolean).join(' | ') || undefined,
-                    surname2: additionalData.surname2 || undefined,
-                    age: (additionalData.age && !isNaN(parseInt(additionalData.age))) ? parseInt(additionalData.age) : undefined,
-                    gender: additionalData.gender || undefined,
-                    whatsapp: additionalData.whatsapp || undefined,
-                    instagram: additionalData.instagram || undefined,
-                    facebook: additionalData.facebook || undefined,
-                    tiktok: additionalData.tiktok || undefined,
-                    linkedin: additionalData.linkedin || undefined,
-                    xTwitter: additionalData.xTwitter || undefined,
-                    paymentMethodId
-                })
-            });
+            const fullName = `${formData.name} ${formData.surname} ${additionalData.surname2}`.trim();
+            const fullPhone = formData.prefix + formData.phone;
+
+            let result: CreatedBooking;
+            if (selectedEvent) {
+                result = await fetchAPI(`/event/${selectedEvent.id}/bookings`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        guestName: fullName,
+                        guestEmail: formData.email,
+                        guestPhone: fullPhone,
+                        pax,
+                        ...(paymentMethodId ? { stripePaymentMethodId: paymentMethodId } : {}),
+                    })
+                });
+            } else {
+                const dateStr = format(selectedDate, 'yyyy-MM-dd');
+                result = await fetchAPI('/restaurant/public/reservation', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        restaurantId,
+                        date: dateStr,
+                        time: selectedTime,
+                        pax,
+                        name: fullName,
+                        email: formData.email,
+                        phone: fullPhone,
+                        notes: [comment, bonusCode ? `Bono: ${bonusCode}` : '', hasAllergy ? 'Tiene alergias/intolerancias' : ''].filter(Boolean).join(' | ') || undefined,
+                        surname2: additionalData.surname2 || undefined,
+                        age: (additionalData.age && !isNaN(parseInt(additionalData.age))) ? parseInt(additionalData.age) : undefined,
+                        gender: additionalData.gender || undefined,
+                        whatsapp: additionalData.whatsapp || undefined,
+                        instagram: additionalData.instagram || undefined,
+                        facebook: additionalData.facebook || undefined,
+                        tiktok: additionalData.tiktok || undefined,
+                        linkedin: additionalData.linkedin || undefined,
+                        xTwitter: additionalData.xTwitter || undefined,
+                        paymentMethodId
+                    })
+                });
+            }
             setCreatedBooking(result);
             setCurrentStep(4);
         } catch (e) {
@@ -453,30 +486,45 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
                                             <span className="text-[#C59D5F]">Disponibilidad:</span> {format(selectedDate, "d 'de' MMMM", { locale: es })}
                                         </h3>
 
-                                        {selectedEvent && (
-                                            <div className="mb-6 p-4 bg-indigo-50 border-2 border-indigo-100 rounded-xl animate-in zoom-in duration-300">
-                                                <div className="flex items-center gap-2 text-indigo-600 mb-1">
-                                                    <PartyPopper className="w-4 h-4" />
-                                                    <span className="text-[10px] font-bold uppercase tracking-widest">Evento Especial</span>
-                                                </div>
-                                                <h4 className="font-bold text-base mb-1">{selectedEvent.name}</h4>
-                                                <p className="text-xs text-gray-600 mb-3 line-clamp-2 italic">{selectedEvent.description}</p>
-                                                <div className="flex justify-between items-center">
-                                                    {selectedEvent._count.bookings >= selectedEvent.capacity ? (
-                                                        <span className="text-sm font-bold text-rose-600 uppercase italic tracking-tighter">Evento Completo</span>
-                                                    ) : (
-                                                        <>
-                                                            <span className="text-lg font-black text-indigo-600 tracking-tighter">{selectedEvent.price}€</span>
-                                                            <Button 
-                                                                size="sm" 
-                                                                className="bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold uppercase h-8 px-4"
-                                                                onClick={() => handleTimeSelect(format(new Date(selectedEvent.date), 'HH:mm'))}
-                                                            >
-                                                                Reservar Evento
-                                                            </Button>
-                                                        </>
-                                                    )}
-                                                </div>
+                                        {dayEvents.length > 0 && (
+                                            <div className="mb-6 space-y-3">
+                                                {dayEvents.map(evt => {
+                                                    const start = new Date(evt.date);
+                                                    const end = new Date(start.getTime() + ((evt.duration || 120) * 60000));
+                                                    const isFull = evt._count.bookings >= evt.capacity;
+                                                    return (
+                                                        <div key={evt.id} className="p-4 bg-indigo-50 border-2 border-indigo-100 rounded-xl animate-in zoom-in duration-300">
+                                                            <div className="flex items-center gap-2 text-indigo-600 mb-1">
+                                                                <PartyPopper className="w-4 h-4" />
+                                                                <span className="text-[10px] font-bold uppercase tracking-widest">Evento Especial</span>
+                                                                <span className="ml-auto flex items-center gap-1 text-[10px] font-bold text-indigo-700">
+                                                                    <Clock className="w-3 h-3" />
+                                                                    {format(start, 'HH:mm')} – {format(end, 'HH:mm')}
+                                                                </span>
+                                                            </div>
+                                                            <h4 className="font-bold text-base mb-1">{evt.name}</h4>
+                                                            {evt.description && (
+                                                                <p className="text-xs text-gray-600 mb-3 line-clamp-2 italic">{evt.description}</p>
+                                                            )}
+                                                            <div className="flex justify-between items-center">
+                                                                {isFull ? (
+                                                                    <span className="text-sm font-bold text-rose-600 uppercase italic tracking-tighter">Evento Completo</span>
+                                                                ) : (
+                                                                    <>
+                                                                        <span className="text-lg font-black text-indigo-600 tracking-tighter">{evt.price}€</span>
+                                                                        <Button
+                                                                            size="sm"
+                                                                            className="bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold uppercase h-8 px-4"
+                                                                            onClick={() => handleSelectEvent(evt)}
+                                                                        >
+                                                                            Reservar Evento
+                                                                        </Button>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
                                         )}
 

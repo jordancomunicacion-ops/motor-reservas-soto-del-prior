@@ -11,6 +11,7 @@ interface EventDetail {
     id: string;
     name: string;
     date: string;
+    duration: number;
     capacity: number;
     price: number;
     description?: string | null;
@@ -33,6 +34,7 @@ export default function EventConfigPage() {
     const [formData, setFormData] = useState({
         name: '',
         date: '',
+        duration: 120,
         capacity: 50,
         price: 0,
         description: '',
@@ -51,10 +53,14 @@ export default function EventConfigPage() {
             fetchAPI<ZoneSummary[]>(`/restaurant/${formData.restaurantId}/zones`)
                 .then(setAvailableZones)
                 .catch(() => setAvailableZones([]));
+        } else if (formData.hotelId) {
+            fetchAPI<ZoneSummary[]>(`/property/hotels/${formData.hotelId}/zones`)
+                .then(setAvailableZones)
+                .catch(() => setAvailableZones([]));
         } else {
             setAvailableZones([]);
         }
-    }, [formData.restaurantId]);
+    }, [formData.restaurantId, formData.hotelId]);
 
     useEffect(() => {
         if (params.id) {
@@ -65,7 +71,6 @@ export default function EventConfigPage() {
     async function loadData() {
         setLoading(true);
         try {
-            console.log('Loading data for event:', params.id);
             const [event, hotelsData, restaurantsData] = await Promise.all([
                 fetchAPI<EventDetail | EventDetail[]>(`/event/${params.id}`),
                 fetchAPI<HotelSummary[]>('/property/hotels'),
@@ -74,8 +79,6 @@ export default function EventConfigPage() {
                 console.error('Error in Promise.all loadData:', err);
                 return [null, [], []] as const;
             });
-            
-            console.log('Data fetched:', { event, hotelsData, restaurantsData });
 
             if (event) {
                 // Check if event is an array (mock data issue)
@@ -87,6 +90,7 @@ export default function EventConfigPage() {
                     setFormData({
                         name: eventObj.name,
                         date: formattedDate,
+                        duration: eventObj.duration || 120,
                         capacity: eventObj.capacity,
                         price: Number(eventObj.price),
                         description: eventObj.description || '',
@@ -108,6 +112,18 @@ export default function EventConfigPage() {
     }
 
     async function handleSave() {
+        if (!formData.hotelId && !formData.restaurantId) {
+            alert('Debes vincular el evento a un hotel o restaurante');
+            return;
+        }
+        if (formData.zoneIds.length === 0) {
+            alert('Debes seleccionar al menos una sala/zona para el evento');
+            return;
+        }
+        if (!formData.duration || formData.duration < 15) {
+            alert('La duración debe ser de al menos 15 minutos');
+            return;
+        }
         setSaving(true);
         try {
             await fetchAPI(`/event/${params.id}`, {
@@ -177,14 +193,25 @@ export default function EventConfigPage() {
                                     onChange={e => setFormData({...formData, name: e.target.value})}
                                 />
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-3 gap-4">
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium">Fecha y Hora</label>
+                                    <label className="text-sm font-medium">Fecha y Hora de Inicio</label>
                                     <input
                                         type="datetime-local"
                                         className="border p-2 rounded w-full dark:bg-zinc-900 focus:ring-2 focus:ring-blue-500 outline-none"
                                         value={formData.date}
                                         onChange={e => setFormData({...formData, date: e.target.value})}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Duración (min)</label>
+                                    <input
+                                        type="number"
+                                        min={15}
+                                        step={15}
+                                        className="border p-2 rounded w-full dark:bg-zinc-900 focus:ring-2 focus:ring-blue-500 outline-none"
+                                        value={formData.duration}
+                                        onChange={e => setFormData({...formData, duration: Number(e.target.value)})}
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -268,11 +295,11 @@ export default function EventConfigPage() {
                         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                             <Utensils className="w-5 h-5 text-orange-500" /> Salas / Áreas Reservadas
                         </h2>
-                        {formData.restaurantId ? (
+                        {(formData.restaurantId || formData.hotelId) ? (
                             availableZones.length > 0 ? (
                                 <div className="space-y-3">
                                     <p className="text-xs text-muted-foreground mb-4">
-                                        Selecciona las salas que ocupará este evento. Las mesas en estas áreas quedarán bloqueadas para reservas normales.
+                                        Selecciona las salas que ocupará este evento. Las mesas en estas áreas quedarán bloqueadas para reservas normales durante la franja del evento.
                                     </p>
                                     <div className="grid grid-cols-2 gap-3">
                                         {availableZones.map(zone => (
@@ -294,10 +321,10 @@ export default function EventConfigPage() {
                                     </div>
                                 </div>
                             ) : (
-                                <p className="text-sm text-muted-foreground italic bg-gray-50 p-4 rounded-lg">Este restaurante no tiene salas configuradas.</p>
+                                <p className="text-sm text-muted-foreground italic bg-gray-50 p-4 rounded-lg">Este establecimiento no tiene salas configuradas.</p>
                             )
                         ) : (
-                            <p className="text-sm text-muted-foreground italic bg-gray-50 p-4 rounded-lg">Selecciona un restaurante primero para ver sus salas.</p>
+                            <p className="text-sm text-muted-foreground italic bg-gray-50 p-4 rounded-lg">Selecciona un hotel o restaurante primero para ver sus salas.</p>
                         )}
                     </div>
                 </div>

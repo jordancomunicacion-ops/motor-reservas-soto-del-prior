@@ -34,6 +34,7 @@ export default function EventsListPage() {
     const [formData, setFormData] = useState({
         name: '',
         date: '',
+        duration: 120,
         capacity: 50,
         price: 0,
         description: '',
@@ -128,6 +129,18 @@ export default function EventsListPage() {
             alert('Nombre y fecha son obligatorios');
             return;
         }
+        if (!formData.hotelId && !formData.restaurantId) {
+            alert('Debes vincular el evento a un hotel o restaurante');
+            return;
+        }
+        if (formData.zoneIds.length === 0) {
+            alert('Debes seleccionar al menos una sala/zona para el evento');
+            return;
+        }
+        if (!formData.duration || formData.duration < 15) {
+            alert('La duración debe ser de al menos 15 minutos');
+            return;
+        }
         try {
             await fetchAPI('/event', {
                 method: 'POST',
@@ -140,6 +153,7 @@ export default function EventsListPage() {
             setFormData({
                 name: '',
                 date: '',
+                duration: 120,
                 capacity: 50,
                 price: 0,
                 description: '',
@@ -186,13 +200,25 @@ export default function EventsListPage() {
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Fecha y Hora</label>
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Fecha y Hora de Inicio</label>
                             <input
                                 type="datetime-local"
                                 className="border-2 p-3 rounded-xl w-full dark:bg-zinc-900 focus:border-indigo-500 outline-none transition-all"
                                 value={formData.date}
                                 onChange={e => setFormData({...formData, date: e.target.value})}
                             />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Duración (minutos)</label>
+                            <input
+                                type="number"
+                                min={15}
+                                step={15}
+                                className="border-2 p-3 rounded-xl w-full dark:bg-zinc-900 focus:border-indigo-500 outline-none transition-all"
+                                value={formData.duration}
+                                onChange={e => setFormData({...formData, duration: Number(e.target.value)})}
+                            />
+                            <p className="text-[10px] text-muted-foreground italic">Las salas seleccionadas se bloquean para reservas ordinarias durante esta franja.</p>
                         </div>
 
                         {/* Establishments linkage with Synergy Logic */}

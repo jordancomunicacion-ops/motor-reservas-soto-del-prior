@@ -36,6 +36,7 @@ export type RestaurantEvent = {
     id: string;
     name: string;
     date: string;
+    duration?: number;
     description: string | null;
     price: number;
     capacity: number;
@@ -65,6 +66,9 @@ export interface SlotsResponse {
     slots: string[];
     closed?: boolean;
     message?: string;
+    /** Lista de eventos del día (puede haber más de uno). */
+    events?: RestaurantEvent[];
+    /** @deprecated Se mantiene por compatibilidad: usar `events` en su lugar. */
     event?: RestaurantEvent | null;
 }
 
