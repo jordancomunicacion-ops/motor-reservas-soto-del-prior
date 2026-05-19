@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
 import { EventService } from './event.service';
 import { Public } from '../../auth/public.decorator';
 import { Roles } from '../../auth/roles.decorator';
@@ -19,8 +19,11 @@ export class EventController {
 
   @Public()
   @Get()
-  findAll() {
-    return this.eventService.findAll();
+  findAll(
+    @Query('restaurantId') restaurantId?: string,
+    @Query('hotelId') hotelId?: string,
+  ) {
+    return this.eventService.findAll({ restaurantId, hotelId });
   }
 
   @Public()

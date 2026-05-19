@@ -4,17 +4,6 @@ import { useSearchParams } from 'next/navigation';
 import { fetchAPI } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { ArrowLeft, Check, Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 interface HotelAvailabilityResult {
     id: string;
@@ -33,40 +22,13 @@ interface HotelBookingResult {
     totalPrice?: number;
 }
 
-function StepHeader({ title, onBack }: { title: string; onBack?: () => void }) {
-    return (
-        <div className="flex items-center justify-between">
-            <h3 className="font-display text-xl font-medium tracking-tight">{title}</h3>
-            {onBack && (
-                <button
-                    onClick={onBack}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-                >
-                    <ArrowLeft className="size-3" /> Atrás
-                </button>
-            )}
-        </div>
-    );
-}
-
 function WidgetContent() {
     const searchParams = useSearchParams();
     const hotelId = searchParams.get('hotelId') || "DEMO-HOTEL-ID";
 
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
-
-    const [stylesPrimary, setStylesPrimary] = useState<string | null>(null);
-    const [customCss, setCustomCss] = useState<string>('');
-
-    useEffect(() => {
-        if (customCss) {
-            const style = document.createElement('style');
-            style.innerHTML = customCss;
-            document.head.appendChild(style);
-            return () => { document.head.removeChild(style); };
-        }
-    }, [customCss]);
+    const [styles, setStyles] = useState({ primary: '#C59D5F', css: '' });
 
     const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
     const checkout = new Date(); checkout.setDate(checkout.getDate() + 3);
@@ -91,11 +53,30 @@ function WidgetContent() {
 
     useEffect(() => {
         fetchAPI<HotelWidgetConfig>(`/config/${hotelId}`).then(res => {
-            setConfig(res);
-            if (res?.primaryColor) setStylesPrimary(res.primaryColor);
-            if (res?.customCss) setCustomCss(res.customCss);
+            if (res) {
+                setConfig(res);
+                const primary = res.primaryColor && res.primaryColor !== '#3b82f6' ? res.primaryColor : '#C59D5F';
+                setStyles({ primary, css: res.customCss || '' });
+            }
         }).catch(() => { /* defaults */ });
     }, [hotelId]);
+
+    useEffect(() => {
+        const link = document.createElement('link');
+        link.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&family=Oswald:wght@300;400;500;700&display=swap";
+        link.rel = "stylesheet";
+        document.head.appendChild(link);
+        return () => { if (document.head.contains(link)) document.head.removeChild(link); };
+    }, []);
+
+    useEffect(() => {
+        if (styles.css) {
+            const style = document.createElement('style');
+            style.innerHTML = styles.css;
+            document.head.appendChild(style);
+            return () => { if (document.head.contains(style)) document.head.removeChild(style); };
+        }
+    }, [styles.css]);
 
     useEffect(() => {
         if (meals.lunch && config?.restaurantId) {
@@ -131,123 +112,77 @@ function WidgetContent() {
         }
     }
 
-    // Override --primary token per hotel (controlled, no inline styles in markup).
-    const wrapperStyle = stylesPrimary
-        ? ({ '--primary': stylesPrimary, '--ring': stylesPrimary } as React.CSSProperties)
-        : undefined;
-
-    const totalSteps = 5;
-
     return (
         <>
             <link rel="stylesheet" href="/custom-widget.css" />
-            <div className="widget-container min-h-screen bg-background grid place-items-center p-4 sm:p-6" style={wrapperStyle}>
-                <Card className="w-full max-w-lg border-border/60 shadow-lg gap-0 py-0 overflow-hidden">
-                    {/* Progress */}
-                    <div className="px-6 pt-6 pb-4 border-b border-border/60">
-                        <div className="flex items-center justify-between mb-3">
-                            <p className="text-eyebrow">Reserva tu estancia</p>
-                            <span className="text-[11px] font-medium text-muted-foreground tabular-nums">
-                                Paso {Math.min(step, totalSteps)} / {totalSteps}
-                            </span>
-                        </div>
-                        <div className="flex gap-1">
-                            {Array.from({ length: totalSteps }).map((_, i) => (
-                                <div
-                                    key={i}
-                                    className={cn(
-                                        "h-1 flex-1 rounded-full transition-colors",
-                                        i < step ? "bg-primary" : "bg-muted",
-                                    )}
-                                />
-                            ))}
-                        </div>
-                    </div>
+            <div
+                className="widget-container min-h-screen bg-white flex items-center justify-center p-4 sm:p-6 text-[#0A0A0A]"
+                style={{ ['--primary' as string]: styles.primary, fontFamily: "'Lato', sans-serif" } as React.CSSProperties}
+            >
+                <Card className="w-full max-w-lg shadow-xl overflow-hidden border-none rounded-none">
 
                     <CardContent className="p-6">
                         {/* STEP 1: SEARCH */}
                         {step === 1 && (
-                            <div className="space-y-5">
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="space-y-1.5">
-                                        <Label htmlFor="checkin" className="text-eyebrow">Entrada</Label>
-                                        <Input
-                                            id="checkin"
-                                            type="date"
-                                            className="h-11"
-                                            value={dates.from}
-                                            onChange={e => setDates({ ...dates, from: e.target.value })}
-                                        />
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500" style={{ fontFamily: "'Oswald', sans-serif" }}>Entrada</label>
+                                        <input type="date" className="w-full border p-3 rounded-none focus:outline-none focus:border-[#C59D5F] bg-white text-sm" value={dates.from} onChange={e => setDates({ ...dates, from: e.target.value })} />
                                     </div>
-                                    <div className="space-y-1.5">
-                                        <Label htmlFor="checkout" className="text-eyebrow">Salida</Label>
-                                        <Input
-                                            id="checkout"
-                                            type="date"
-                                            className="h-11"
-                                            value={dates.to}
-                                            onChange={e => setDates({ ...dates, to: e.target.value })}
-                                        />
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500" style={{ fontFamily: "'Oswald', sans-serif" }}>Salida</label>
+                                        <input type="date" className="w-full border p-3 rounded-none focus:outline-none focus:border-[#C59D5F] bg-white text-sm" value={dates.to} onChange={e => setDates({ ...dates, to: e.target.value })} />
                                     </div>
                                 </div>
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="pax" className="text-eyebrow">Huéspedes</Label>
-                                    <Select value={String(pax)} onValueChange={v => setPax(Number(v))}>
-                                        <SelectTrigger id="pax" className="w-full h-11">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {[1, 2, 3, 4].map(n => (
-                                                <SelectItem key={n} value={String(n)}>
-                                                    {n} {n === 1 ? 'Adulto' : 'Adultos'}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500" style={{ fontFamily: "'Oswald', sans-serif" }}>Huéspedes</label>
+                                    <select className="w-full border p-3 rounded-none focus:outline-none focus:border-[#C59D5F] bg-white text-sm" value={pax} onChange={e => setPax(+e.target.value)}>
+                                        <option value="1">1 Adulto</option>
+                                        <option value="2">2 Adultos</option>
+                                        <option value="3">3 Adultos</option>
+                                        <option value="4">4 Adultos</option>
+                                    </select>
                                 </div>
                                 <Button
-                                    size="xl"
-                                    className="w-full"
+                                    className="w-full py-6 rounded-none font-bold text-base uppercase tracking-widest text-white shadow-lg hover:bg-black transition-colors"
+                                    style={{ backgroundColor: styles.primary, fontFamily: "'Oswald', sans-serif" }}
                                     onClick={handleSearch}
                                     disabled={loading}
                                 >
-                                    {loading && <Loader2 className="size-4 animate-spin" />}
-                                    {loading ? 'Buscando disponibilidad…' : 'Ver disponibilidad'}
+                                    {loading ? 'Buscando...' : 'Ver Disponibilidad'}
                                 </Button>
                             </div>
                         )}
 
                         {/* STEP 2: SELECT ROOM */}
                         {step === 2 && (
-                            <div className="space-y-5">
-                                <StepHeader title="Selecciona habitación" onBack={() => setStep(1)} />
-                                <div className="space-y-2.5">
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="font-bold text-xl uppercase tracking-tighter" style={{ fontFamily: "'Oswald', sans-serif" }}>Selecciona Habitación</h3>
+                                    <button onClick={() => setStep(1)} className="text-[10px] font-bold uppercase tracking-widest text-gray-500 underline bg-transparent">Cambiar fechas</button>
+                                </div>
+
+                                <div className="space-y-3">
                                     {results.length === 0 ? (
-                                        <p className="text-sm text-muted-foreground text-center py-8">
-                                            No hay disponibilidad para esas fechas.
-                                        </p>
+                                        <p className="text-sm text-gray-400 italic text-center py-8">Sin disponibilidad para esas fechas.</p>
                                     ) : results.map(r => (
-                                        <button
+                                        <div
                                             key={r.id}
-                                            type="button"
+                                            className="border p-4 rounded-none cursor-pointer hover:border-[#C59D5F] hover:bg-[#C59D5F]/5 transition-all group"
                                             onClick={() => { setSelectedRoom(r); setStep(3); }}
-                                            className="w-full text-left rounded-lg border border-border/70 bg-card p-4 transition-all hover:border-primary/50 hover:shadow-sm hover:bg-primary/[0.02] group"
                                         >
-                                            <div className="flex justify-between items-start gap-4">
-                                                <div className="min-w-0">
-                                                    <span className="block font-display text-base font-medium group-hover:text-primary transition-colors">
-                                                        {r.name}
-                                                    </span>
-                                                    {r.description && (
-                                                        <p className="text-sm text-muted-foreground mt-1">{r.description}</p>
-                                                    )}
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <span className="font-bold text-lg group-hover:text-[#C59D5F] transition-colors" style={{ fontFamily: "'Oswald', sans-serif" }}>{r.name}</span>
+                                                    {r.description && <p className="text-sm text-gray-400 mt-1">{r.description}</p>}
                                                 </div>
-                                                <div className="text-right shrink-0">
-                                                    <span className="block font-display text-xl font-medium tabular-nums">€{r.totalPrice}</span>
-                                                    <span className="text-eyebrow">Total estancia</span>
+                                                <div className="text-right">
+                                                    <span className="block font-black text-xl tracking-tighter" style={{ fontFamily: "'Oswald', sans-serif" }}>€{r.totalPrice}</span>
+                                                    <span className="text-[10px] uppercase font-bold tracking-widest text-gray-500">Total Estancia</span>
                                                 </div>
                                             </div>
-                                        </button>
+                                        </div>
                                     ))}
                                 </div>
                             </div>
@@ -255,39 +190,67 @@ function WidgetContent() {
 
                         {/* STEP 3: EXTRAS / SYNERGY */}
                         {step === 3 && (
-                            <div className="space-y-5">
-                                <StepHeader title="Personaliza tu estancia" onBack={() => setStep(2)} />
+                            <div className="space-y-6">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="font-bold text-xl uppercase tracking-tighter" style={{ fontFamily: "'Oswald', sans-serif" }}>Personaliza tu estancia</h3>
+                                    <button onClick={() => setStep(2)} className="text-[10px] font-bold uppercase tracking-widest text-gray-500 underline bg-transparent">Atrás</button>
+                                </div>
 
-                                <div className="space-y-2.5">
+                                <div className="space-y-4">
                                     {/* Breakfast */}
-                                    <ExtraOption
-                                        selected={meals.breakfast}
+                                    <div
+                                        className={`p-4 border rounded-none transition-all cursor-pointer ${meals.breakfast ? 'border-[#C59D5F] bg-[#C59D5F]/5' : 'border-gray-100'}`}
                                         onClick={() => setMeals({ ...meals, breakfast: !meals.breakfast })}
-                                        title="Desayuno buffet"
-                                        subtitle="Soto del Prior · sin horario fijo"
-                                        rightLabel="+€12/día"
-                                    />
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-5 h-5 border-2 rounded flex items-center justify-center border-gray-300">
+                                                    {meals.breakfast && <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: styles.primary }}></div>}
+                                                </div>
+                                                <div>
+                                                    <span className="font-bold" style={{ fontFamily: "'Oswald', sans-serif" }}>Desayuno Buffet</span>
+                                                    <p className="text-xs text-gray-400">Soto del Prior · sin horario fijo</p>
+                                                </div>
+                                            </div>
+                                            <span className="font-bold text-sm" style={{ color: styles.primary }}>+€12/día</span>
+                                        </div>
+                                    </div>
 
                                     {/* Lunch */}
                                     {config?.restaurantId && (
-                                        <div
-                                            className={cn(
-                                                "rounded-lg border bg-card transition-all",
-                                                meals.lunch ? "border-primary/60 bg-primary/[0.04]" : "border-border/70",
-                                            )}
-                                        >
-                                            <ExtraOption
-                                                selected={meals.lunch}
-                                                onClick={() => setMeals({ ...meals, lunch: !meals.lunch })}
-                                                title="Comida"
-                                                subtitle="Turnos de mediodía"
-                                                rightLabel="Cita previa"
-                                                bare
-                                            />
+                                        <div className={`p-4 border rounded-none transition-all ${meals.lunch ? 'border-[#C59D5F] bg-[#C59D5F]/5' : 'border-gray-100'}`}>
+                                            <div className="flex items-center justify-between cursor-pointer" onClick={() => setMeals({ ...meals, lunch: !meals.lunch })}>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-5 h-5 border-2 rounded flex items-center justify-center border-gray-300">
+                                                        {meals.lunch && <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: styles.primary }}></div>}
+                                                    </div>
+                                                    <div>
+                                                        <span className="font-bold" style={{ fontFamily: "'Oswald', sans-serif" }}>Comida</span>
+                                                        <p className="text-xs text-gray-400">Turnos de mediodía</p>
+                                                    </div>
+                                                </div>
+                                                <span className="font-bold text-sm" style={{ color: styles.primary }}>Cita Previa</span>
+                                            </div>
                                             {meals.lunch && (
-                                                <div className="px-4 pb-4 pt-3 border-t border-border/60 animate-in fade-in slide-in-from-top-1 duration-200">
-                                                    <p className="text-eyebrow mb-2">Horario comida</p>
-                                                    <SlotPicker slots={lunchSlots} value={lunchTime} onChange={setLunchTime} />
+                                                <div className="mt-4 pt-4 border-t border-dashed animate-in fade-in slide-in-from-top-2 duration-300">
+                                                    <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 block mb-2" style={{ fontFamily: "'Oswald', sans-serif" }}>Horario Comida</label>
+                                                    <div className="grid grid-cols-4 gap-2">
+                                                        {lunchSlots.length === 0 ? (
+                                                            <p className="text-xs text-gray-400 italic col-span-4">Sin disponibilidad.</p>
+                                                        ) : lunchSlots.map(slot => (
+                                                            <button
+                                                                key={slot}
+                                                                className="p-2 text-xs font-bold rounded-none transition-all border tabular-nums"
+                                                                style={lunchTime === slot
+                                                                    ? { backgroundColor: styles.primary, color: 'white', borderColor: styles.primary }
+                                                                    : { backgroundColor: 'white', color: '#0A0A0A', borderColor: '#E5E7EB' }
+                                                                }
+                                                                onClick={() => setLunchTime(slot)}
+                                                            >
+                                                                {slot}
+                                                            </button>
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
@@ -295,24 +258,40 @@ function WidgetContent() {
 
                                     {/* Dinner */}
                                     {config?.restaurantId && (
-                                        <div
-                                            className={cn(
-                                                "rounded-lg border bg-card transition-all",
-                                                meals.dinner ? "border-primary/60 bg-primary/[0.04]" : "border-border/70",
-                                            )}
-                                        >
-                                            <ExtraOption
-                                                selected={meals.dinner}
-                                                onClick={() => setMeals({ ...meals, dinner: !meals.dinner })}
-                                                title="Cena"
-                                                subtitle="Turnos de noche"
-                                                rightLabel="Cita previa"
-                                                bare
-                                            />
+                                        <div className={`p-4 border rounded-none transition-all ${meals.dinner ? 'border-[#C59D5F] bg-[#C59D5F]/5' : 'border-gray-100'}`}>
+                                            <div className="flex items-center justify-between cursor-pointer" onClick={() => setMeals({ ...meals, dinner: !meals.dinner })}>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-5 h-5 border-2 rounded flex items-center justify-center border-gray-300">
+                                                        {meals.dinner && <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: styles.primary }}></div>}
+                                                    </div>
+                                                    <div>
+                                                        <span className="font-bold" style={{ fontFamily: "'Oswald', sans-serif" }}>Cena</span>
+                                                        <p className="text-xs text-gray-400">Turnos de noche</p>
+                                                    </div>
+                                                </div>
+                                                <span className="font-bold text-sm" style={{ color: styles.primary }}>Cita Previa</span>
+                                            </div>
+
                                             {meals.dinner && (
-                                                <div className="px-4 pb-4 pt-3 border-t border-border/60 animate-in fade-in slide-in-from-top-1 duration-200">
-                                                    <p className="text-eyebrow mb-2">Horario cena</p>
-                                                    <SlotPicker slots={dinnerSlots} value={dinnerTime} onChange={setDinnerTime} />
+                                                <div className="mt-4 pt-4 border-t border-dashed animate-in fade-in slide-in-from-top-2 duration-300">
+                                                    <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 block mb-2" style={{ fontFamily: "'Oswald', sans-serif" }}>Horario Cena</label>
+                                                    <div className="grid grid-cols-4 gap-2">
+                                                        {dinnerSlots.length === 0 ? (
+                                                            <p className="text-xs text-gray-400 italic col-span-4">Sin disponibilidad.</p>
+                                                        ) : dinnerSlots.map(slot => (
+                                                            <button
+                                                                key={slot}
+                                                                className="p-2 text-xs font-bold rounded-none transition-all border tabular-nums"
+                                                                style={dinnerTime === slot
+                                                                    ? { backgroundColor: styles.primary, color: 'white', borderColor: styles.primary }
+                                                                    : { backgroundColor: 'white', color: '#0A0A0A', borderColor: '#E5E7EB' }
+                                                                }
+                                                                onClick={() => setDinnerTime(slot)}
+                                                            >
+                                                                {slot}
+                                                            </button>
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
@@ -320,8 +299,8 @@ function WidgetContent() {
                                 </div>
 
                                 <Button
-                                    size="xl"
-                                    className="w-full"
+                                    className="w-full py-6 rounded-none font-bold text-base uppercase tracking-widest text-white shadow-lg hover:bg-black transition-colors"
+                                    style={{ backgroundColor: styles.primary, fontFamily: "'Oswald', sans-serif" }}
                                     onClick={() => setStep(4)}
                                     disabled={(meals.lunch && !lunchTime) || (meals.dinner && !dinnerTime)}
                                 >
@@ -332,46 +311,25 @@ function WidgetContent() {
 
                         {/* STEP 4: GUEST INFO */}
                         {step === 4 && (
-                            <div className="space-y-5">
-                                <StepHeader title="Datos del huésped" onBack={() => setStep(3)} />
-                                <div className="space-y-4">
-                                    <div className="space-y-1.5">
-                                        <Label htmlFor="g-name" className="text-eyebrow">Nombre completo</Label>
-                                        <Input
-                                            id="g-name"
-                                            type="text"
-                                            className="h-11"
-                                            value={guest.name}
-                                            onChange={e => setGuest({ ...guest, name: e.target.value })}
-                                            required
-                                        />
+                            <div className="space-y-4">
+                                <h3 className="font-bold text-xl uppercase tracking-tighter" style={{ fontFamily: "'Oswald', sans-serif" }}>Datos del Huésped</h3>
+                                <div className="space-y-3">
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500" style={{ fontFamily: "'Oswald', sans-serif" }}>Nombre Completo</label>
+                                        <input type="text" className="w-full border p-3 rounded-none focus:outline-none focus:border-[#C59D5F] bg-white text-sm" value={guest.name} onChange={e => setGuest({ ...guest, name: e.target.value })} />
                                     </div>
-                                    <div className="space-y-1.5">
-                                        <Label htmlFor="g-email" className="text-eyebrow">Email</Label>
-                                        <Input
-                                            id="g-email"
-                                            type="email"
-                                            className="h-11"
-                                            value={guest.email}
-                                            onChange={e => setGuest({ ...guest, email: e.target.value })}
-                                            required
-                                        />
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500" style={{ fontFamily: "'Oswald', sans-serif" }}>Email</label>
+                                        <input type="email" className="w-full border p-3 rounded-none focus:outline-none focus:border-[#C59D5F] bg-white text-sm" value={guest.email} onChange={e => setGuest({ ...guest, email: e.target.value })} />
                                     </div>
-                                    <div className="space-y-1.5">
-                                        <Label htmlFor="g-phone" className="text-eyebrow">Teléfono</Label>
-                                        <Input
-                                            id="g-phone"
-                                            type="tel"
-                                            className="h-11"
-                                            placeholder="+34 600 000 000"
-                                            value={guest.phone}
-                                            onChange={e => setGuest({ ...guest, phone: e.target.value })}
-                                        />
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500" style={{ fontFamily: "'Oswald', sans-serif" }}>Teléfono</label>
+                                        <input type="tel" className="w-full border p-3 rounded-none focus:outline-none focus:border-[#C59D5F] bg-white text-sm" value={guest.phone} onChange={e => setGuest({ ...guest, phone: e.target.value })} placeholder="+34 600 000 000" />
                                     </div>
                                 </div>
                                 <Button
-                                    size="xl"
-                                    className="w-full"
+                                    className="w-full py-6 rounded-none font-bold text-base uppercase tracking-widest text-white shadow-lg hover:bg-black transition-colors"
+                                    style={{ backgroundColor: styles.primary, fontFamily: "'Oswald', sans-serif" }}
                                     disabled={submitting || !guest.name || !guest.email}
                                     onClick={async () => {
                                         if (!guest.name || !guest.email) { alert('Nombre y email son obligatorios'); return; }
@@ -414,38 +372,28 @@ function WidgetContent() {
                                         }
                                     }}
                                 >
-                                    {submitting && <Loader2 className="size-4 animate-spin" />}
-                                    {submitting
-                                        ? 'Procesando…'
-                                        : `Confirmar reserva · €${(selectedRoom?.totalPrice ?? 0) + (meals.breakfast ? 12 * 4 : 0)}`}
+                                    {submitting ? 'Procesando...' : `Confirmar Reserva · €${(selectedRoom?.totalPrice ?? 0) + (meals.breakfast ? 12 * 4 : 0)}`}
                                 </Button>
+                                <button onClick={() => setStep(3)} className="w-full text-center text-[10px] uppercase tracking-widest text-gray-500 mt-2 bg-transparent">Revisar extras</button>
                             </div>
                         )}
 
                         {/* STEP 5: SUCCESS */}
                         {step === 5 && (
-                            <div className="space-y-5 py-4 text-center">
-                                <div className="mx-auto grid place-items-center size-16 rounded-full bg-success/10 text-success">
-                                    <Check className="size-8" strokeWidth={2.5} />
+                            <div className="space-y-6 text-center py-8">
+                                <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto shadow-lg" style={{ backgroundColor: styles.primary }}>
+                                    <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
                                 </div>
-                                <div className="space-y-1.5">
-                                    <h3 className="font-display text-2xl font-medium tracking-tight">
-                                        ¡Reserva confirmada!
-                                    </h3>
-                                    <p className="text-sm text-muted-foreground">
-                                        Ref: <span className="font-mono text-foreground">{bookingResult?.referenceCode || 'N/A'}</span>
-                                    </p>
+                                <h3 className="font-bold text-2xl uppercase tracking-tight" style={{ fontFamily: "'Oswald', sans-serif" }}>¡Reserva Confirmada!</h3>
+                                <p className="text-sm text-gray-500">Ref: <span className="font-mono text-[#0A0A0A]">{bookingResult?.referenceCode || 'N/A'}</span></p>
+                                <div className="bg-gray-50 p-4 text-sm text-left space-y-1.5 border-l-4" style={{ borderColor: styles.primary }}>
+                                    <p><strong className="font-bold text-gray-500 uppercase text-[10px] tracking-widest mr-2">Huésped</strong>{guest.name}</p>
+                                    <p><strong className="font-bold text-gray-500 uppercase text-[10px] tracking-widest mr-2">Check-in</strong>{dates.from}</p>
+                                    <p><strong className="font-bold text-gray-500 uppercase text-[10px] tracking-widest mr-2">Check-out</strong>{dates.to}</p>
+                                    <p><strong className="font-bold text-gray-500 uppercase text-[10px] tracking-widest mr-2">Habitación</strong>{selectedRoom?.name}</p>
+                                    <p><strong className="font-bold text-gray-500 uppercase text-[10px] tracking-widest mr-2">Total</strong>€{bookingResult?.totalPrice || selectedRoom?.totalPrice}</p>
                                 </div>
-                                <div className="rounded-lg border border-border/60 bg-muted/40 p-4 text-sm text-left space-y-2">
-                                    <SummaryRow label="Huésped" value={guest.name} />
-                                    <SummaryRow label="Check-in" value={dates.from} />
-                                    <SummaryRow label="Check-out" value={dates.to} />
-                                    <SummaryRow label="Habitación" value={selectedRoom?.name ?? '—'} />
-                                    <SummaryRow label="Total" value={`€${bookingResult?.totalPrice || selectedRoom?.totalPrice || 0}`} strong />
-                                </div>
-                                <p className="text-xs text-muted-foreground">
-                                    Recibirás un email de confirmación en breve.
-                                </p>
+                                <p className="text-xs text-gray-400 italic">Recibirás un email de confirmación en breve.</p>
                             </div>
                         )}
                     </CardContent>
@@ -455,99 +403,9 @@ function WidgetContent() {
     );
 }
 
-function ExtraOption({
-    selected,
-    onClick,
-    title,
-    subtitle,
-    rightLabel,
-    bare,
-}: {
-    selected: boolean;
-    onClick: () => void;
-    title: string;
-    subtitle: string;
-    rightLabel: string;
-    bare?: boolean;
-}) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            className={cn(
-                "w-full text-left transition-all",
-                bare
-                    ? "px-4 py-4"
-                    : cn(
-                        "rounded-lg border bg-card p-4",
-                        selected ? "border-primary/60 bg-primary/[0.04]" : "border-border/70 hover:border-primary/30",
-                    ),
-            )}
-        >
-            <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                    <span
-                        className={cn(
-                            "size-4 rounded border grid place-items-center shrink-0 transition-all",
-                            selected ? "bg-primary border-primary" : "border-input bg-background",
-                        )}
-                    >
-                        {selected && <Check className="size-3 text-primary-foreground" strokeWidth={3} />}
-                    </span>
-                    <div className="min-w-0">
-                        <span className="block font-medium text-sm text-foreground">{title}</span>
-                        <p className="text-xs text-muted-foreground">{subtitle}</p>
-                    </div>
-                </div>
-                <span className="text-xs font-semibold text-primary shrink-0">{rightLabel}</span>
-            </div>
-        </button>
-    );
-}
-
-function SlotPicker({ slots, value, onChange }: { slots: string[]; value: string; onChange: (v: string) => void }) {
-    if (slots.length === 0) {
-        return <p className="text-xs text-muted-foreground">Sin disponibilidad.</p>;
-    }
-    return (
-        <div className="grid grid-cols-4 gap-1.5">
-            {slots.map(slot => (
-                <button
-                    key={slot}
-                    type="button"
-                    onClick={() => onChange(slot)}
-                    className={cn(
-                        "py-2 text-xs font-semibold rounded-md transition-all border tabular-nums",
-                        value === slot
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-card text-foreground border-border/70 hover:border-primary/40",
-                    )}
-                >
-                    {slot}
-                </button>
-            ))}
-        </div>
-    );
-}
-
-function SummaryRow({ label, value, strong }: { label: string; value: React.ReactNode; strong?: boolean }) {
-    return (
-        <div className="flex justify-between items-center">
-            <span className="text-muted-foreground">{label}</span>
-            <span className={cn(strong ? "font-display text-base font-medium" : "font-medium")}>{value}</span>
-        </div>
-    );
-}
-
 export default function WidgetPage() {
     return (
-        <Suspense
-            fallback={
-                <div className="min-h-screen grid place-items-center bg-background">
-                    <Loader2 className="size-6 animate-spin text-muted-foreground" />
-                </div>
-            }
-        >
+        <Suspense fallback={<div className="min-h-screen grid place-items-center bg-white text-xs uppercase tracking-widest text-gray-400">Cargando…</div>}>
             <WidgetContent />
         </Suspense>
     );

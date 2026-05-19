@@ -2,11 +2,12 @@
 import { useState } from 'react';
 import { CardElement, useElements, useStripe } from '@stripe/react-stripe-js';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, CreditCard } from 'lucide-react';
+import type { WidgetColors } from './widget-types';
 
 interface Props {
     onSuccess: (paymentMethodId: string) => void;
     submitting: boolean;
+    colors?: WidgetColors;
     amount: number;
 }
 
@@ -35,33 +36,23 @@ export function WidgetCardForm({ onSuccess, submitting, amount }: Props) {
     };
 
     return (
-        <div className="space-y-3">
-            <div className="rounded-md border border-border bg-card p-4 space-y-3">
-                <div className="flex items-center gap-2 text-eyebrow text-primary">
-                    <CreditCard className="size-3.5" />
-                    Datos de la tarjeta
-                </div>
+        <div className="space-y-4">
+            <div className="p-4 bg-gray-50 border rounded-none">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-[#C59D5F] mb-4">Datos de la Tarjeta</p>
                 <CardElement options={{
                     style: {
                         base: {
-                            fontSize: '15px',
-                            fontFamily: 'inherit',
-                            color: 'var(--foreground)',
-                            '::placeholder': { color: 'var(--muted-foreground)' },
+                            fontSize: '16px',
+                            color: '#424770',
+                            '::placeholder': { color: '#aab7c4' },
                         },
-                        invalid: { color: 'var(--destructive)' },
+                        invalid: { color: '#9e2146' },
                     },
                 }} />
             </div>
-            {error && (
-                <div className="flex items-start gap-2 rounded-md border border-destructive/20 bg-destructive/5 p-2.5 text-xs text-destructive">
-                    <AlertCircle className="size-3.5 mt-0.5 shrink-0" />
-                    <span>{error}</span>
-                </div>
-            )}
-            <p className="text-[11px] text-muted-foreground leading-relaxed italic">
-                No se realizará ningún cargo ahora. Solo se solicita como garantía.
-                Se aplicará una penalización de {amount}€ por persona en caso de no presentarse sin cancelar con 48 h de antelación.
+            {error && <p className="text-xs text-red-500 italic">{error}</p>}
+            <p className="text-[11px] text-gray-500 leading-relaxed italic">
+                * No se realizará ningún cargo ahora. Solo se solicita como garantía. Se aplicará una penalización de {amount}€ por persona en caso de no presentarse sin cancelar con 48h de antelación.
             </p>
             <Button
                 id="stripe-submit-btn"

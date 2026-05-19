@@ -10,8 +10,13 @@ export class EventService {
     private crmIntegrationService: CrmIntegrationService,
   ) {}
 
-  async findAll() {
+  async findAll(filters?: { restaurantId?: string; hotelId?: string }) {
+    const where: { restaurantId?: string; hotelId?: string } = {};
+    if (filters?.restaurantId) where.restaurantId = filters.restaurantId;
+    if (filters?.hotelId) where.hotelId = filters.hotelId;
+
     return this.prisma.event.findMany({
+      where,
       include: {
         hotel: { select: { name: true } },
         restaurant: { select: { name: true } },
