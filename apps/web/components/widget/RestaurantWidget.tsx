@@ -3,32 +3,9 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isBefore, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
-import {
-    ChevronLeft,
-    ChevronRight,
-    Play,
-    Check,
-    Users,
-    PartyPopper,
-    Info,
-    Clock,
-    ArrowLeft,
-    Loader2,
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight, Play, Check, Users, PartyPopper, Info, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-    Select,
-    SelectTrigger,
-    SelectValue,
-    SelectContent,
-    SelectItem,
-} from '@/components/ui/select';
-import { cn } from '@/lib/utils';
 import { fetchAPI } from '@/lib/api';
 import { loadStripe, type Stripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
@@ -125,12 +102,21 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
     };
 
     useEffect(() => {
-        if (!widgetConfig?.customCss) return;
-        const styleTag = document.createElement('style');
-        styleTag.innerHTML = widgetConfig.customCss;
-        document.head.appendChild(styleTag);
+        const link = document.createElement('link');
+        link.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&family=Oswald:wght@300;400;500;700&display=swap";
+        link.rel = "stylesheet";
+        document.head.appendChild(link);
+
+        let styleTag: HTMLStyleElement | null = null;
+        if (widgetConfig?.customCss) {
+            styleTag = document.createElement('style');
+            styleTag.innerHTML = widgetConfig.customCss;
+            document.head.appendChild(styleTag);
+        }
+
         return () => {
-            if (document.head.contains(styleTag)) document.head.removeChild(styleTag);
+            if (document.head.contains(link)) document.head.removeChild(link);
+            if (styleTag && document.head.contains(styleTag)) document.head.removeChild(styleTag);
         };
     }, [widgetConfig?.customCss]);
 
@@ -167,7 +153,8 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
 
     const handleDateSelect = async (date: Date) => {
         const status = getDayStatus(date);
-        if (status !== 'available') return;
+        // Permitimos 'available' y 'event' (los días con evento son seleccionables).
+        if (status !== 'available' && status !== 'event') return;
         setSelectedDate(date);
         setSelectedTime(null);
         setLoadingSlots(true);
@@ -181,12 +168,10 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
                 lunch: lunchData?.slots || [],
                 dinner: dinnerData?.slots || [],
             });
-            // Backend nuevo: `events[]`. Fallback al campo legacy `event` mientras se despliega.
             const eventsFromResponse =
                 lunchData?.events ??
                 dinnerData?.events ??
                 ((lunchData?.event || dinnerData?.event) ? [(lunchData?.event || dinnerData?.event) as RestaurantEvent] : []);
-            // Dedupe por id (lunch y dinner devuelven el mismo set)
             const uniqueEvents = Array.from(new Map(eventsFromResponse.map(e => [e.id, e])).values());
             setDayEvents(uniqueEvents);
             setSelectedEvent(null);
@@ -315,524 +300,68 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
     const startDay = monthStart.getDay();
     const adjustedStartDay = startDay === 0 ? 6 : startDay - 1;
     const paddingDays = Array(adjustedStartDay).fill(null);
-    const weekDays = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+    const weekDays = ['L', 'M', 'Mi', 'J', 'V', 'S', 'D'];
 
-    // Override --primary token per restaurant when configured
-    const wrapperStyle = widgetConfig?.primaryColor && widgetConfig.primaryColor !== '#3b82f6'
-        ? ({ '--primary': widgetConfig.primaryColor, '--ring': widgetConfig.primaryColor } as React.CSSProperties)
-        : undefined;
+    const colors = {
+        accent: widgetConfig?.primaryColor === '#3b82f6' ? '#C59D5F' : (widgetConfig?.primaryColor || '#C59D5F'),
+        bg: '#F4F4F4',
+        text: '#0A0A0A',
+        white: '#FFFFFF',
+    };
 
     return (
-        <div
-            className={cn(
-                "min-h-screen bg-background text-foreground",
-                mode === 'inline' ? "py-6" : "py-10",
+        <div className="max-w-4xl mx-auto px-4 pb-4 pt-0 text-[#0A0A0A] bg-white" style={{ fontFamily: "'Lato', sans-serif" }}>
+
+            {/* Header / Back Button */}
+            {currentStep > 1 && currentStep < 4 && (
+                <div className="flex justify-between items-center mb-4 px-1 pt-4">
+                    <button
+                        onClick={handleBack}
+                        className="text-xs font-bold uppercase tracking-wider flex items-center gap-1 hover:text-[#C59D5F] transition-colors"
+                        style={{ backgroundColor: 'transparent', color: colors.text, fontFamily: "'Oswald', sans-serif" }}
+                    >
+                        {'<'} VOLVER
+                    </button>
+                    <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400">{restaurantName || 'RESERVAS'}</h2>
+                </div>
             )}
-            style={wrapperStyle}
-        >
-            <div className="max-w-4xl mx-auto px-4">
-                {/* Header */}
-                {currentStep > 1 && currentStep < 4 && (
-                    <div className="flex justify-between items-center mb-6">
-                        <button
-                            onClick={handleBack}
-                            className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                            <ArrowLeft className="size-3" /> Volver
-                        </button>
-                        <p className="text-eyebrow">{restaurantName || 'Reservas'}</p>
-                    </div>
-                )}
 
-                {/* Stepper */}
-                <Stepper steps={displaySteps} currentStep={currentStep} />
+            {/* Stepper */}
+            <div className={`flex relative justify-between items-center mb-0 px-8 max-w-2xl mx-auto ${currentStep === 1 ? 'pt-8' : ''}`}>
+                <div className="absolute top-4 left-10 right-10 h-0.5 bg-gray-200 -z-10">
+                    <div
+                        className="h-full bg-[#0A0A0A] transition-all duration-500"
+                        style={{
+                            width: `${((displaySteps.findIndex(s => s.id === currentStep)) / (displaySteps.length - 1)) * 100}%`
+                        }}
+                    ></div>
+                </div>
 
-                <Card className="border-border/60 shadow-sm mt-6 overflow-hidden gap-0 py-0">
-                    <CardContent className="p-5 sm:p-6">
-                        {/* STEP 1 — Calendar + slots */}
-                        {currentStep === 1 && (
-                            <div className={cn(
-                                "grid grid-cols-1 gap-6",
-                                mode === 'inline' ? 'min-[600px]:grid-cols-2' : 'sm:grid-cols-2',
-                            )}>
-                                <div className="space-y-5">
-                                    <PaxSelector pax={pax} setPax={setPax} />
-
-                                    <div>
-                                        <div className="flex justify-between items-center mb-3">
-                                            <button
-                                                onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-                                                className="grid place-items-center size-7 rounded-md hover:bg-accent transition-colors"
-                                                aria-label="Mes anterior"
-                                            >
-                                                <ChevronLeft className="size-4 text-muted-foreground" />
-                                            </button>
-                                            <h3 className="font-display text-base font-medium tracking-tight capitalize">
-                                                {format(currentMonth, 'MMMM yyyy', { locale: es })}
-                                            </h3>
-                                            <button
-                                                onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-                                                className="grid place-items-center size-7 rounded-md hover:bg-accent transition-colors"
-                                                aria-label="Mes siguiente"
-                                            >
-                                                <ChevronRight className="size-4 text-muted-foreground" />
-                                            </button>
-                                        </div>
-                                        <div className="grid grid-cols-7 gap-1 mb-2 text-center pb-1.5 border-b border-border/60">
-                                            {weekDays.map(d => (
-                                                <div key={d} className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{d}</div>
-                                            ))}
-                                        </div>
-                                        <div className="grid grid-cols-7 gap-1">
-                                            {paddingDays.map((_, i) => <div key={`pad-${i}`} />)}
-                                            {daysInMonth.map(date => {
-                                                const status = getDayStatus(date);
-                                                const isSelected = selectedDate && isSameDay(date, selectedDate);
-                                                const isPast = isBefore(date, startOfDay(new Date()));
-                                                const disabled = isPast || status === 'closed';
-
-                                                return (
-                                                    <button
-                                                        key={date.toString()}
-                                                        type="button"
-                                                        disabled={disabled}
-                                                        onClick={() => !disabled && handleDateSelect(date)}
-                                                        className={cn(
-                                                            "size-9 grid place-items-center text-xs font-medium rounded-md transition-all",
-                                                            isSelected && "bg-primary text-primary-foreground shadow-sm",
-                                                            !isSelected && disabled && "text-muted-foreground/40 cursor-not-allowed",
-                                                            !isSelected && !disabled && status === 'event' && "bg-info/10 text-info border border-info/20 hover:bg-info/20",
-                                                            !isSelected && !disabled && status === 'available' && "text-foreground hover:bg-primary/10 hover:text-primary border border-transparent",
-                                                        )}
-                                                    >
-                                                        {format(date, 'd')}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="flex flex-col border-t pt-5 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-6 border-border/60">
-                                    <Legend />
-
-                                    {!selectedDate && (
-                                        <div className="flex-1 flex flex-col items-center justify-center text-center p-8 border border-dashed border-border rounded-md mt-4">
-                                            <Play className="size-8 mb-3 text-muted-foreground/50" />
-                                            <p className="text-sm text-muted-foreground italic max-w-xs">
-                                                Selecciona un día del calendario para ver la disponibilidad.
-                                            </p>
-                                        </div>
-                                    )}
-
-                                    {selectedDate && loadingSlots && (
-                                        <div className="flex-1 flex items-center justify-center py-12">
-                                            <Loader2 className="size-5 animate-spin text-muted-foreground" />
-                                        </div>
-                                    )}
-
-                                    {selectedDate && !loadingSlots && timeSlots && (
-                                        <div className="animate-in fade-in slide-in-from-right-2 duration-300 mt-4">
-                                            <h3 className="font-display text-base font-medium tracking-tight mb-3">
-                                                <span className="text-primary">Disponibilidad · </span>
-                                                <span className="capitalize">{format(selectedDate, "d 'de' MMMM", { locale: es })}</span>
-                                            </h3>
-
-                                            {dayEvents.length > 0 && (
-                                                <div className="mb-5 space-y-2.5">
-                                                    {dayEvents.map(evt => (
-                                                        <EventCard
-                                                            key={evt.id}
-                                                            event={evt}
-                                                            onReserve={() => handleSelectEvent(evt)}
-                                                        />
-                                                    ))}
-                                                </div>
-                                            )}
-
-                                            <SlotsGroup label="Comida" slots={timeSlots.lunch} onPick={handleTimeSelect} />
-                                            <SlotsGroup label="Cena" slots={timeSlots.dinner} onPick={handleTimeSelect} />
-
-                                            {timeSlots.lunch.length === 0 && timeSlots.dinner.length === 0 && (
-                                                <div className="mt-5 p-5 bg-warning/10 border border-warning/30 rounded-md text-center">
-                                                    <Info className="size-6 text-warning mx-auto mb-2" />
-                                                    <h4 className="font-medium mb-1">No queda sitio</h4>
-                                                    <p className="text-xs text-muted-foreground mb-4">
-                                                        Apúntate a la lista de espera y te avisaremos si se libera una mesa.
-                                                    </p>
-                                                    <Button
-                                                        variant="warning"
-                                                        className="w-full"
-                                                        onClick={() => setCurrentStep(5)}
-                                                    >
-                                                        Apuntarse a la lista de espera
-                                                    </Button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* STEP 2 — Information */}
-                        {currentStep === 2 && selectedDate && (
-                            <div className="animate-in fade-in slide-in-from-right-2 duration-300 max-w-2xl mx-auto space-y-6">
-                                <SummaryStrip
-                                    date={selectedDate}
-                                    time={selectedTime}
-                                    pax={pax}
-                                    place={restaurantName}
-                                />
-
-                                <div className="grid gap-4">
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                        <Field id="r-name" label="Nombre">
-                                            <Input
-                                                id="r-name"
-                                                className="h-10"
-                                                placeholder="Nombre"
-                                                value={formData.name}
-                                                onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                            />
-                                        </Field>
-                                        <Field id="r-surname" label="Primer apellido">
-                                            <Input
-                                                id="r-surname"
-                                                className="h-10"
-                                                placeholder="Apellido"
-                                                value={formData.surname}
-                                                onChange={e => setFormData({ ...formData, surname: e.target.value })}
-                                            />
-                                        </Field>
-                                        <Field id="r-surname2" label="Segundo apellido">
-                                            <Input
-                                                id="r-surname2"
-                                                className="h-10"
-                                                placeholder="Opcional"
-                                                value={additionalData.surname2}
-                                                onChange={e => setAdditionalData({ ...additionalData, surname2: e.target.value })}
-                                            />
-                                        </Field>
-                                    </div>
-                                    <Field id="r-email" label="Email">
-                                        <Input
-                                            id="r-email"
-                                            type="email"
-                                            className="h-10"
-                                            placeholder="ejemplo@email.com"
-                                            value={formData.email}
-                                            onChange={e => setFormData({ ...formData, email: e.target.value })}
-                                        />
-                                    </Field>
-                                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                                        <Field id="r-prefix" label="Prefijo">
-                                            <Select value={formData.prefix} onValueChange={v => setFormData({ ...formData, prefix: v })}>
-                                                <SelectTrigger id="r-prefix" className="w-full h-10">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="+34">🇪🇸 +34</SelectItem>
-                                                    <SelectItem value="+33">🇫🇷 +33</SelectItem>
-                                                    <SelectItem value="+44">🇬🇧 +44</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </Field>
-                                        <div className="sm:col-span-3">
-                                            <Field id="r-phone" label="Teléfono">
-                                                <Input
-                                                    id="r-phone"
-                                                    type="tel"
-                                                    className="h-10"
-                                                    placeholder="000 000 000"
-                                                    value={formData.phone}
-                                                    onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                                                />
-                                            </Field>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label className="text-eyebrow">¿Alergias?</Label>
-                                        <div className="flex gap-5">
-                                            <label className="inline-flex items-center gap-2 cursor-pointer">
-                                                <Checkbox
-                                                    checked={hasAllergy === true}
-                                                    onCheckedChange={() => setHasAllergy(true)}
-                                                />
-                                                <span className="text-sm">Sí</span>
-                                            </label>
-                                            <label className="inline-flex items-center gap-2 cursor-pointer">
-                                                <Checkbox
-                                                    checked={hasAllergy === false}
-                                                    onCheckedChange={() => setHasAllergy(false)}
-                                                />
-                                                <span className="text-sm">No</span>
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    <Field id="r-comment" label="Comentario">
-                                        <Textarea
-                                            id="r-comment"
-                                            rows={2}
-                                            className="resize-none"
-                                            placeholder="Opcional"
-                                            value={comment}
-                                            onChange={e => setComment(e.target.value)}
-                                        />
-                                    </Field>
-
-                                    <div className="space-y-2 pt-2">
-                                        <label className="inline-flex items-start gap-2 cursor-pointer">
-                                            <Checkbox
-                                                checked={acceptTerms}
-                                                onCheckedChange={(v) => setAcceptTerms(!!v)}
-                                                className="mt-0.5"
-                                            />
-                                            <span className="text-xs text-muted-foreground leading-snug">
-                                                Acepto las condiciones de uso.
-                                            </span>
-                                        </label>
-                                        <label className="inline-flex items-start gap-2 cursor-pointer">
-                                            <Checkbox
-                                                checked={acceptData}
-                                                onCheckedChange={(v) => setAcceptData(!!v)}
-                                                className="mt-0.5"
-                                            />
-                                            <span className="text-xs text-muted-foreground leading-snug">
-                                                Consiento el tratamiento de mis datos.
-                                            </span>
-                                        </label>
-                                    </div>
-                                </div>
-
-                                <Button
-                                    size="xl"
-                                    className="w-full"
-                                    onClick={() => {
-                                        if (isStep3Skipped) handleSubmitReservation();
-                                        else setCurrentStep(3);
-                                    }}
-                                >
-                                    Continuar
-                                </Button>
-                            </div>
-                        )}
-
-                        {/* STEP 3 — Additional / Stripe */}
-                        {currentStep === 3 && (
-                            <div className="animate-in fade-in slide-in-from-right-2 duration-300 max-w-2xl mx-auto py-2 space-y-6">
-                                <div className="text-center space-y-1.5">
-                                    <p className="text-eyebrow">Garantía de reserva</p>
-                                    <h3 className="font-display text-2xl font-medium tracking-tight">
-                                        Asegura tu mesa
-                                    </h3>
-                                </div>
-
-                                {widgetConfig?.showCrmFields !== false && (
-                                    <div className="border-b border-border/60 pb-5 space-y-3">
-                                        <p className="text-eyebrow text-primary">Datos opcionales</p>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <Input
-                                                type="number"
-                                                placeholder="Edad"
-                                                className="h-10"
-                                                value={additionalData.age}
-                                                onChange={e => setAdditionalData({ ...additionalData, age: e.target.value })}
-                                            />
-                                            <Select value={additionalData.gender || 'none'} onValueChange={v => setAdditionalData({ ...additionalData, gender: v === 'none' ? '' : v })}>
-                                                <SelectTrigger className="w-full h-10">
-                                                    <SelectValue placeholder="Sexo" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="none">Sin especificar</SelectItem>
-                                                    <SelectItem value="M">Hombre</SelectItem>
-                                                    <SelectItem value="F">Mujer</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                            <Input placeholder="WhatsApp" className="h-10" value={additionalData.whatsapp} onChange={e => setAdditionalData({ ...additionalData, whatsapp: e.target.value })} />
-                                            <Input placeholder="Instagram" className="h-10" value={additionalData.instagram} onChange={e => setAdditionalData({ ...additionalData, instagram: e.target.value })} />
-                                            <Input placeholder="TikTok" className="h-10" value={additionalData.tiktok} onChange={e => setAdditionalData({ ...additionalData, tiktok: e.target.value })} />
-                                            <Input placeholder="Facebook" className="h-10" value={additionalData.facebook} onChange={e => setAdditionalData({ ...additionalData, facebook: e.target.value })} />
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div>
-                                    {stripeRequired ? (
-                                        <WidgetCardForm
-                                            onSuccess={(pmId) => handleSubmitReservation(pmId)}
-                                            submitting={submitting}
-                                            amount={widgetConfig?.noShowFeeAmount || 20}
-                                        />
-                                    ) : (
-                                        <div className="rounded-md bg-muted/50 border border-border p-4 text-center text-sm text-muted-foreground italic">
-                                            No se requiere garantía con tarjeta para esta reserva.
-                                        </div>
-                                    )}
-                                </div>
-
-                                <Button
-                                    size="xl"
-                                    className="w-full"
-                                    onClick={handleMainSubmit}
-                                    disabled={submitting}
-                                >
-                                    {submitting && <Loader2 className="size-4 animate-spin" />}
-                                    {submitting ? 'Procesando…' : 'Reservar ahora'}
-                                </Button>
-                            </div>
-                        )}
-
-                        {/* STEP 4 — Confirmation */}
-                        {currentStep === 4 && (
-                            <div className="animate-in fade-in zoom-in-95 duration-300 py-6 text-center space-y-6">
-                                <div className={cn(
-                                    "mx-auto grid place-items-center size-16 rounded-full",
-                                    createdBooking?.isWaitlist
-                                        ? "bg-warning/15 text-warning-foreground"
-                                        : "bg-success/10 text-success",
-                                )}>
-                                    {createdBooking?.isWaitlist
-                                        ? <Clock className="size-7" />
-                                        : <Check className="size-8" strokeWidth={2.5} />}
-                                </div>
-                                <div className="space-y-1.5">
-                                    <h2 className="font-display text-2xl font-medium tracking-tight">
-                                        {createdBooking?.isWaitlist ? 'En lista de espera' : '¡Reserva confirmada!'}
-                                    </h2>
-                                    <p className="text-sm text-muted-foreground">
-                                        {selectedDate && format(selectedDate, "d 'de' MMMM 'de' yyyy", { locale: es })}
-                                        {!createdBooking?.isWaitlist && selectedTime && ` · ${selectedTime}h`}
-                                    </p>
-                                </div>
-                                <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                                    {createdBooking?.isWaitlist
-                                        ? `Te avisaremos si se libera una mesa para ${pax} personas.`
-                                        : `${pax} personas en ${restaurantName}. Recibirás un email de confirmación en breve.`}
-                                </p>
-                                <Button variant="outline" onClick={() => window.location.reload()}>
-                                    Volver al inicio
-                                </Button>
-                            </div>
-                        )}
-
-                        {/* STEP 5 — Waitlist */}
-                        {currentStep === 5 && selectedDate && (
-                            <div className="animate-in fade-in zoom-in-95 duration-300 max-w-xl mx-auto py-2 space-y-6">
-                                <div className="text-center space-y-1.5">
-                                    <p className="text-eyebrow">Lista de espera</p>
-                                    <h3 className="font-display text-2xl font-medium tracking-tight">
-                                        Apúntate y te avisamos
-                                    </h3>
-                                    <p className="text-sm text-muted-foreground capitalize">
-                                        {format(selectedDate, "d 'de' MMMM", { locale: es })} · {pax} personas
-                                    </p>
-                                </div>
-
-                                <div className="space-y-4">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                        <Field id="w-name" label="Nombre">
-                                            <Input id="w-name" className="h-10" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
-                                        </Field>
-                                        <Field id="w-email" label="Email">
-                                            <Input id="w-email" type="email" className="h-10" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
-                                        </Field>
-                                    </div>
-                                    <Field id="w-phone" label="Teléfono">
-                                        <Input
-                                            id="w-phone"
-                                            type="tel"
-                                            className="h-10"
-                                            placeholder="+34 000 000 000"
-                                            value={formData.phone}
-                                            onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                                        />
-                                    </Field>
-                                    <Field id="w-notes" label="Notas / alergias">
-                                        <Textarea
-                                            id="w-notes"
-                                            rows={3}
-                                            className="resize-none"
-                                            value={comment}
-                                            onChange={e => setComment(e.target.value)}
-                                        />
-                                    </Field>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Button
-                                        size="xl"
-                                        variant="warning"
-                                        className="w-full"
-                                        onClick={handleJoinWaitlist}
-                                        disabled={submitting}
-                                    >
-                                        {submitting && <Loader2 className="size-4 animate-spin" />}
-                                        {submitting ? 'Apuntando…' : 'Confirmar disponibilidad'}
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        className="w-full"
-                                        onClick={() => setCurrentStep(1)}
-                                    >
-                                        Volver al calendario
-                                    </Button>
-                                </div>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-            </div>
-        </div>
-    );
-}
-
-/* ============================================================
-   Subcomponents
-   ============================================================ */
-
-function Stepper({
-    steps,
-    currentStep,
-}: {
-    steps: typeof BASE_STEPS;
-    currentStep: number;
-}) {
-    return (
-        <div className="flex items-center justify-between max-w-2xl mx-auto px-4">
-            <div className="flex-1 flex items-center relative">
-                {steps.map((step, i) => {
-                    const stepIndex = steps.findIndex(s => s.id === step.id);
-                    const currentIndex = steps.findIndex(s => s.id === currentStep);
-                    const isCompleted = currentIndex > stepIndex;
+                {displaySteps.map((step, index) => {
                     const isActive = currentStep === step.id;
-                    const isDone = isCompleted || isActive;
+                    const stepIndex = displaySteps.findIndex(s => s.id === step.id);
+                    const currentStepIndex = displaySteps.findIndex(s => s.id === currentStep);
+                    const isCompleted = currentStepIndex > stepIndex;
 
                     return (
-                        <div key={step.id} className="flex-1 flex flex-col items-center relative">
-                            {i > 0 && (
-                                <div className={cn(
-                                    "absolute top-3.5 right-1/2 h-0.5 w-full transition-colors",
-                                    isDone ? "bg-foreground" : "bg-border",
-                                )} />
-                            )}
+                        <div key={step.id} className="flex flex-col items-center gap-1 bg-white px-2">
                             <div
-                                className={cn(
-                                    "relative size-7 rounded-full grid place-items-center text-xs font-medium border-2 transition-all bg-background",
-                                    isDone
-                                        ? "bg-foreground border-foreground text-background"
-                                        : "border-border text-muted-foreground",
-                                )}
+                                className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-300"
+                                style={{
+                                    borderColor: isActive || isCompleted ? '#0A0A0A' : '#E5E7EB',
+                                    backgroundColor: isActive || isCompleted ? '#0A0A0A' : 'white',
+                                    color: isActive || isCompleted ? 'white' : '#D1D5DB',
+                                    fontFamily: "'Oswald', sans-serif"
+                                }}
                             >
-                                {isCompleted ? <Check className="size-3.5" strokeWidth={3} /> : i + 1}
+                                {isCompleted ? <Check className="w-4 h-4" /> : index + 1}
                             </div>
                             <span
-                                className={cn(
-                                    "mt-1.5 text-[10px] font-medium uppercase tracking-wider transition-colors",
-                                    isDone ? "text-foreground" : "text-muted-foreground",
-                                )}
+                                className="text-[10px] font-bold uppercase tracking-widest"
+                                style={{
+                                    color: isActive || isCompleted ? colors.text : '#D1D5DB',
+                                    fontFamily: "'Oswald', sans-serif"
+                                }}
                             >
                                 {step.label}
                             </span>
@@ -840,181 +369,451 @@ function Stepper({
                     );
                 })}
             </div>
-        </div>
-    );
-}
 
-function PaxSelector({ pax, setPax }: { pax: number; setPax: (n: number) => void }) {
-    return (
-        <div className="rounded-md border border-border bg-muted/30 px-4 py-3">
-            <p className="text-eyebrow mb-2">¿Cuántos sois?</p>
-            <div className="flex items-center justify-between">
-                <button
-                    onClick={() => setPax(Math.max(1, pax - 1))}
-                    className="grid place-items-center size-8 rounded-md border border-border bg-background hover:bg-accent transition-colors"
-                    aria-label="Menos personas"
-                >
-                    <span className="text-base font-medium">−</span>
-                </button>
-                <div className="inline-flex items-center gap-2">
-                    <Users className="size-4 text-primary" />
-                    <span className="font-display text-lg font-medium tracking-tight tabular-nums">
-                        {pax} {pax === 1 ? 'persona' : 'personas'}
-                    </span>
-                </div>
-                <button
-                    onClick={() => setPax(pax + 1)}
-                    className="grid place-items-center size-8 rounded-md border border-border bg-background hover:bg-accent transition-colors"
-                    aria-label="Más personas"
-                >
-                    <span className="text-base font-medium">+</span>
-                </button>
-            </div>
-        </div>
-    );
-}
+            <Card className="rounded-none overflow-hidden min-h-[450px] border-none shadow-none">
+                <CardContent className="p-4 pt-0 bg-white">
 
-function Legend() {
-    const items = [
-        { label: 'Disponible', cls: 'bg-background border border-border' },
-        { label: 'Cerrado', cls: 'bg-muted border border-border' },
-        { label: 'Evento', cls: 'bg-info/10 border border-info/30' },
-        { label: 'Seleccionado', cls: 'bg-primary' },
-    ];
-    return (
-        <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-[11px] text-muted-foreground">
-            {items.map(i => (
-                <span key={i.label} className="inline-flex items-center gap-1.5">
-                    <span className={cn("size-2.5 rounded", i.cls)} />
-                    {i.label}
-                </span>
-            ))}
-        </div>
-    );
-}
+                    {/* STEP 1: FIND (Calendar + Times) */}
+                    {currentStep === 1 && (
+                        <div className={`grid grid-cols-1 ${mode === 'inline' ? 'min-[600px]:grid-cols-2' : 'sm:grid-cols-2'} gap-4 h-full`}>
+                            <div className="flex flex-col">
+                                <div className="max-w-[280px] mx-auto w-full">
+                                    {/* Pax Selector */}
+                                    <div className="mb-6 bg-gray-50 p-3 rounded-none border-l-4" style={{ borderColor: colors.accent }}>
+                                        <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2 block" style={{ fontFamily: "'Oswald', sans-serif" }}>¿Cuántos sois?</label>
+                                        <div className="flex items-center justify-between">
+                                            <button
+                                                onClick={() => setPax(Math.max(1, pax - 1))}
+                                                className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center hover:bg-white transition-colors bg-white text-[#0A0A0A]"
+                                            >
+                                                -
+                                            </button>
+                                            <div className="flex items-center gap-2">
+                                                <Users className="w-4 h-4" style={{ color: colors.accent }} />
+                                                <span className="text-xl font-black italic tracking-tighter" style={{ fontFamily: "'Oswald', sans-serif" }}>{pax} PERSONAS</span>
+                                            </div>
+                                            <button
+                                                onClick={() => setPax(pax + 1)}
+                                                className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center hover:bg-white transition-colors bg-white text-[#0A0A0A]"
+                                            >
+                                                +
+                                            </button>
+                                        </div>
+                                    </div>
 
-function SlotsGroup({
-    label,
-    slots,
-    onPick,
-}: {
-    label: string;
-    slots: string[];
-    onPick: (t: string) => void;
-}) {
-    return (
-        <div className="mb-4">
-            <h4 className="text-eyebrow mb-2 pb-1.5 border-b border-border/60">{label}</h4>
-            {slots.length > 0 ? (
-                <div className="grid grid-cols-3 gap-2">
-                    {slots.map(t => (
-                        <button
-                            key={t}
-                            type="button"
-                            onClick={() => onPick(t)}
-                            className="h-10 rounded-md bg-primary text-primary-foreground text-sm font-medium tabular-nums hover:bg-primary/90 transition-colors shadow-sm"
-                        >
-                            {t}
-                        </button>
-                    ))}
-                </div>
-            ) : (
-                <p className="text-xs text-muted-foreground italic">Sin disponibilidad.</p>
-            )}
-        </div>
-    );
-}
+                                    <div className="flex justify-between items-center mb-2">
+                                        <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-1 hover:bg-gray-100 rounded-full transition-colors bg-transparent text-gray-500">
+                                            <ChevronLeft className="w-4 h-4 text-gray-400" />
+                                        </button>
+                                        <h3 className="font-bold text-lg uppercase tracking-tighter" style={{ fontFamily: "'Oswald', sans-serif" }}>
+                                            {format(currentMonth, 'MMMM yyyy', { locale: es })}
+                                        </h3>
+                                        <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-1 hover:bg-gray-100 rounded-full transition-colors bg-transparent text-gray-500">
+                                            <ChevronRight className="w-4 h-4 text-gray-400" />
+                                        </button>
+                                    </div>
+                                    <div className="grid grid-cols-7 gap-1 mb-2 text-center border-b pb-2">
+                                        {weekDays.map(d => (
+                                            <div key={d} className="font-black text-[10px] uppercase tracking-widest" style={{ color: colors.accent }}>{d}</div>
+                                        ))}
+                                    </div>
+                                    <div className="grid grid-cols-7 gap-1">
+                                        {paddingDays.map((_, i) => <div key={`pad-${i}`} />)}
+                                        {daysInMonth.map(date => {
+                                            const status = getDayStatus(date);
+                                            const isSelected = selectedDate && isSameDay(date, selectedDate);
+                                            const isPast = isBefore(date, startOfDay(new Date()));
+                                            let style: React.CSSProperties = {};
+                                            let className = "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 mx-auto ";
 
-function EventCard({
-    event,
-    onReserve,
-}: {
-    event: RestaurantEvent;
-    onReserve: () => void;
-}) {
-    const full = event._count.bookings >= event.capacity;
-    const start = new Date(event.date);
-    const duration = (event as RestaurantEvent & { duration?: number }).duration ?? 0;
-    const end = duration > 0 ? new Date(start.getTime() + duration * 60_000) : null;
-    const startStr = format(start, 'HH:mm');
-    const endStr = end ? format(end, 'HH:mm') : null;
-    const franja = endStr ? `${startStr} – ${endStr}` : startStr;
+                                            if (isSelected) {
+                                                style = { backgroundColor: colors.accent, color: 'white', boxShadow: '0 2px 6px rgba(197, 157, 95, 0.4)' };
+                                                className += "cursor-pointer transform scale-105";
+                                            } else if (status === 'closed' || isPast) {
+                                                style = { backgroundColor: '#F3F4F6', color: '#9CA3AF' };
+                                                className += "cursor-not-allowed";
+                                            } else if (status === 'event') {
+                                                style = { backgroundColor: '#EEF2FF', color: '#4F46E5', border: '1px solid #C7D2FE' };
+                                                className += "cursor-pointer hover:bg-[#E0E7FF]";
+                                            } else {
+                                                className += "bg-white text-gray-700 hover:bg-[#F9F9F9] hover:text-[#C59D5F] cursor-pointer border border-transparent hover:border-[#C59D5F]";
+                                            }
+                                            return (
+                                                <div
+                                                    key={date.toString()}
+                                                    onClick={() => !isPast && status !== 'closed' && handleDateSelect(date)}
+                                                    className={className}
+                                                    style={style}
+                                                >
+                                                    {format(date, 'd')}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex flex-col border-l pl-0 md:pl-8 border-gray-100">
+                                <div className="flex flex-wrap gap-x-4 gap-y-2 mb-4 text-[10px] uppercase font-bold tracking-wider text-gray-500">
+                                    <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded" style={{ backgroundColor: colors.white, border: '1px solid #CCC' }}></div> Disponible</div>
+                                    <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-gray-100 border border-gray-200"></div> Cerrado</div>
+                                    <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-indigo-50 border border-indigo-100"></div> Evento</div>
+                                    <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded flex justify-center items-center text-white" style={{ backgroundColor: colors.accent }}></div> Seleccionado</div>
+                                </div>
+                                {!selectedDate && (
+                                    <div className="flex-1 flex flex-col items-center justify-center text-gray-300 text-center p-8 border-2 border-dashed border-gray-100 rounded-lg">
+                                        <Play className="w-12 h-12 mb-4 text-gray-200" />
+                                        <p className="font-light italic">Seleccione un día en el calendario para ver disponibilidad.</p>
+                                    </div>
+                                )}
+                                {selectedDate && loadingSlots && (
+                                    <div className="flex-1 flex items-center justify-center py-12">
+                                        <span className="text-xs text-gray-400 italic uppercase tracking-widest">Cargando…</span>
+                                    </div>
+                                )}
+                                {selectedDate && !loadingSlots && timeSlots && (
+                                    <div className="animate-in fade-in slide-in-from-right-4 duration-500">
+                                        <h3 className="font-bold text-lg mb-4 flex items-center gap-2" style={{ fontFamily: "'Oswald', sans-serif" }}>
+                                            <span style={{ color: colors.accent }}>Disponibilidad:</span> {format(selectedDate, "d 'de' MMMM", { locale: es })}
+                                        </h3>
 
-    return (
-        <div className="p-4 bg-info/5 border border-info/20 rounded-md animate-in zoom-in-95 duration-300">
-            <div className="flex items-center justify-between gap-2 mb-1.5">
-                <div className="flex items-center gap-1.5 text-info">
-                    <PartyPopper className="size-3.5" />
-                    <span className="text-[10px] font-medium uppercase tracking-wider">Evento especial</span>
-                </div>
-                <span className="text-[11px] font-medium text-info tabular-nums">{franja}</span>
-            </div>
-            <h4 className="font-display text-base font-medium tracking-tight mb-1">{event.name}</h4>
-            {event.description && (
-                <p className="text-xs text-muted-foreground mb-3 line-clamp-2 italic">{event.description}</p>
-            )}
-            <div className="flex justify-between items-center">
-                {full ? (
-                    <span className="text-sm font-medium text-destructive italic">Evento completo</span>
-                ) : (
-                    <>
-                        <span className="font-display text-lg font-medium text-info tabular-nums">{event.price}€</span>
-                        <Button size="sm" onClick={onReserve}>
-                            Reservar evento
-                        </Button>
-                    </>
-                )}
-            </div>
-        </div>
-    );
-}
+                                        {dayEvents.length > 0 && (
+                                            <div className="mb-6 space-y-3">
+                                                {dayEvents.map(evt => {
+                                                    const full = evt._count.bookings >= evt.capacity;
+                                                    const start = new Date(evt.date);
+                                                    const duration = (evt as RestaurantEvent & { duration?: number }).duration ?? 0;
+                                                    const end = duration > 0 ? new Date(start.getTime() + duration * 60_000) : null;
+                                                    const startStr = format(start, 'HH:mm');
+                                                    const endStr = end ? format(end, 'HH:mm') : null;
+                                                    const franja = endStr ? `${startStr} – ${endStr}` : startStr;
+                                                    return (
+                                                        <div key={evt.id} className="p-4 bg-indigo-50 border-2 border-indigo-100 rounded-xl animate-in zoom-in duration-300">
+                                                            <div className="flex items-center justify-between gap-2 mb-1">
+                                                                <div className="flex items-center gap-2 text-indigo-600">
+                                                                    <PartyPopper className="w-4 h-4" />
+                                                                    <span className="text-[10px] font-bold uppercase tracking-widest">Evento Especial</span>
+                                                                </div>
+                                                                <span className="text-[11px] font-bold text-indigo-600 tabular-nums">{franja}</span>
+                                                            </div>
+                                                            <h4 className="font-bold text-base mb-1" style={{ fontFamily: "'Oswald', sans-serif" }}>{evt.name}</h4>
+                                                            {evt.description && (
+                                                                <p className="text-xs text-gray-600 mb-3 line-clamp-2 italic">{evt.description}</p>
+                                                            )}
+                                                            <div className="flex justify-between items-center">
+                                                                {full ? (
+                                                                    <span className="text-sm font-bold text-rose-600 uppercase italic tracking-tighter">Evento Completo</span>
+                                                                ) : (
+                                                                    <>
+                                                                        <span className="text-lg font-black text-indigo-600 tracking-tighter">{evt.price}€</span>
+                                                                        <Button
+                                                                            size="sm"
+                                                                            className="bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold uppercase h-8 px-4"
+                                                                            onClick={() => handleSelectEvent(evt)}
+                                                                        >
+                                                                            Reservar Evento
+                                                                        </Button>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
 
-function SummaryStrip({
-    date,
-    time,
-    pax,
-    place,
-}: {
-    date: Date;
-    time: string | null;
-    pax: number;
-    place: string;
-}) {
-    return (
-        <div className="rounded-md bg-muted/40 border border-border px-4 py-3">
-            <p className="text-eyebrow mb-2">Resumen de reserva</p>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
-                <SummaryRow label="Fecha" value={format(date, 'dd-MM-yyyy', { locale: es })} />
-                <SummaryRow label="Hora" value={time ? `${time}h` : '—'} />
-                <SummaryRow label="Pax" value={`${pax} personas`} />
-                <SummaryRow label="Lugar" value={place || 'Restaurante'} />
-            </div>
-        </div>
-    );
-}
+                                        <div className="mb-6">
+                                            <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3 border-b pb-1">Comida</h4>
+                                            {timeSlots.lunch.length > 0 ? (
+                                                <div className="grid grid-cols-3 gap-2">
+                                                    {timeSlots.lunch.map(t => (
+                                                        <Button key={t} className="text-white text-sm py-2 h-auto font-bold tracking-wider hover:translate-y-[-2px] transition-transform shadow-sm rounded-none" style={{ backgroundColor: colors.accent }} onClick={() => handleTimeSelect(t)}>{t}</Button>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="text-[10px] text-gray-400 italic">No hay disponibilidad para comer.</p>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3 border-b pb-1">Cena</h4>
+                                            {timeSlots.dinner.length > 0 ? (
+                                                <div className="grid grid-cols-3 gap-2">
+                                                    {timeSlots.dinner.map(t => (
+                                                        <Button key={t} className="text-white text-sm py-2 h-auto font-bold tracking-wider hover:translate-y-[-2px] transition-transform shadow-sm rounded-none" style={{ backgroundColor: colors.accent }} onClick={() => handleTimeSelect(t)}>{t}</Button>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="text-[10px] text-gray-400 italic">No hay disponibilidad para cenar.</p>
+                                            )}
+                                        </div>
 
-function SummaryRow({ label, value }: { label: string; value: string }) {
-    return (
-        <div className="flex items-baseline gap-2">
-            <span className="text-eyebrow w-12">{label}</span>
-            <span className="font-medium text-foreground truncate">{value}</span>
-        </div>
-    );
-}
+                                        {timeSlots.lunch.length === 0 && timeSlots.dinner.length === 0 && dayEvents.length === 0 && (
+                                            <div className="mt-8 p-6 bg-amber-50 border-2 border-amber-100 rounded-2xl text-center">
+                                                <Info className="w-8 h-8 text-amber-500 mx-auto mb-3" />
+                                                <h4 className="font-bold text-gray-800 mb-1">¡Vaya! No queda sitio</h4>
+                                                <p className="text-xs text-gray-600 mb-4">Pero no te preocupes, puedes apuntarte a nuestra lista de espera y te avisaremos si se libera una mesa.</p>
+                                                <Button
+                                                    className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold uppercase tracking-widest text-xs h-12 rounded-xl shadow-lg shadow-amber-200"
+                                                    onClick={() => setCurrentStep(5)}
+                                                >
+                                                    Apuntarse a la Lista de Espera
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
 
-function Field({
-    id,
-    label,
-    children,
-}: {
-    id?: string;
-    label: string;
-    children: React.ReactNode;
-}) {
-    return (
-        <div className="space-y-1.5">
-            <Label htmlFor={id} className="text-eyebrow">{label}</Label>
-            {children}
+                    {/* STEP 2: INFORMATION */}
+                    {currentStep === 2 && selectedDate && (
+                        <div className="animate-in fade-in slide-in-from-right-8 duration-500 max-w-2xl mx-auto">
+                            <div className="bg-gray-50 p-4 border-l-4 mb-6 shadow-sm" style={{ borderColor: colors.accent }}>
+                                <h3 className="text-lg font-bold mb-3" style={{ fontFamily: "'Oswald', sans-serif" }}>Resumen de Reserva</h3>
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div className="flex items-center gap-2">
+                                        <div className="font-bold text-gray-500 w-16 uppercase text-xs">Fecha</div>
+                                        <div>{format(selectedDate, 'dd-MM-yyyy', { locale: es })}</div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="font-bold text-gray-500 w-16 uppercase text-xs">Hora</div>
+                                        <div>{selectedTime}h.</div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="font-bold text-gray-500 w-16 uppercase text-xs">Pax</div>
+                                        <div>{pax} personas</div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="font-bold text-gray-500 w-16 uppercase text-xs">Lugar</div>
+                                        <div>{restaurantName || 'Restaurante'}</div>
+                                    </div>
+                                </div>
+                                {selectedEvent && (
+                                    <div className="mt-3 pt-3 border-t border-dashed border-gray-300 flex items-center gap-2 text-indigo-700">
+                                        <PartyPopper className="w-4 h-4" />
+                                        <span className="text-xs font-bold uppercase tracking-widest">Evento: {selectedEvent.name}</span>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="grid gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <div className="grid gap-1">
+                                        <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Nombre</label>
+                                        <input className="border p-3 text-sm rounded-none focus:outline-none focus:border-[#C59D5F] transition-colors bg-white" placeholder="Nombre" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
+                                    </div>
+                                    <div className="grid gap-1">
+                                        <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Primer Apellido</label>
+                                        <input className="border p-3 text-sm rounded-none focus:outline-none focus:border-[#C59D5F] transition-colors bg-white" placeholder="Apellido" value={formData.surname} onChange={e => setFormData({ ...formData, surname: e.target.value })} />
+                                    </div>
+                                    <div className="grid gap-1">
+                                        <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Segundo Apellido</label>
+                                        <input className="border p-3 text-sm rounded-none focus:outline-none focus:border-[#C59D5F] transition-colors bg-white" placeholder="Opcional" value={additionalData.surname2} onChange={e => setAdditionalData({ ...additionalData, surname2: e.target.value })} />
+                                    </div>
+                                </div>
+                                <div className="grid gap-1">
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Email</label>
+                                    <input className="border p-3 text-sm rounded-none focus:outline-none focus:border-[#C59D5F] transition-colors bg-white" placeholder="ejemplo@email.com" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                                    <div className="grid gap-1 col-span-1">
+                                        <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Prefijo</label>
+                                        <select
+                                            className="border p-3 text-sm rounded-none bg-white focus:outline-none focus:border-[#C59D5F]"
+                                            value={formData.prefix}
+                                            onChange={e => setFormData({ ...formData, prefix: e.target.value })}
+                                        >
+                                            <option value="+34">🇪🇸 +34</option>
+                                            <option value="+33">🇫🇷 +33</option>
+                                            <option value="+44">🇬🇧 +44</option>
+                                        </select>
+                                    </div>
+                                    <div className="grid gap-1 col-span-3">
+                                        <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Teléfono</label>
+                                        <input className="border p-3 text-sm rounded-none focus:outline-none focus:border-[#C59D5F] transition-colors bg-white" placeholder="000 000 000" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
+                                    </div>
+                                </div>
+                                <div className="grid gap-2">
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">¿Alergias?</label>
+                                    <div className="flex gap-4">
+                                        <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" className="accent-[#C59D5F] w-4 h-4 cursor-pointer" checked={hasAllergy === true} onChange={() => setHasAllergy(true)} /><span className="text-sm">Sí</span></label>
+                                        <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" className="accent-[#C59D5F] w-4 h-4 cursor-pointer" checked={hasAllergy === false} onChange={() => setHasAllergy(false)} /><span className="text-sm">No</span></label>
+                                    </div>
+                                </div>
+                                <div className="grid gap-1">
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Introduce un comentario</label>
+                                    <textarea className="border p-3 text-sm rounded-none focus:outline-none focus:border-[#C59D5F] transition-colors bg-white resize-none" rows={2} value={comment} onChange={e => setComment(e.target.value)}></textarea>
+                                </div>
+                                <div className="grid gap-2 mt-2">
+                                    <label className="flex items-start gap-2 cursor-pointer"><input type="checkbox" className="accent-[#C59D5F] w-4 h-4 mt-0.5 cursor-pointer" checked={acceptTerms} onChange={e => setAcceptTerms(e.target.checked)} /><span className="text-xs text-gray-600">Acepto condiciones</span></label>
+                                    <label className="flex items-start gap-2 cursor-pointer"><input type="checkbox" className="accent-[#C59D5F] w-4 h-4 mt-0.5 cursor-pointer" checked={acceptData} onChange={e => setAcceptData(e.target.checked)} /><span className="text-xs text-gray-600">Consiento tratamiento</span></label>
+                                </div>
+                            </div>
+                            <div className="mt-8">
+                                <Button className="w-full py-4 text-base font-bold uppercase tracking-widest text-white hover:bg-black transition-colors shadow-lg rounded-none"
+                                    style={{ backgroundColor: colors.accent, fontFamily: "'Oswald', sans-serif" }}
+                                    onClick={() => {
+                                        if (isStep3Skipped) {
+                                            handleSubmitReservation();
+                                        } else {
+                                            setCurrentStep(3);
+                                        }
+                                    }}>
+                                    Continuar
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* STEP 3: ADDITIONAL / STRIPE */}
+                    {currentStep === 3 && (
+                        <div className="animate-in fade-in slide-in-from-right-8 duration-500 max-w-2xl mx-auto pt-6 pb-8">
+                            <h3 className="text-xl font-bold mb-2 text-center" style={{ fontFamily: "'Oswald', sans-serif" }}>GARANTÍA DE RESERVA</h3>
+                            <div className="text-left max-w-lg mx-auto space-y-5">
+                                {widgetConfig?.showCrmFields !== false && (
+                                    <div className="border-b border-gray-100 pb-4">
+                                        <h4 className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: colors.accent, fontFamily: "'Oswald', sans-serif" }}>Datos opcionales</h4>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <input type="number" className="border p-2.5 text-sm rounded-none focus:outline-none" placeholder="Edad" value={additionalData.age} onChange={e => setAdditionalData({ ...additionalData, age: e.target.value })} />
+                                            <select className="border p-2.5 text-sm rounded-none focus:outline-none" value={additionalData.gender} onChange={e => setAdditionalData({ ...additionalData, gender: e.target.value })}>
+                                                <option value="">Sexo</option>
+                                                <option value="M">Hombre</option>
+                                                <option value="F">Mujer</option>
+                                            </select>
+                                            <input className="border p-2.5 text-sm rounded-none focus:outline-none" placeholder="WhatsApp" value={additionalData.whatsapp} onChange={e => setAdditionalData({ ...additionalData, whatsapp: e.target.value })} />
+                                            <input className="border p-2.5 text-sm rounded-none focus:outline-none" placeholder="Instagram" value={additionalData.instagram} onChange={e => setAdditionalData({ ...additionalData, instagram: e.target.value })} />
+                                            <input className="border p-2.5 text-sm rounded-none focus:outline-none" placeholder="TikTok" value={additionalData.tiktok} onChange={e => setAdditionalData({ ...additionalData, tiktok: e.target.value })} />
+                                            <input className="border p-2.5 text-sm rounded-none focus:outline-none" placeholder="Facebook" value={additionalData.facebook} onChange={e => setAdditionalData({ ...additionalData, facebook: e.target.value })} />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Stripe Form */}
+                                <div className="mt-6">
+                                    {stripeRequired ? (
+                                        <WidgetCardForm
+                                            onSuccess={(pmId) => handleSubmitReservation(pmId)}
+                                            submitting={submitting}
+                                            colors={colors}
+                                            amount={widgetConfig?.noShowFeeAmount || 20}
+                                        />
+                                    ) : (
+                                        <div className="p-4 bg-gray-50 text-center italic text-sm text-gray-500">
+                                            No se requiere garantía con tarjeta para esta reserva.
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="mt-8 max-w-lg mx-auto">
+                                <Button
+                                    className="w-full py-4 text-base font-bold uppercase tracking-widest text-white hover:bg-black transition-colors shadow-lg rounded-none"
+                                    style={{ backgroundColor: colors.accent, fontFamily: "'Oswald', sans-serif" }}
+                                    onClick={handleMainSubmit}
+                                    disabled={submitting}
+                                >
+                                    {submitting ? 'PROCESANDO...' : 'RESERVAR AHORA'}
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* STEP 4: CONFIRMATION */}
+                    {currentStep === 4 && (
+                        <div className="animate-in fade-in zoom-in duration-500 h-full pt-4 text-center">
+                            <div className="flex flex-col items-center justify-center pb-8 border-b border-gray-100 mb-8">
+                                <div
+                                    className="w-20 h-20 rounded-full flex items-center justify-center shadow-lg mb-6"
+                                    style={{ backgroundColor: createdBooking?.isWaitlist ? '#f59e0b' : colors.accent }}
+                                >
+                                    {createdBooking?.isWaitlist ? <Clock className="w-10 h-10 text-white" /> : <Check className="w-10 h-10 text-white" strokeWidth={4} />}
+                                </div>
+                                <h2 className="text-3xl font-bold uppercase tracking-wide" style={{ fontFamily: "'Oswald', sans-serif" }}>
+                                    {createdBooking?.isWaitlist ? 'Lista de Espera' : 'Reserva Confirmada'}
+                                </h2>
+                            </div>
+                            <div className="max-w-md mx-auto space-y-3 mb-8">
+                                <p className="text-lg font-bold" style={{ fontFamily: "'Oswald', sans-serif" }}>
+                                    {selectedDate ? format(selectedDate, 'dd-MM-yyyy') : ''}
+                                    {!createdBooking?.isWaitlist && `, ${selectedTime}h`}
+                                </p>
+                                <p>
+                                    {createdBooking?.isWaitlist
+                                        ? `Te avisaremos si se libera una mesa para ${pax} personas.`
+                                        : `${pax} personas en ${restaurantName}.`
+                                    }
+                                </p>
+                            </div>
+                            <Button className="px-8 py-3 bg-black text-white font-bold uppercase tracking-wider text-xs rounded-none" onClick={() => window.location.reload()}>Volver al Inicio</Button>
+                        </div>
+                    )}
+
+                    {/* STEP 5: WAITLIST FORM */}
+                    {currentStep === 5 && selectedDate && (
+                        <div className="animate-in fade-in zoom-in duration-500 max-w-xl mx-auto py-4">
+                            <div className="text-center mb-8">
+                                <h3 className="text-2xl font-bold uppercase tracking-wide mb-2" style={{ fontFamily: "'Oswald', sans-serif" }}>Lista de Espera</h3>
+                                <p className="text-sm text-gray-500">Para el {format(selectedDate, "d 'de' MMMM", { locale: es })} · {pax} personas</p>
+                            </div>
+
+                            <div className="space-y-4 mb-8">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold uppercase text-gray-400">Nombre</label>
+                                        <input
+                                            className="w-full border p-3 rounded focus:ring-1 focus:ring-amber-500 outline-none"
+                                            value={formData.name}
+                                            onChange={e => setFormData({ ...formData, name: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold uppercase text-gray-400">Email</label>
+                                        <input
+                                            className="w-full border p-3 rounded focus:ring-1 focus:ring-amber-500 outline-none"
+                                            value={formData.email}
+                                            onChange={e => setFormData({ ...formData, email: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold uppercase text-gray-400">Teléfono</label>
+                                    <input
+                                        className="w-full border p-3 rounded focus:ring-1 focus:ring-amber-500 outline-none"
+                                        placeholder="+34 000 000 000"
+                                        value={formData.phone}
+                                        onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold uppercase text-gray-400">Notas / Alergias</label>
+                                    <textarea
+                                        className="w-full border p-3 rounded focus:ring-1 focus:ring-amber-500 outline-none h-24 resize-none"
+                                        value={comment}
+                                        onChange={e => setComment(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-3">
+                                <Button
+                                    className="w-full h-14 bg-amber-500 hover:bg-amber-600 text-white font-bold uppercase tracking-widest text-sm rounded shadow-lg"
+                                    onClick={handleJoinWaitlist}
+                                    disabled={submitting}
+                                >
+                                    {submitting ? 'APUNTANDO...' : 'CONFIRMAR DISPONIBILIDAD'}
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    className="w-full text-gray-400 hover:text-gray-600 font-bold uppercase text-[10px] tracking-widest"
+                                    onClick={() => setCurrentStep(1)}
+                                >
+                                    Volver al calendario
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
+                </CardContent>
+            </Card>
         </div>
     );
 }
