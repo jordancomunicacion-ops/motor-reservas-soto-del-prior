@@ -39,6 +39,7 @@ import ReservationForm from '@/components/restaurant/ReservationForm';
 import GuestProfileSheet from '@/components/restaurant/GuestProfileSheet';
 import { DateSelector } from '@/components/admin/DateSelector';
 import ReviewsPanel from '@/components/admin/ReviewsPanel';
+import HotelReviewsPanel from '@/components/admin/HotelReviewsPanel';
 
 interface RoomType { id: string; name: string; rooms: Room[] }
 interface Room { id: string; name: string; }
@@ -316,7 +317,7 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
         </div>
     );
 }
-function HotelPlanning({ 
+function HotelPlanning({
     contextId,
     loading,
     roomTypes,
@@ -336,6 +337,7 @@ function HotelPlanning({
     handleNext: () => void;
     handleToday: () => void;
 }) {
+    const [view, setView] = useState<'PLANNING' | 'REVIEWS'>('PLANNING');
     return (
         <div className="flex flex-col h-full gap-4">
             <header className="flex justify-between items-center bg-white dark:bg-zinc-800 p-3 rounded-lg shadow-sm border border-gray-100 dark:border-zinc-700">
@@ -344,12 +346,35 @@ function HotelPlanning({
                     <h1 className="text-lg font-bold tracking-tight">Planning de Ocupación</h1>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={handlePrev}><ChevronLeft className="w-4 h-4" /></Button>
-                    <Button variant="outline" size="sm" onClick={handleToday}>Hoy</Button>
-                    <Button variant="outline" size="sm" onClick={handleNext}><ChevronRight className="w-4 h-4" /></Button>
+                    <div className="flex bg-gray-200 dark:bg-zinc-900 p-1 rounded-lg mr-2">
+                        <button
+                            onClick={() => setView('PLANNING')}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${view === 'PLANNING' ? 'bg-white dark:bg-zinc-800 shadow text-black dark:text-white' : 'text-gray-500 hover:text-black dark:hover:text-white'}`}
+                        >
+                            <LayoutGrid className="w-4 h-4" /> Planning
+                        </button>
+                        <button
+                            onClick={() => setView('REVIEWS')}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${view === 'REVIEWS' ? 'bg-white dark:bg-zinc-800 shadow text-black dark:text-white' : 'text-gray-500 hover:text-black dark:hover:text-white'}`}
+                        >
+                            <Star className="w-4 h-4" /> Valoraciones
+                        </button>
+                    </div>
+                    {view === 'PLANNING' && (
+                        <>
+                            <Button variant="outline" size="sm" onClick={handlePrev}><ChevronLeft className="w-4 h-4" /></Button>
+                            <Button variant="outline" size="sm" onClick={handleToday}>Hoy</Button>
+                            <Button variant="outline" size="sm" onClick={handleNext}><ChevronRight className="w-4 h-4" /></Button>
+                        </>
+                    )}
                 </div>
             </header>
 
+            {view === 'REVIEWS' ? (
+                <div className="flex-1 bg-white dark:bg-zinc-800 rounded-lg shadow-sm border border-gray-100 dark:border-zinc-700 overflow-auto p-4">
+                    <HotelReviewsPanel endpoint={`/bookings/hotel/${contextId}/reviews`} />
+                </div>
+            ) : (
             <div className="flex-1 bg-white dark:bg-zinc-800 rounded-lg shadow-sm border border-gray-100 dark:border-zinc-700 overflow-hidden flex flex-col">
                 <div className="overflow-auto flex-1">
                     <table className="w-full border-collapse">
@@ -405,6 +430,7 @@ function HotelPlanning({
                     </table>
                 </div>
             </div>
+            )}
         </div>
     );
 }

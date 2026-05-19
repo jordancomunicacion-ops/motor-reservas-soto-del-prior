@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useSearchParams } from 'next/navigation';
-import { Building2, Utensils, Calendar, Users, TrendingUp, CreditCard, Sparkles } from 'lucide-react';
+import { Building2, Utensils, Calendar, Users, TrendingUp, CreditCard, Sparkles, Star } from 'lucide-react';
 import { fetchAPI } from '@/lib/api';
 import { useEffect, useState } from 'react';
 
@@ -32,6 +32,11 @@ interface ContextEntity {
     restaurantId?: string | null;
 }
 
+interface ReviewsSummary {
+    total: number;
+    overall: number | null;
+}
+
 export default function AdminDashboard() {
     const searchParams = useSearchParams();
     const contextType = searchParams.get('context') || 'hotel';
@@ -40,6 +45,7 @@ export default function AdminDashboard() {
 
     const [entity, setEntity] = useState<ContextEntity | null>(null);
     const [stats, setStats] = useState<DashboardStats | null>(null);
+    const [reviews, setReviews] = useState<ReviewsSummary | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -57,6 +63,17 @@ export default function AdminDashboard() {
             ]);
             setStats(statsData);
             setEntity(entityData);
+
+            if (contextId) {
+                const endpoint = contextType === 'hotel'
+                    ? `/bookings/hotel/${contextId}/reviews`
+                    : `/restaurant/${contextId}/reviews`;
+                fetchAPI<{ total: number; averages: { overall: number | null } }>(endpoint)
+                    .then(d => setReviews({ total: d.total, overall: d.averages?.overall ?? null }))
+                    .catch(() => setReviews(null));
+            } else {
+                setReviews(null);
+            }
         } catch (e) {
             console.error(e);
         } finally {
@@ -136,6 +153,29 @@ export default function AdminDashboard() {
                     </Card>
                 )}
 
+
+                {/* Reviews Metric (per-context) */}
+                {!isGlobal && (
+                    <Link
+                        href={contextType === 'hotel' ? `/admin/hotels/${contextId}/reviews` : `/admin/restaurant/${contextId}/reviews`}
+                        className="block"
+                    >
+                        <Card className="hover:bg-amber-50/40 transition-colors cursor-pointer h-full">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium">Valoración</CardTitle>
+                                <Star className="h-4 w-4 text-amber-500" />
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-bold">
+                                    {reviews?.overall !== null && reviews?.overall !== undefined ? `${reviews.overall.toFixed(1)} / 5` : '—'}
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    {reviews?.total ?? 0} {(reviews?.total ?? 0) === 1 ? 'opinión recibida' : 'opiniones recibidas'}
+                                </p>
+                            </CardContent>
+                        </Card>
+                    </Link>
+                )}
 
                 {/* Visitor Metric */}
                 <Card>
