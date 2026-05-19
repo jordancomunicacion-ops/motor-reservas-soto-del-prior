@@ -156,25 +156,20 @@ export default function AdminDashboard() {
 
                 {/* Reviews Metric (per-context) */}
                 {!isGlobal && (
-                    <Link
-                        href={contextType === 'hotel' ? `/admin/hotels/${contextId}/reviews` : `/admin/restaurant/${contextId}/reviews`}
-                        className="block"
-                    >
-                        <Card className="hover:bg-amber-50/40 transition-colors cursor-pointer h-full">
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Valoración</CardTitle>
-                                <Star className="h-4 w-4 text-amber-500" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">
-                                    {reviews?.overall !== null && reviews?.overall !== undefined ? `${reviews.overall.toFixed(1)} / 5` : '—'}
-                                </div>
-                                <p className="text-xs text-muted-foreground">
-                                    {reviews?.total ?? 0} {(reviews?.total ?? 0) === 1 ? 'opinión recibida' : 'opiniones recibidas'}
-                                </p>
-                            </CardContent>
-                        </Card>
-                    </Link>
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">Valoración</CardTitle>
+                            <Star className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">
+                                {reviews?.overall !== null && reviews?.overall !== undefined ? `${reviews.overall.toFixed(1)} / 5` : '—'}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                {reviews?.total ?? 0} {(reviews?.total ?? 0) === 1 ? 'opinión recibida' : 'opiniones recibidas'}
+                            </p>
+                        </CardContent>
+                    </Card>
                 )}
 
                 {/* Visitor Metric */}
