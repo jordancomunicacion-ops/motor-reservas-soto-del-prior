@@ -90,7 +90,7 @@ function LocationSwitcherContent() {
                 role="combobox"
                 aria-expanded={open}
                 className={cn(
-                    "h-10 min-w-[260px] justify-between gap-3 px-3",
+                    "h-9 min-w-[240px] justify-between gap-3 px-2.5 text-[13px]",
                     open && "ring-1 ring-primary/30 border-primary/40",
                 )}
                 onClick={() => setOpen(!open)}

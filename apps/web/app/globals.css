@@ -61,7 +61,8 @@
    Paleta: Ivory + Charcoal + Gold (#C59D5F)
    ============================================================ */
 :root {
-  --radius: 0.5rem;
+  /* Radius más compacto — vibe tech-SaaS (Linear/Vercel/Notion) */
+  --radius: 0.375rem;
 
   /* Backgrounds — Warm Ivory (no pure white) */
   --background: oklch(0.985 0.004 80);
@@ -211,5 +212,12 @@
   /* Eyebrow / overline labels (reemplaza el patrón Oswald uppercase) */
   .text-eyebrow {
     @apply text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground;
+  }
+
+  /* Display numérico para KPIs — tabular nums, tracking tight, peso medio */
+  .text-display-num {
+    font-feature-settings: "tnum", "lnum";
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
   }
 }

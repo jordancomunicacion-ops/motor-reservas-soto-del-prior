@@ -8,6 +8,10 @@ interface PageHeaderProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "ti
   actions?: React.ReactNode
 }
 
+/**
+ * Cabecera estándar de páginas admin. Estilo tech-SaaS compacto:
+ * eyebrow + título sans semibold tight + descripción + acciones a la derecha.
+ */
 export function PageHeader({
   eyebrow,
   title,
@@ -19,14 +23,14 @@ export function PageHeader({
   return (
     <header
       className={cn(
-        "flex flex-col gap-3 pb-6 border-b border-border/60 sm:flex-row sm:items-end sm:justify-between sm:gap-6",
+        "flex flex-col gap-3 pb-5 border-b border-border/60 sm:flex-row sm:items-end sm:justify-between sm:gap-6",
         className
       )}
       {...props}
     >
-      <div className="space-y-1.5">
+      <div className="space-y-1">
         {eyebrow && <p className="text-eyebrow">{eyebrow}</p>}
-        <h1 className="font-display text-2xl font-medium tracking-tight text-foreground sm:text-[28px] leading-tight">
+        <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-[22px] leading-tight">
           {title}
         </h1>
         {description && (
