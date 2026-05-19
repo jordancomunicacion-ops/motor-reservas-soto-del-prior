@@ -263,6 +263,7 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
                                 onBookingMove={handleAssignTable}
                                 onTableSelect={handleQuickRes}
                                 onSelectProfile={(b) => setSelectedBookingForProfile(b)}
+                                hideArchitectButton
                                 className="h-full w-full"
                             />
                         )}

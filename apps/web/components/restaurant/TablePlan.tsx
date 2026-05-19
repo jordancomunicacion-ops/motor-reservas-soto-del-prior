@@ -274,6 +274,7 @@ export default function TablePlan({
     selectedTableId,
     restaurantId,
     hideToolbar = false,
+    hideArchitectButton = false,
     mode = 'SERVICE',
     onSelectProfile,
     activeZoneId,
@@ -289,6 +290,7 @@ export default function TablePlan({
     selectedTableId?: string | null,
     restaurantId?: string,
     hideToolbar?: boolean,
+    hideArchitectButton?: boolean,
     mode?: 'VIEW' | 'EDIT' | 'SERVICE',
     activeZoneId?: string,
     onActiveZoneChange?: (id: string) => void,
@@ -341,7 +343,7 @@ export default function TablePlan({
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8 text-center space-y-4 bg-gray-50 dark:bg-zinc-900 rounded-lg border border-dashed border-gray-200 dark:border-zinc-800">
                 <LayoutGrid className="w-12 h-12 opacity-20" />
                 <p>No hay mesas ni zonas configuradas.</p>
-                {restaurantId ? (
+                {restaurantId && !hideArchitectButton ? (
                     <Button
                         variant="outline"
                         className="gap-2 mt-2"
@@ -379,8 +381,9 @@ export default function TablePlan({
                         <span className="text-[10px] font-bold w-8 text-center">{Math.round(scale * 100)}%</span>
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setScale(Math.min(2, scale + 0.1))}>+</Button>
                         
-                        {/* Only show edit redirect if we are in service mode and have an ID */}
-                        {mode === 'SERVICE' && restaurantId && (
+                        {/* Only show edit redirect if we are in service mode and have an ID.
+                            Some hosts (e.g. /admin/occupancy) ocultan este atajo porque la configuración vive en otra sección. */}
+                        {mode === 'SERVICE' && restaurantId && !hideArchitectButton && (
                             <>
                                 <div className="h-4 w-px bg-gray-300 dark:bg-zinc-700 mx-1" />
                                 <Button
