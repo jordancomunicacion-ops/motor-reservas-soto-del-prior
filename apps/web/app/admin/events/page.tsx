@@ -54,6 +54,7 @@ interface ZoneSummary { id: string; name?: string }
 const EMPTY_FORM = {
     name: '',
     date: '',
+    duration: 120,
     capacity: 50,
     price: 0,
     description: '',
@@ -149,6 +150,18 @@ export default function EventsListPage() {
             alert('Nombre y fecha son obligatorios');
             return;
         }
+        if (!formData.hotelId && !formData.restaurantId) {
+            alert('Debes vincular el evento a un hotel o restaurante');
+            return;
+        }
+        if (formData.zoneIds.length === 0) {
+            alert('Debes seleccionar al menos una sala / zona para el evento');
+            return;
+        }
+        if (!formData.duration || formData.duration < 15) {
+            alert('La duración debe ser de al menos 15 minutos');
+            return;
+        }
         setCreating(true);
         try {
             await fetchAPI('/event', {
@@ -209,7 +222,7 @@ export default function EventsListPage() {
                                         required
                                     />
                                 </Field>
-                                <Field id="ev-date" label="Fecha y hora">
+                                <Field id="ev-date" label="Fecha y hora de inicio">
                                     <Input
                                         id="ev-date"
                                         type="datetime-local"
@@ -218,6 +231,22 @@ export default function EventsListPage() {
                                         onChange={e => setFormData({ ...formData, date: e.target.value })}
                                         required
                                     />
+                                </Field>
+
+                                <Field id="ev-duration" label="Duración (minutos)">
+                                    <Input
+                                        id="ev-duration"
+                                        type="number"
+                                        min={15}
+                                        step={15}
+                                        className="h-10 tabular-nums"
+                                        value={formData.duration}
+                                        onChange={e => setFormData({ ...formData, duration: Number(e.target.value) })}
+                                        required
+                                    />
+                                    <p className="text-[11px] text-muted-foreground mt-1">
+                                        Las salas seleccionadas se bloquean para reservas ordinarias durante esta franja.
+                                    </p>
                                 </Field>
 
                                 <Field id="ev-hotel" label="Hotel vinculado" icon={Building2}>

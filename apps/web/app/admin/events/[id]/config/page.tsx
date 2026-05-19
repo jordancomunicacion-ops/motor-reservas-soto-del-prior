@@ -202,15 +202,27 @@ export default function EventConfigPage() {
                                     onChange={e => setFormData({ ...formData, name: e.target.value })}
                                 />
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div className="space-y-1.5">
-                                    <Label htmlFor="event-date" className="text-eyebrow">Fecha y Hora</Label>
+                                    <Label htmlFor="event-date" className="text-eyebrow">Fecha y hora de inicio</Label>
                                     <Input
                                         id="event-date"
                                         type="datetime-local"
                                         className="h-10"
                                         value={formData.date}
                                         onChange={e => setFormData({ ...formData, date: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="event-duration" className="text-eyebrow">Duración (min)</Label>
+                                    <Input
+                                        id="event-duration"
+                                        type="number"
+                                        min={15}
+                                        step={15}
+                                        className="h-10 tabular-nums"
+                                        value={formData.duration}
+                                        onChange={e => setFormData({ ...formData, duration: Number(e.target.value) })}
                                     />
                                 </div>
                                 <div className="space-y-1.5">
@@ -307,7 +319,7 @@ export default function EventConfigPage() {
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            {formData.restaurantId ? (
+                            {(formData.restaurantId || formData.hotelId) ? (
                                 availableZones.length > 0 ? (
                                     <div className="space-y-3">
                                         <p className="text-xs text-muted-foreground">

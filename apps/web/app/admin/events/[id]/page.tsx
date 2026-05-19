@@ -4,6 +4,9 @@ import { useParams } from 'next/navigation';
 import { fetchAPI } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { PageHeader } from '@/components/ui/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -20,6 +23,8 @@ import {
     Building2,
     Utensils,
     Inbox,
+    Loader2,
+    Plus,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -69,6 +74,50 @@ export default function EventDetailPage() {
             console.error(e);
         } finally {
             setLoading(false);
+        }
+    }
+
+    async function handleCancelBooking(bookingId: string) {
+        if (!event) return;
+        if (!confirm('¿Cancelar esta reserva? El cliente liberará su plaza.')) return;
+        try {
+            await fetchAPI(`/event/${event.id}/bookings/${bookingId}`, { method: 'DELETE' });
+            loadEvent();
+        } catch (e) {
+            console.error(e);
+            alert('No se pudo cancelar la reserva.');
+        }
+    }
+
+    async function handleAddManual() {
+        if (!event) return;
+        if (!manualForm.guestName.trim()) {
+            alert('El nombre del cliente es obligatorio');
+            return;
+        }
+        if (manualForm.pax < 1) {
+            alert('El número de pax debe ser al menos 1');
+            return;
+        }
+        setSavingManual(true);
+        try {
+            await fetchAPI(`/event/${event.id}/bookings`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    guestName: manualForm.guestName.trim(),
+                    guestEmail: manualForm.guestEmail.trim() || undefined,
+                    guestPhone: manualForm.guestPhone.trim() || undefined,
+                    pax: manualForm.pax,
+                }),
+            });
+            setManualForm({ guestName: '', guestEmail: '', guestPhone: '', pax: 1 });
+            setShowAddManual(false);
+            loadEvent();
+        } catch (e) {
+            const msg = (e instanceof Error && e.message) || 'No se pudo crear la reserva';
+            alert(msg);
+        } finally {
+            setSavingManual(false);
         }
     }
 
@@ -168,7 +217,8 @@ export default function EventDetailPage() {
                                                     variant="ghost"
                                                     size="icon-sm"
                                                     className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                                    aria-label="Eliminar"
+                                                    aria-label="Cancelar reserva"
+                                                    onClick={() => handleCancelBooking(booking.id)}
                                                 >
                                                     <Trash2 className="size-3.5" />
                                                 </Button>
@@ -245,70 +295,77 @@ export default function EventDetailPage() {
                         </CardContent>
                     </Card>
 
-                    <Button className="w-full" size="lg">
-                        <Users className="size-4" /> Añadir reserva manual
+                    <Button className="w-full" size="lg" onClick={() => setShowAddManual(true)}>
+                        <Plus className="size-4" /> Añadir reserva manual
                     </Button>
                 </div>
             </div>
 
-            {showAddManual && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAddManual(false)}>
-                    <div className="bg-white dark:bg-zinc-800 rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
-                        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                            <Users className="w-5 h-5 text-purple-500" /> Nueva reserva manual
-                        </h3>
-                        <div className="space-y-3">
-                            <div>
-                                <label className="text-xs font-medium text-muted-foreground">Nombre del cliente *</label>
-                                <input
-                                    className="border p-2 rounded w-full dark:bg-zinc-900 focus:ring-2 focus:ring-purple-500 outline-none mt-1"
-                                    value={manualForm.guestName}
-                                    onChange={e => setManualForm({ ...manualForm, guestName: e.target.value })}
-                                />
-                            </div>
-                            <div>
-                                <label className="text-xs font-medium text-muted-foreground">Email</label>
-                                <input
-                                    type="email"
-                                    className="border p-2 rounded w-full dark:bg-zinc-900 focus:ring-2 focus:ring-purple-500 outline-none mt-1"
-                                    value={manualForm.guestEmail}
-                                    onChange={e => setManualForm({ ...manualForm, guestEmail: e.target.value })}
-                                />
-                            </div>
-                            <div>
-                                <label className="text-xs font-medium text-muted-foreground">Teléfono</label>
-                                <input
-                                    className="border p-2 rounded w-full dark:bg-zinc-900 focus:ring-2 focus:ring-purple-500 outline-none mt-1"
-                                    value={manualForm.guestPhone}
-                                    onChange={e => setManualForm({ ...manualForm, guestPhone: e.target.value })}
-                                />
-                            </div>
-                            <div>
-                                <label className="text-xs font-medium text-muted-foreground">Pax *</label>
-                                <input
-                                    type="number"
-                                    min={1}
-                                    className="border p-2 rounded w-full dark:bg-zinc-900 focus:ring-2 focus:ring-purple-500 outline-none mt-1"
-                                    value={manualForm.pax}
-                                    onChange={e => setManualForm({ ...manualForm, pax: Number(e.target.value) })}
-                                />
-                            </div>
+            <Sheet open={showAddManual} onOpenChange={setShowAddManual}>
+                <SheetContent className="sm:max-w-md p-6">
+                    <SheetHeader className="text-left space-y-1.5 px-0">
+                        <SheetTitle className="font-display text-xl font-medium tracking-tight inline-flex items-center gap-2">
+                            <Users className="size-5 text-primary" /> Nueva reserva manual
+                        </SheetTitle>
+                        <SheetDescription>
+                            Añade una reserva al evento manualmente (teléfono, walk-in…).
+                        </SheetDescription>
+                    </SheetHeader>
+
+                    <div className="space-y-4 mt-6">
+                        <div className="space-y-1.5">
+                            <Label htmlFor="m-name" className="text-eyebrow">Nombre del cliente *</Label>
+                            <Input
+                                id="m-name"
+                                className="h-10"
+                                value={manualForm.guestName}
+                                onChange={e => setManualForm({ ...manualForm, guestName: e.target.value })}
+                            />
                         </div>
-                        <div className="mt-6 flex justify-end gap-2">
-                            <Button variant="ghost" onClick={() => setShowAddManual(false)} disabled={savingManual}>
-                                Cancelar
-                            </Button>
-                            <Button
-                                className="bg-purple-600 hover:bg-purple-700"
-                                onClick={handleAddManual}
-                                disabled={savingManual}
-                            >
-                                {savingManual ? 'Guardando...' : 'Crear reserva'}
-                            </Button>
+                        <div className="space-y-1.5">
+                            <Label htmlFor="m-email" className="text-eyebrow">Email</Label>
+                            <Input
+                                id="m-email"
+                                type="email"
+                                className="h-10"
+                                value={manualForm.guestEmail}
+                                onChange={e => setManualForm({ ...manualForm, guestEmail: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label htmlFor="m-phone" className="text-eyebrow">Teléfono</Label>
+                            <Input
+                                id="m-phone"
+                                type="tel"
+                                className="h-10"
+                                value={manualForm.guestPhone}
+                                onChange={e => setManualForm({ ...manualForm, guestPhone: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label htmlFor="m-pax" className="text-eyebrow">Pax *</Label>
+                            <Input
+                                id="m-pax"
+                                type="number"
+                                min={1}
+                                className="h-10 tabular-nums"
+                                value={manualForm.pax}
+                                onChange={e => setManualForm({ ...manualForm, pax: Number(e.target.value) })}
+                            />
                         </div>
                     </div>
-                </div>
-            )}
+
+                    <SheetFooter className="mt-6 flex flex-row justify-end gap-2">
+                        <Button variant="ghost" onClick={() => setShowAddManual(false)} disabled={savingManual}>
+                            Cancelar
+                        </Button>
+                        <Button onClick={handleAddManual} disabled={savingManual}>
+                            {savingManual && <Loader2 className="size-4 animate-spin" />}
+                            {savingManual ? 'Guardando…' : 'Crear reserva'}
+                        </Button>
+                    </SheetFooter>
+                </SheetContent>
+            </Sheet>
         </div>
     );
 }

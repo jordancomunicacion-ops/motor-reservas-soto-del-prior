@@ -222,30 +222,47 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
 
         setSubmitting(true);
         try {
-            const dateStr = format(selectedDate, 'yyyy-MM-dd');
-            const result = await fetchAPI<CreatedBooking>('/restaurant/public/reservation', {
-                method: 'POST',
-                body: JSON.stringify({
-                    restaurantId,
-                    date: dateStr,
-                    time: selectedTime,
-                    pax,
-                    name: `${formData.name} ${formData.surname} ${additionalData.surname2}`.trim(),
-                    email: formData.email,
-                    phone: formData.prefix + formData.phone,
-                    notes: [comment, bonusCode ? `Bono: ${bonusCode}` : '', hasAllergy ? 'Tiene alergias/intolerancias' : ''].filter(Boolean).join(' | ') || undefined,
-                    surname2: additionalData.surname2 || undefined,
-                    age: (additionalData.age && !isNaN(parseInt(additionalData.age))) ? parseInt(additionalData.age) : undefined,
-                    gender: additionalData.gender || undefined,
-                    whatsapp: additionalData.whatsapp || undefined,
-                    instagram: additionalData.instagram || undefined,
-                    facebook: additionalData.facebook || undefined,
-                    tiktok: additionalData.tiktok || undefined,
-                    linkedin: additionalData.linkedin || undefined,
-                    xTwitter: additionalData.xTwitter || undefined,
-                    paymentMethodId,
-                }),
-            });
+            const fullName = `${formData.name} ${formData.surname} ${additionalData.surname2}`.trim();
+            const fullPhone = formData.prefix + formData.phone;
+
+            let result: CreatedBooking;
+            if (selectedEvent) {
+                result = await fetchAPI<CreatedBooking>(`/event/${selectedEvent.id}/bookings`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        guestName: fullName,
+                        guestEmail: formData.email,
+                        guestPhone: fullPhone,
+                        pax,
+                        ...(paymentMethodId ? { stripePaymentMethodId: paymentMethodId } : {}),
+                    }),
+                });
+            } else {
+                const dateStr = format(selectedDate, 'yyyy-MM-dd');
+                result = await fetchAPI<CreatedBooking>('/restaurant/public/reservation', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        restaurantId,
+                        date: dateStr,
+                        time: selectedTime,
+                        pax,
+                        name: fullName,
+                        email: formData.email,
+                        phone: fullPhone,
+                        notes: [comment, bonusCode ? `Bono: ${bonusCode}` : '', hasAllergy ? 'Tiene alergias/intolerancias' : ''].filter(Boolean).join(' | ') || undefined,
+                        surname2: additionalData.surname2 || undefined,
+                        age: (additionalData.age && !isNaN(parseInt(additionalData.age))) ? parseInt(additionalData.age) : undefined,
+                        gender: additionalData.gender || undefined,
+                        whatsapp: additionalData.whatsapp || undefined,
+                        instagram: additionalData.instagram || undefined,
+                        facebook: additionalData.facebook || undefined,
+                        tiktok: additionalData.tiktok || undefined,
+                        linkedin: additionalData.linkedin || undefined,
+                        xTwitter: additionalData.xTwitter || undefined,
+                        paymentMethodId,
+                    }),
+                });
+            }
             setCreatedBooking(result);
             setCurrentStep(4);
         } catch (e) {
@@ -421,8 +438,16 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
                                                 <span className="capitalize">{format(selectedDate, "d 'de' MMMM", { locale: es })}</span>
                                             </h3>
 
-                                            {selectedEvent && (
-                                                <EventCard event={selectedEvent} onReserve={() => handleTimeSelect(format(new Date(selectedEvent.date), 'HH:mm'))} />
+                                            {dayEvents.length > 0 && (
+                                                <div className="mb-5 space-y-2.5">
+                                                    {dayEvents.map(evt => (
+                                                        <EventCard
+                                                            key={evt.id}
+                                                            event={evt}
+                                                            onReserve={() => handleSelectEvent(evt)}
+                                                        />
+                                                    ))}
+                                                </div>
                                             )}
 
                                             <SlotsGroup label="Comida" slots={timeSlots.lunch} onPick={handleTimeSelect} />
@@ -908,11 +933,21 @@ function EventCard({
     onReserve: () => void;
 }) {
     const full = event._count.bookings >= event.capacity;
+    const start = new Date(event.date);
+    const duration = (event as RestaurantEvent & { duration?: number }).duration ?? 0;
+    const end = duration > 0 ? new Date(start.getTime() + duration * 60_000) : null;
+    const startStr = format(start, 'HH:mm');
+    const endStr = end ? format(end, 'HH:mm') : null;
+    const franja = endStr ? `${startStr} – ${endStr}` : startStr;
+
     return (
-        <div className="mb-5 p-4 bg-info/5 border border-info/20 rounded-md animate-in zoom-in-95 duration-300">
-            <div className="flex items-center gap-1.5 text-info mb-1">
-                <PartyPopper className="size-3.5" />
-                <span className="text-[10px] font-medium uppercase tracking-wider">Evento especial</span>
+        <div className="p-4 bg-info/5 border border-info/20 rounded-md animate-in zoom-in-95 duration-300">
+            <div className="flex items-center justify-between gap-2 mb-1.5">
+                <div className="flex items-center gap-1.5 text-info">
+                    <PartyPopper className="size-3.5" />
+                    <span className="text-[10px] font-medium uppercase tracking-wider">Evento especial</span>
+                </div>
+                <span className="text-[11px] font-medium text-info tabular-nums">{franja}</span>
             </div>
             <h4 className="font-display text-base font-medium tracking-tight mb-1">{event.name}</h4>
             {event.description && (
