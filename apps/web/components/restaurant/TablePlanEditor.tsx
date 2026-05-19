@@ -4,19 +4,18 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { 
-    Plus, 
-    Trash2, 
-    RotateCw, 
-    Square, 
-    Circle, 
-    Move, 
-    Save, 
-    Layout, 
-    Type, 
+import {
+    Plus,
+    Trash2,
+    RotateCw,
+    Square,
+    Circle,
+    Save,
+    Layout,
+    Type,
     Users,
     Link as LinkIcon,
-    Unlink
+    Loader2,
 } from "lucide-react";
 import { fetchAPI } from "@/lib/api";
 import TablePlan, { type TableUpdates } from "./TablePlan";
@@ -41,7 +40,7 @@ interface Table {
     shape: 'RECTANGLE' | 'ROUND';
     rotation: number;
     seatsLostPerJoin: number;
-    contiguousTableIds?: string[]; // We'll store this in metadata or a dedicated field if we update schema
+    contiguousTableIds?: string[];
 }
 
 export default function TablePlanEditor({ restaurantId }: { restaurantId: string }) {
@@ -49,18 +48,18 @@ export default function TablePlanEditor({ restaurantId }: { restaurantId: string
     const [activeZoneId, setActiveZoneId] = useState<string>("");
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    
-    // Selection state
+
     const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
 
     useEffect(() => {
         loadData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [restaurantId]);
 
     async function loadData() {
         setLoading(true);
         try {
-            const data = await fetchAPI(`/restaurant/${restaurantId}/tables`);
+            const data = await fetchAPI<Zone[]>(`/restaurant/${restaurantId}/tables`);
             if (Array.isArray(data)) {
                 setZones(data);
                 if (data.length > 0 && !activeZoneId) {
@@ -75,36 +74,27 @@ export default function TablePlanEditor({ restaurantId }: { restaurantId: string
     }
 
     const activeZone = zones.find(z => z.id === activeZoneId);
-    // Find selected table in any zone to be more robust
     const selectedTable = zones.flatMap(z => z.tables).find(t => t.id === selectedTableId);
 
     const handleAddZone = async () => {
         const name = prompt("Nombre de la nueva área (ej: Terraza):");
         if (!name) return;
-        
+
         try {
-            const newZone = await fetchAPI(`/restaurant/zones`, {
+            const newZone = await fetchAPI<Zone>(`/restaurant/zones`, {
                 method: 'POST',
-                body: JSON.stringify({ restaurantId, name })
+                body: JSON.stringify({ restaurantId, name }),
             });
             setZones([...zones, { ...newZone, tables: [] }]);
             setActiveZoneId(newZone.id);
-        } catch (e) {
+        } catch {
             alert("Error al crear área");
         }
     };
 
-    const handleDeleteZone = async (id: string) => {
-        if (!confirm("¿Estás seguro de eliminar esta área y todas sus mesas?")) return;
-        // In a real app, we'd call a DELETE endpoint. 
-        // For now, let's assume we can sync the whole state.
-        setZones(zones.filter(z => z.id !== id));
-        if (activeZoneId === id) setActiveZoneId(zones[0]?.id || "");
-    };
-
     const handleAddTable = () => {
         if (!activeZoneId) return;
-        
+
         const newTable: Table = {
             id: `temp-${Date.now()}`,
             name: `M${(activeZone?.tables.length || 0) + 1}`,
@@ -118,13 +108,13 @@ export default function TablePlanEditor({ restaurantId }: { restaurantId: string
             shape: 'RECTANGLE',
             rotation: 0,
             seatsLostPerJoin: 1,
-            contiguousTableIds: []
+            contiguousTableIds: [],
         };
 
-        setZones(zones.map(z => 
-            z.id === activeZoneId 
-                ? { ...z, tables: [...z.tables, newTable] } 
-                : z
+        setZones(zones.map(z =>
+            z.id === activeZoneId
+                ? { ...z, tables: [...z.tables, newTable] }
+                : z,
         ));
         setSelectedTableId(newTable.id);
     };
@@ -132,25 +122,24 @@ export default function TablePlanEditor({ restaurantId }: { restaurantId: string
     const handleUpdateTable = (tableId: string, updates: TableUpdates) => {
         setZones(prevZones => prevZones.map(z => ({
             ...z,
-            tables: z.tables.map(t => t.id === tableId ? { ...t, ...updates } as Table : t)
+            tables: z.tables.map(t => t.id === tableId ? { ...t, ...updates } as Table : t),
         })));
     };
 
-    // New helper for multiple updates at once
-    const handleUpdateTables = (updates: { id: string, data: Partial<Table> }[]) => {
+    const handleUpdateTables = (updates: { id: string; data: Partial<Table> }[]) => {
         setZones(prevZones => prevZones.map(z => ({
             ...z,
             tables: z.tables.map(t => {
                 const update = updates.find(u => u.id === t.id);
                 return update ? { ...t, ...update.data } : t;
-            })
+            }),
         })));
     };
 
     const handleDeleteTable = (tableId: string) => {
         setZones(zones.map(z => ({
             ...z,
-            tables: z.tables.filter(t => t.id !== tableId)
+            tables: z.tables.filter(t => t.id !== tableId),
         })));
         setSelectedTableId(null);
     };
@@ -159,14 +148,13 @@ export default function TablePlanEditor({ restaurantId }: { restaurantId: string
         setSaving(true);
         try {
             const updatedZones = [...zones];
-            
+
             for (let i = 0; i < updatedZones.length; i++) {
                 const zone = updatedZones[i];
-                // 1. Prepare tables (strip temp IDs but keep a ref for mapping)
                 const tablesToSync = zone.tables.map(t => ({
                     ...t,
                     originalId: t.id,
-                    id: t.id.startsWith('temp-') ? undefined : t.id
+                    id: t.id.startsWith('temp-') ? undefined : t.id,
                 }));
 
                 type SavedTable = Table & {
@@ -174,32 +162,24 @@ export default function TablePlanEditor({ restaurantId }: { restaurantId: string
                 };
                 const savedTables = await fetchAPI<SavedTable[]>(`/restaurant/zones/${zone.id}/tables/sync`, {
                     method: 'POST',
-                    body: JSON.stringify(tablesToSync)
+                    body: JSON.stringify(tablesToSync),
                 });
 
-                // Create a mapping of originalId (temp or real) to NEW real ID
-                // We use 'name' as a secondary correlation if originalId is lost,
-                // but syncTables should return them in order or with enough info.
-                // For now, let's assume the backend returns them in same order or we match by name.
                 const idMap: Record<string, string> = {};
                 savedTables.forEach((st, idx) => {
                     idMap[tablesToSync[idx].originalId] = st.id;
                 });
 
-                // Update the state tables with real IDs
                 updatedZones[i] = {
                     ...zone,
                     tables: savedTables.map(st => ({
                         ...st,
-                        // Fix contiguousTableIds using the map
                         contiguousTableIds: (st.metadata?.contiguousTableIds || st.contiguousTableIds || [])
-                            .map(oldId => idMap[oldId] || oldId)
-                    }))
+                            .map(oldId => idMap[oldId] || oldId),
+                    })),
                 };
             }
-            
-            // Second pass across ALL zones to fix cross-zone links if any (though usually intra-zone)
-            // For now, just set state.
+
             setZones(updatedZones);
             alert("Plano guardado correctamente");
         } catch (e) {
@@ -210,160 +190,179 @@ export default function TablePlanEditor({ restaurantId }: { restaurantId: string
         }
     };
 
-    if (loading) return <div className="p-8 text-center">Cargando editor de plano...</div>;
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center py-16 text-sm text-muted-foreground gap-2">
+                <Loader2 className="size-4 animate-spin" /> Cargando editor de plano…
+            </div>
+        );
+    }
 
     return (
-        <div className="flex flex-col gap-6 h-full">
-            <div className="flex justify-between items-center bg-white dark:bg-zinc-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-zinc-700">
-                <div className="flex items-center gap-4">
-                    <div className="flex bg-gray-100 dark:bg-zinc-900 p-1 rounded-lg">
-                        {zones.map(z => (
-                            <button
-                                key={z.id}
-                                onClick={() => setActiveZoneId(z.id)}
-                                className={cn(
-                                    "px-4 py-2 rounded-md text-sm font-medium transition-all",
-                                    activeZoneId === z.id 
-                                        ? "bg-white dark:bg-zinc-800 shadow text-blue-600 font-bold" 
-                                        : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-                                )}
-                            >
-                                {z.name}
-                            </button>
-                        ))}
+        <div className="flex flex-col gap-4 h-full">
+            <div className="flex justify-between items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 flex-wrap">
+                <div className="inline-flex rounded-md border border-border p-0.5 bg-background">
+                    {zones.map(z => (
                         <button
-                            onClick={handleAddZone}
-                            className="px-3 py-2 text-gray-400 hover:text-blue-600 transition-colors"
-                            title="Añadir área"
+                            key={z.id}
+                            type="button"
+                            onClick={() => setActiveZoneId(z.id)}
+                            className={cn(
+                                "px-3 h-8 rounded text-xs font-medium transition-colors",
+                                activeZoneId === z.id
+                                    ? "bg-primary text-primary-foreground"
+                                    : "text-muted-foreground hover:text-foreground",
+                            )}
                         >
-                            <Plus className="w-5 h-5" />
+                            {z.name}
                         </button>
-                    </div>
+                    ))}
+                    <button
+                        type="button"
+                        onClick={handleAddZone}
+                        className="px-2 h-8 inline-flex items-center text-muted-foreground hover:text-primary transition-colors"
+                        title="Añadir área"
+                        aria-label="Añadir área"
+                    >
+                        <Plus className="size-3.5" />
+                    </button>
                 </div>
 
-                <div className="flex items-center gap-3">
-                    <Button variant="outline" className="gap-2" onClick={handleAddTable} disabled={!activeZoneId}>
-                        <Plus className="w-4 h-4" /> Añadir Mesa
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={handleAddTable} disabled={!activeZoneId}>
+                        <Plus className="size-3.5" /> Añadir mesa
                     </Button>
-                    <Button className="gap-2 bg-blue-600 hover:bg-blue-700" onClick={handleSave} disabled={saving}>
-                        <Save className="w-4 h-4" /> {saving ? 'Guardando...' : 'Guardar Plano'}
+                    <Button size="sm" onClick={handleSave} disabled={saving}>
+                        {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
+                        {saving ? 'Guardando…' : 'Guardar plano'}
                     </Button>
                 </div>
             </div>
 
-            <div className="flex-1 flex gap-6 overflow-hidden">
-                {/* Main Canvas */}
-                <div className="flex-1 bg-white dark:bg-zinc-800 rounded-xl shadow-sm border border-gray-100 dark:border-zinc-700 overflow-hidden relative">
-                    <TablePlan 
-                        zones={zones} 
-                        tables={zones.flatMap(z => z.tables.map(t => ({ ...t, zoneId: z.id })))} 
+            <div className="flex-1 flex gap-4 overflow-hidden">
+                <div className="flex-1 rounded-lg border border-border bg-card overflow-hidden relative">
+                    <TablePlan
+                        zones={zones}
+                        tables={zones.flatMap(z => z.tables.map(t => ({ ...t, zoneId: z.id })))}
                         activeZoneId={activeZoneId}
                         onActiveZoneChange={setActiveZoneId}
                         onTableUpdate={handleUpdateTable}
-                        onBookingMove={() => {}} 
+                        onBookingMove={() => { }}
                         onTableSelect={setSelectedTableId}
                         selectedTableId={selectedTableId}
                         mode="EDIT"
                         hideToolbar={true}
                         className="h-full"
                     />
-                    
-                    {/* Overlay for selection handled by parent if needed, 
-                        but for now let's use TablePlan's internal state or pass it down */}
                 </div>
 
-                {/* Sidebar Properties */}
-                <aside className="w-80 space-y-6 overflow-y-auto pr-2 custom-scrollbar">
-                    <Card className="shadow-sm border-gray-100 dark:border-zinc-700">
+                <aside className="w-80 space-y-4 overflow-y-auto pr-1">
+                    <Card>
                         <CardHeader>
-                            <CardTitle className="text-lg flex items-center gap-2">
-                                <Layout className="w-5 h-5 text-blue-500" />
+                            <CardTitle className="font-display text-base font-medium tracking-tight inline-flex items-center gap-2">
+                                <Layout className="size-4 text-primary" />
                                 Propiedades
                             </CardTitle>
                             <CardDescription>
-                                {selectedTable ? `Mesa: ${selectedTable.name}` : "Selecciona una mesa en el plano para editarla"}
+                                {selectedTable
+                                    ? `Mesa: ${selectedTable.name}`
+                                    : "Selecciona una mesa en el plano para editarla."}
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             {!selectedTable ? (
-                                <div className="py-8 text-center text-gray-400 italic text-sm">
-                                    Haz clic en una mesa para ver sus ajustes
+                                <div className="py-8 text-center text-xs text-muted-foreground italic">
+                                    Haz clic en una mesa para ver sus ajustes.
                                 </div>
                             ) : (
                                 <>
-                                    <div className="space-y-2">
-                                        <Label className="flex items-center gap-2">
-                                            <Type className="w-3.5 h-3.5" /> Nombre / Etiqueta
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="t-name" className="text-eyebrow inline-flex items-center gap-1.5">
+                                            <Type className="size-3" /> Nombre / etiqueta
                                         </Label>
-                                        <Input 
-                                            value={selectedTable.name} 
+                                        <Input
+                                            id="t-name"
+                                            className="h-10"
+                                            value={selectedTable.name}
                                             onChange={e => handleUpdateTable(selectedTable.id, { name: e.target.value })}
                                         />
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label className="flex items-center gap-2">
-                                                <Users className="w-3.5 h-3.5" /> Mín. Pax
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor="t-min" className="text-eyebrow inline-flex items-center gap-1.5">
+                                                <Users className="size-3" /> Mín. pax
                                             </Label>
-                                            <Input 
-                                                type="number" 
-                                                value={selectedTable.minPax || 1} 
+                                            <Input
+                                                id="t-min"
+                                                type="number"
+                                                className="h-10 tabular-nums"
+                                                value={selectedTable.minPax || 1}
                                                 onChange={e => handleUpdateTable(selectedTable.id, { minPax: parseInt(e.target.value) || 1 })}
                                             />
                                         </div>
-                                        <div className="space-y-2">
-                                            <Label className="flex items-center gap-2">
-                                                <Users className="w-3.5 h-3.5" /> Máx. Pax
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor="t-max" className="text-eyebrow inline-flex items-center gap-1.5">
+                                                <Users className="size-3" /> Máx. pax
                                             </Label>
-                                            <Input 
-                                                type="number" 
-                                                value={selectedTable.maxPax || selectedTable.capacity} 
+                                            <Input
+                                                id="t-max"
+                                                type="number"
+                                                className="h-10 tabular-nums"
+                                                value={selectedTable.maxPax || selectedTable.capacity}
                                                 onChange={e => handleUpdateTable(selectedTable.id, { maxPax: parseInt(e.target.value) || selectedTable.capacity })}
                                             />
                                         </div>
                                     </div>
 
-                                    <div className="pt-4 border-t">
-                                        <Label className="mb-3 block text-xs uppercase font-bold text-gray-400">Apariencia</Label>
+                                    <div className="pt-4 border-t border-border/60 space-y-2">
+                                        <Label className="text-eyebrow">Apariencia</Label>
                                         <div className="grid grid-cols-2 gap-2">
-                                            <Button 
-                                                variant={selectedTable.shape === 'RECTANGLE' ? 'default' : 'outline'} 
-                                                className="gap-2 text-xs h-9"
+                                            <Button
+                                                variant={selectedTable.shape === 'RECTANGLE' ? 'default' : 'outline'}
+                                                size="sm"
                                                 onClick={() => handleUpdateTable(selectedTable.id, { shape: 'RECTANGLE' })}
                                             >
-                                                <Square className="w-4 h-4" /> Rectangular
+                                                <Square className="size-3.5" /> Rectangular
                                             </Button>
-                                            <Button 
-                                                variant={selectedTable.shape === 'ROUND' ? 'default' : 'outline'} 
-                                                className="gap-2 text-xs h-9"
+                                            <Button
+                                                variant={selectedTable.shape === 'ROUND' ? 'default' : 'outline'}
+                                                size="sm"
                                                 onClick={() => handleUpdateTable(selectedTable.id, { shape: 'ROUND' })}
                                             >
-                                                <Circle className="w-4 h-4" /> Redonda
+                                                <Circle className="size-3.5" /> Redonda
                                             </Button>
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-1">
-                                            <Label className="text-[10px] uppercase font-bold text-zinc-500">Rotación</Label>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor="t-rot" className="text-eyebrow">Rotación</Label>
                                             <div className="flex gap-2">
-                                                <Input 
-                                                    type="number" 
-                                                    className="h-9" 
+                                                <Input
+                                                    id="t-rot"
+                                                    type="number"
+                                                    className="h-9 tabular-nums"
                                                     value={selectedTable.rotation || 0}
                                                     onChange={e => handleUpdateTable(selectedTable.id, { rotation: parseInt(e.target.value) || 0 })}
                                                 />
-                                                <Button variant="outline" size="icon" className="shrink-0" onClick={() => handleUpdateTable(selectedTable.id, { rotation: ((selectedTable.rotation || 0) + 45) % 360 })}>
-                                                    <RotateCw className="w-4 h-4" />
+                                                <Button
+                                                    variant="outline"
+                                                    size="icon-sm"
+                                                    className="shrink-0"
+                                                    onClick={() => handleUpdateTable(selectedTable.id, { rotation: ((selectedTable.rotation || 0) + 45) % 360 })}
+                                                    aria-label="Rotar 45°"
+                                                >
+                                                    <RotateCw className="size-3.5" />
                                                 </Button>
                                             </div>
                                         </div>
-                                        <div className="space-y-1">
-                                            <Label className="text-[10px] uppercase font-bold text-zinc-500">Tamaño (PX)</Label>
-                                            <Input 
-                                                type="number" 
-                                                className="h-9" 
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor="t-size" className="text-eyebrow">Tamaño (px)</Label>
+                                            <Input
+                                                id="t-size"
+                                                type="number"
+                                                className="h-9 tabular-nums"
                                                 value={selectedTable.width || 60}
                                                 onChange={e => {
                                                     const val = parseInt(e.target.value) || 60;
@@ -373,60 +372,65 @@ export default function TablePlanEditor({ restaurantId }: { restaurantId: string
                                         </div>
                                     </div>
 
-                                    <div className="space-y-1 pt-2">
-                                        <Label className="text-[10px] uppercase font-bold text-zinc-500">Pérdida por Unión (Comensales)</Label>
-                                        <Input 
-                                            type="number" 
-                                            className="h-9" 
+                                    <div className="space-y-1.5 pt-2">
+                                        <Label htmlFor="t-loss" className="text-eyebrow">Pérdida por unión (comensales)</Label>
+                                        <Input
+                                            id="t-loss"
+                                            type="number"
+                                            className="h-9 tabular-nums"
                                             placeholder="Suele ser 1"
                                             value={selectedTable.seatsLostPerJoin || 1}
                                             onChange={e => handleUpdateTable(selectedTable.id, { seatsLostPerJoin: parseInt(e.target.value) || 1 })}
                                         />
-                                        <p className="text-[9px] text-muted-foreground">Sillas que se pierden al pegar esta mesa a otra.</p>
+                                        <p className="text-[11px] text-muted-foreground">
+                                            Sillas que se pierden al pegar esta mesa a otra.
+                                        </p>
                                     </div>
 
-                                    <div className="pt-4 border-t">
-                                        <Label className="mb-3 block text-xs uppercase font-bold text-gray-400 flex items-center gap-2">
-                                            <LinkIcon className="w-3 h-3" /> Mesas Contiguas
+                                    <div className="pt-4 border-t border-border/60 space-y-2">
+                                        <Label className="text-eyebrow inline-flex items-center gap-1.5">
+                                            <LinkIcon className="size-3" /> Mesas contiguas
                                         </Label>
-                                        <p className="text-[10px] text-muted-foreground mb-2">Permite unir estas mesas para reservas grandes.</p>
-                                        <div className="flex flex-wrap gap-1">
+                                        <p className="text-[11px] text-muted-foreground">
+                                            Permite unir estas mesas para reservas grandes.
+                                        </p>
+                                        <div className="flex flex-wrap gap-1.5">
                                             {(() => {
-                                                // Find the zone this table belongs to
                                                 const tableZone = zones.find(z => z.tables.some(t => t.id === selectedTable.id));
                                                 if (!tableZone) return null;
 
                                                 const otherTables = tableZone.tables.filter(t => t.id !== selectedTable.id);
-                                                
+
                                                 if (otherTables.length === 0) {
-                                                    return <p className="text-[10px] text-muted-foreground italic">No hay otras mesas en esta área para unir.</p>;
+                                                    return <p className="text-[11px] text-muted-foreground italic">No hay otras mesas en esta área para unir.</p>;
                                                 }
 
                                                 return otherTables.map(t => {
                                                     const isLinked = selectedTable.contiguousTableIds?.includes(t.id);
                                                     return (
-                                                        <Button 
+                                                        <Button
                                                             key={t.id}
-                                                            variant={isLinked ? "secondary" : "outline"}
-                                                            className={cn(
-                                                                "h-8 px-3 text-xs gap-2 rounded-full transition-all", 
-                                                                isLinked && "bg-blue-600 text-white hover:bg-blue-700 border-blue-600 shadow-sm"
-                                                            )}
+                                                            variant={isLinked ? "default" : "outline"}
+                                                            size="sm"
+                                                            className="h-8 px-3 text-xs rounded-full"
                                                             onClick={() => {
                                                                 const current = selectedTable.contiguousTableIds || [];
-                                                                const next = isLinked ? current.filter(id => id !== t.id) : [...current, t.id];
-                                                                
-                                                                // Symmetric link
+                                                                const next = isLinked
+                                                                    ? current.filter(id => id !== t.id)
+                                                                    : [...current, t.id];
+
                                                                 const otherCurrent = t.contiguousTableIds || [];
-                                                                const otherNext = isLinked ? otherCurrent.filter(id => id !== selectedTable.id) : [...otherCurrent, selectedTable.id];
-                                                                
+                                                                const otherNext = isLinked
+                                                                    ? otherCurrent.filter(id => id !== selectedTable.id)
+                                                                    : [...otherCurrent, selectedTable.id];
+
                                                                 handleUpdateTables([
                                                                     { id: selectedTable.id, data: { contiguousTableIds: next } },
-                                                                    { id: t.id, data: { contiguousTableIds: otherNext } }
+                                                                    { id: t.id, data: { contiguousTableIds: otherNext } },
                                                                 ]);
                                                             }}
                                                         >
-                                                            {isLinked ? <LinkIcon className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+                                                            {isLinked ? <LinkIcon className="size-3" /> : <Plus className="size-3" />}
                                                             {t.name}
                                                         </Button>
                                                     );
@@ -435,20 +439,13 @@ export default function TablePlanEditor({ restaurantId }: { restaurantId: string
                                         </div>
                                     </div>
 
-                                    <div className="pt-6 border-t mt-6 flex flex-col gap-3">
-                                        <Button 
-                                            className="w-full gap-2 bg-blue-600 hover:bg-blue-700" 
-                                            onClick={handleSave}
-                                            disabled={saving}
-                                        >
-                                            <Save className="w-4 h-4" /> {saving ? 'Guardando...' : 'Guardar Cambios'}
+                                    <div className="pt-4 border-t border-border/60 flex flex-col gap-2">
+                                        <Button onClick={handleSave} disabled={saving}>
+                                            {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
+                                            {saving ? 'Guardando…' : 'Guardar cambios'}
                                         </Button>
-                                        <Button 
-                                            variant="destructive" 
-                                            className="w-full gap-2" 
-                                            onClick={() => handleDeleteTable(selectedTable.id)}
-                                        >
-                                            <Trash2 className="w-4 h-4" /> Eliminar Mesa
+                                        <Button variant="destructive" onClick={() => handleDeleteTable(selectedTable.id)}>
+                                            <Trash2 className="size-3.5" /> Eliminar mesa
                                         </Button>
                                     </div>
                                 </>
@@ -457,31 +454,6 @@ export default function TablePlanEditor({ restaurantId }: { restaurantId: string
                     </Card>
                 </aside>
             </div>
-            
-            {/* Inject a script to handle table selection from TablePlan click */}
-            <style jsx global>{`
-                .table-node-selected {
-                    ring: 2px solid #2563eb;
-                    ring-offset: 2px;
-                    z-index: 100;
-                }
-                .custom-scrollbar::-webkit-scrollbar {
-                    width: 6px;
-                }
-                .custom-scrollbar::-webkit-scrollbar-track {
-                    background: transparent;
-                }
-                .custom-scrollbar::-webkit-scrollbar-thumb {
-                    background: #e2e8f0;
-                    border-radius: 10px;
-                }
-                .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-                    background: #cbd5e1;
-                }
-                .dark .custom-scrollbar::-webkit-scrollbar-thumb {
-                    background: #3f3f46;
-                }
-            `}</style>
         </div>
     );
 }

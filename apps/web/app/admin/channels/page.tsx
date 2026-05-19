@@ -7,6 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { PageHeader } from '@/components/ui/page-header';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { CheckCircle2, RotateCw, Trash2, AlertCircle } from 'lucide-react';
 
 interface Hotel { id: string; name: string }
@@ -176,27 +178,28 @@ export default function ChannelWizard() {
     }
 
     return (
-        <div className="max-w-5xl mx-auto space-y-8 p-4">
-            <div className="flex justify-between items-center gap-4 flex-wrap">
-                <div>
-                    <h1 className="text-3xl font-bold">Channel Manager</h1>
-                    <p className="text-muted-foreground">Sincroniza tu inventario con Booking.com, Airbnb y más vía iCal.</p>
-                </div>
-                <div className="flex items-center gap-2">
-                    {hotels.length > 1 && (
-                        <Select value={selectedHotel} onValueChange={setSelectedHotel}>
-                            <SelectTrigger className="w-56"><SelectValue placeholder="Hotel..." /></SelectTrigger>
-                            <SelectContent>
-                                {hotels.map(h => <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                    )}
-                    <Button variant="outline" onClick={handleSyncAll} disabled={loading}>
-                        <RotateCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                        Sincronizar todo
-                    </Button>
-                </div>
-            </div>
+        <div className="max-w-5xl mx-auto space-y-8">
+            <PageHeader
+                eyebrow="Integraciones"
+                title="Channel manager"
+                description="Sincroniza tu inventario con Booking.com, Airbnb y más vía iCal."
+                actions={
+                    <>
+                        {hotels.length > 1 && (
+                            <Select value={selectedHotel} onValueChange={setSelectedHotel}>
+                                <SelectTrigger className="w-56"><SelectValue placeholder="Hotel…" /></SelectTrigger>
+                                <SelectContent>
+                                    {hotels.map(h => <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        )}
+                        <Button variant="outline" onClick={handleSyncAll} disabled={loading}>
+                            <RotateCw className={loading ? 'animate-spin size-4' : 'size-4'} />
+                            Sincronizar todo
+                        </Button>
+                    </>
+                }
+            />
 
             {hotels.length === 0 && (
                 <Alert variant="destructive">
@@ -248,7 +251,7 @@ export default function ChannelWizard() {
                                 <Alert>
                                     <AlertTitle>Instrucciones</AlertTitle>
                                     <AlertDescription>
-                                        En {channelSource}, ve a configuración del calendario y copia el enlace de "Exportar calendario (iCal)". Pégalo abajo.
+                                        En {channelSource}, ve a configuración del calendario y copia el enlace de «Exportar calendario (iCal)». Pégalo abajo.
                                     </AlertDescription>
                                 </Alert>
                                 <div className="space-y-2">
@@ -284,11 +287,13 @@ export default function ChannelWizard() {
 
                         {step === 3 && (
                             <div className="text-center space-y-4 py-8">
-                                <div className="flex justify-center text-emerald-500">
-                                    <CheckCircle2 className="h-16 w-16" />
+                                <div className="mx-auto grid place-items-center size-14 rounded-full bg-success/10 text-success">
+                                    <CheckCircle2 className="size-7" />
                                 </div>
-                                <h3 className="text-xl font-semibold">¡Canal conectado!</h3>
-                                <p className="text-muted-foreground">Las reservas se importarán automáticamente cada 10 minutos.</p>
+                                <div className="space-y-1">
+                                    <h3 className="font-display text-xl font-medium tracking-tight">¡Canal conectado!</h3>
+                                    <p className="text-sm text-muted-foreground">Las reservas se importarán automáticamente cada 10 minutos.</p>
+                                </div>
                                 <Button onClick={resetWizard}>Conectar otro</Button>
                             </div>
                         )}
@@ -302,18 +307,18 @@ export default function ChannelWizard() {
                     <CardContent>
                         <div className="space-y-4">
                             {feeds.map(feed => (
-                                <div key={feed.id} className="flex flex-col gap-1 p-3 border rounded-lg bg-muted/50 text-sm">
-                                    <div className="font-semibold flex justify-between items-center">
-                                        <span>{feed.source}</span>
-                                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${feed.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                                            {feed.isActive ? 'ACTIVO' : 'INACTIVO'}
-                                        </span>
+                                <div key={feed.id} className="flex flex-col gap-1 p-3 border border-border rounded-md bg-muted/30 text-sm">
+                                    <div className="flex justify-between items-center gap-2">
+                                        <span className="font-medium">{feed.source}</span>
+                                        <StatusBadge tone={feed.isActive ? 'success' : 'neutral'} className="text-[10px]">
+                                            {feed.isActive ? 'Activo' : 'Inactivo'}
+                                        </StatusBadge>
                                     </div>
                                     <div className="text-xs text-muted-foreground truncate" title={feed.name || feed.url}>
                                         {feed.name || feed.url}
                                     </div>
                                     <div className="text-xs text-muted-foreground mt-1">Habitación: {feed.roomType?.name}</div>
-                                    <div className="text-[10px] text-gray-400">
+                                    <div className="text-[11px] text-muted-foreground/80">
                                         Último sync: {feed.lastSync ? new Date(feed.lastSync).toLocaleString() : 'Nunca'}
                                     </div>
 
@@ -321,27 +326,28 @@ export default function ChannelWizard() {
                                         <Button
                                             size="sm"
                                             variant="outline"
-                                            className="flex-1 h-7 text-[10px]"
+                                            className="flex-1 h-7 text-[11px]"
                                             onClick={() => handleSyncFeed(feed.id)}
                                             disabled={syncingFeed === feed.id}
                                         >
-                                            <RotateCw className={`mr-1 h-3 w-3 ${syncingFeed === feed.id ? 'animate-spin' : ''}`} />
+                                            <RotateCw className={`size-3 ${syncingFeed === feed.id ? 'animate-spin' : ''}`} />
                                             Sync
                                         </Button>
                                         <Button
                                             size="sm"
                                             variant="ghost"
-                                            className="h-7 text-[10px] text-red-600 hover:text-red-700"
+                                            className="h-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
                                             onClick={() => handleDeleteFeed(feed.id)}
+                                            aria-label="Eliminar"
                                         >
-                                            <Trash2 className="h-3 w-3" />
+                                            <Trash2 className="size-3" />
                                         </Button>
                                     </div>
 
-                                    <div className="pt-2 border-t mt-2">
-                                        <div className="text-[10px] font-bold text-muted-foreground mb-1">EXPORTAR ICAL (pega esto en la OTA):</div>
+                                    <div className="pt-2 border-t border-border mt-2">
+                                        <div className="text-eyebrow mb-1">Exportar iCal (pega en la OTA)</div>
                                         <code
-                                            className="block bg-black/5 p-1 rounded text-[10px] break-all select-all cursor-pointer hover:bg-black/10 transition-colors"
+                                            className="block bg-card border border-border p-1.5 rounded text-[11px] break-all select-all cursor-pointer hover:bg-accent/40 transition-colors font-mono"
                                             onClick={() => navigator.clipboard.writeText(`${getOrigin()}/api/channels/export/${feed.roomType.id}/calendar.ics`)}
                                         >
                                             {`/api/channels/export/${feed.roomType.id}/calendar.ics`}
@@ -349,7 +355,7 @@ export default function ChannelWizard() {
                                     </div>
                                 </div>
                             ))}
-                            {feeds.length === 0 && <div className="text-sm text-muted-foreground text-center py-4">Aún no hay canales conectados.</div>}
+                            {feeds.length === 0 && <div className="text-sm text-muted-foreground text-center py-6 italic">Aún no hay canales conectados.</div>}
                         </div>
                     </CardContent>
                 </Card>
@@ -364,12 +370,12 @@ export default function ChannelWizard() {
                     {logs.length === 0 ? (
                         <div className="text-sm text-muted-foreground">Sin actividad reciente.</div>
                     ) : (
-                        <div className="space-y-1 text-xs font-mono">
+                        <div className="space-y-0.5 text-xs font-mono">
                             {logs.map(l => (
-                                <div key={l.id} className="flex items-center gap-2 py-1 border-b last:border-0">
-                                    <span className={`px-1.5 py-0.5 rounded text-[10px] ${l.status === 'SUCCESS' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                                <div key={l.id} className="flex items-center gap-2 py-1.5 border-b border-border/60 last:border-0">
+                                    <StatusBadge tone={l.status === 'SUCCESS' ? 'success' : 'danger'} className="text-[10px]">
                                         {l.status}
-                                    </span>
+                                    </StatusBadge>
                                     <span className="text-muted-foreground">{new Date(l.timestamp).toLocaleString()}</span>
                                     <span className="font-semibold">{l.channel}</span>
                                     <span>{l.action}</span>

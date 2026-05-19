@@ -1,13 +1,23 @@
 "use client";
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { useSearchParams } from 'next/navigation';
-import { Building2, Utensils, Calendar, Users, TrendingUp, CreditCard, Sparkles, Star } from 'lucide-react';
+import { MetricCard } from '@/components/ui/metric-card';
+import { PageHeader } from '@/components/ui/page-header';
+import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import {
+    Building2,
+    Utensils,
+    Calendar,
+    CreditCard,
+    TrendingUp,
+    Star,
+    Inbox,
+} from 'lucide-react';
 import { fetchAPI } from '@/lib/api';
-import { useEffect, useState } from 'react';
-
-
 
 interface RecentBooking {
     id: string;
@@ -81,183 +91,204 @@ export default function AdminDashboard() {
         }
     }
 
-    // Helper to keep context in links
     const getContextLink = (basePath: string) => {
         const params = new URLSearchParams(searchParams.toString());
         return `${basePath}?${params.toString()}`;
     };
 
-    if (loading && !stats) {
-        return <div className="flex items-center justify-center h-[400px] text-muted-foreground animate-pulse">Cargando estadísticas reales...</div>;
-    }
+    const contextLabel = isGlobal
+        ? 'Visión global'
+        : contextType === 'hotel'
+            ? entity?.name ?? 'Hotel'
+            : entity?.name ?? 'Restaurante';
+
+    const showRevenue = true;
+    const showActive = isGlobal || contextType === 'hotel';
+    const showOccupancy = isGlobal || contextType === 'hotel';
+    const showCovers = isGlobal || contextType === 'restaurant' || !!entity?.restaurantId;
+    const showReviews = !isGlobal;
+    const linkedRestaurant = entity?.restaurantId && contextType === 'hotel';
 
     return (
-        <div className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Ingresos {isGlobal ? 'Totales' : (contextType === 'hotel' ? 'Hotel' : 'Restaurante')}</CardTitle>
-                        <CreditCard className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">€{stats?.revenue?.total.toLocaleString() || '0.00'}</div>
-                        <p className="text-xs text-muted-foreground">{(stats?.revenue?.change ?? 0) >= 0 ? '+' : ''}{stats?.revenue?.change ?? 0}% vs mes pasado</p>
-                    </CardContent>
-                </Card>
-                
-                {/* Conditional Metric 1 */}
-                {(isGlobal || contextType === 'hotel') && (
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Reservas Activas</CardTitle>
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">+{stats?.activeReservations?.total || '0'}</div>
-                            <p className="text-xs text-muted-foreground">{(stats?.activeReservations?.change ?? 0) >= 0 ? '+' : ''}{stats?.activeReservations?.change ?? 0}% vs mes pasado</p>
-                        </CardContent>
-                    </Card>
+        <div className="space-y-8">
+            <PageHeader
+                eyebrow="Panel de control"
+                title={contextLabel}
+                description={
+                    isGlobal
+                        ? 'Actividad agregada de todas las propiedades.'
+                        : `Actividad de ${contextType === 'hotel' ? 'este hotel' : 'este restaurante'}.`
+                }
+            />
+
+            {/* KPIs */}
+            <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                {loading && !stats ? (
+                    Array.from({ length: 4 }).map((_, i) => (
+                        <Card key={i} className="gap-3 py-5">
+                            <CardContent className="space-y-3">
+                                <Skeleton className="h-3 w-24" />
+                                <Skeleton className="h-8 w-20" />
+                                <Skeleton className="h-3 w-32" />
+                            </CardContent>
+                        </Card>
+                    ))
+                ) : (
+                    <>
+                        {showRevenue && (
+                            <MetricCard
+                                label={`Ingresos ${isGlobal ? 'totales' : contextType === 'hotel' ? 'hotel' : 'restaurante'}`}
+                                value={`€${stats?.revenue?.total.toLocaleString() ?? '0'}`}
+                                hint="vs mes pasado"
+                                change={stats?.revenue?.change ?? 0}
+                                icon={CreditCard}
+                            />
+                        )}
+                        {showActive && (
+                            <MetricCard
+                                label="Reservas activas"
+                                value={stats?.activeReservations?.total ?? 0}
+                                hint="vs mes pasado"
+                                change={stats?.activeReservations?.change ?? 0}
+                                icon={Calendar}
+                            />
+                        )}
+                        {showOccupancy && (
+                            <MetricCard
+                                label="Ocupación"
+                                value={`${stats?.occupancy?.percentage ?? 0}%`}
+                                hint="vs mes pasado"
+                                change={stats?.occupancy?.change ?? 0}
+                                icon={Building2}
+                            />
+                        )}
+                        {showCovers && (
+                            <MetricCard
+                                label={`Cubiertos ${isGlobal ? 'totales' : ''}${linkedRestaurant ? ' · vinculado' : ''}`.trim()}
+                                value={stats?.covers?.total ?? 0}
+                                hint="última hora"
+                                change={stats?.covers?.change ?? 0}
+                                icon={Utensils}
+                                highlight={!!linkedRestaurant}
+                            />
+                        )}
+                        {showReviews && (
+                            <MetricCard
+                                label="Valoración"
+                                value={
+                                    reviews?.overall !== null && reviews?.overall !== undefined
+                                        ? `${reviews.overall.toFixed(1)} / 5`
+                                        : '—'
+                                }
+                                hint={`${reviews?.total ?? 0} ${(reviews?.total ?? 0) === 1 ? 'opinión recibida' : 'opiniones recibidas'}`}
+                                icon={Star}
+                            />
+                        )}
+                        <MetricCard
+                            label="Visitas web"
+                            value="0"
+                            hint="vs ayer"
+                            change={0}
+                            icon={TrendingUp}
+                        />
+                    </>
                 )}
+            </section>
 
-                {(isGlobal || contextType === 'hotel') && (
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Ocupación</CardTitle>
-                            <Building2 className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">{stats?.occupancy?.percentage || '0'}%</div>
-                            <p className="text-xs text-muted-foreground">{(stats?.occupancy?.change ?? 0) >= 0 ? '+' : ''}{stats?.occupancy?.change ?? 0}% vs mes pasado</p>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {/* Restaurant Specific Metric */}
-                {(isGlobal || contextType === 'restaurant' || entity?.restaurantId) && (
-                    <Card className={entity?.restaurantId ? "border-blue-200 bg-blue-50/10" : ""}>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">
-                                Cubiertos {isGlobal ? 'Totales' : ''} 
-                                {entity?.restaurantId && contextType === 'hotel' && (
-                                    <span className="text-[10px] ml-2 text-blue-500 font-bold uppercase tracking-tighter">
-                                        (Vinculado)
-                                    </span>
-                                )}
-                            </CardTitle>
-                            <Utensils className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">+{stats?.covers?.total || '0'}</div>
-                            <p className="text-xs text-muted-foreground">{(stats?.covers?.change ?? 0) >= 0 ? '+' : ''}{stats?.covers?.change ?? 0} última hora</p>
-                        </CardContent>
-                    </Card>
-                )}
-
-
-                {/* Reviews Metric (per-context) */}
-                {!isGlobal && (
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Valoración</CardTitle>
-                            <Star className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">
-                                {reviews?.overall !== null && reviews?.overall !== undefined ? `${reviews.overall.toFixed(1)} / 5` : '—'}
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                                {reviews?.total ?? 0} {(reviews?.total ?? 0) === 1 ? 'opinión recibida' : 'opiniones recibidas'}
-                            </p>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {/* Visitor Metric */}
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Visitas Web</CardTitle>
-                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">+0</div>
-                        <p className="text-xs text-muted-foreground">+0% vs ayer</p>
-                    </CardContent>
-                </Card>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-                <Card className="col-span-4">
+            {/* Recent + Quick actions */}
+            <section className="grid gap-4 lg:grid-cols-7">
+                <Card className="lg:col-span-4">
                     <CardHeader>
-                        <CardTitle>Reservas Recientes</CardTitle>
+                        <CardTitle className="font-display text-lg font-medium tracking-tight">
+                            Reservas recientes
+                        </CardTitle>
                         <CardDescription>
-                            {isGlobal 
-                                ? "Viendo actividad de toda la propiedad." 
-                                : `Viendo actividad de ${contextType === 'hotel' ? 'este hotel' : 'este restaurante'}.`}
+                            {isGlobal
+                                ? 'Actividad de toda la propiedad.'
+                                : `Actividad de ${contextType === 'hotel' ? 'este hotel' : 'este restaurante'}.`}
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div className="space-y-8">
-                            {(stats?.recentBookings?.length ?? 0) > 0 ? stats!.recentBookings!.map((booking) => (
-                                <div key={booking.id} className="flex items-center">
-                                    <div className="p-2 bg-blue-100 rounded-full text-blue-600 mr-2">
-                                        {booking.type === 'hotel' ? <Building2 className="w-4 h-4" /> : <Utensils className="w-4 h-4" />}
-                                    </div>
-                                    <div className="ml-2 space-y-1">
-                                        <p className="text-sm font-medium leading-none">{booking.customerName}</p>
-                                        <p className="text-sm text-muted-foreground">{booking.customerEmail}</p>
-                                    </div>
-                                    <div className="ml-auto text-xs text-muted-foreground">
-                                        {new Date(booking.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
-                                    </div>
-                                    <div className="ml-4 font-medium">
-                                        {booking.amount > 0 ? `+€${booking.amount.toLocaleString()}` : '-'}
-                                    </div>
-                                </div>
-                            )) : (
-                                <div className="text-center py-8 text-muted-foreground italic">No hay reservas recientes.</div>
-                            )}
-                        </div>
+                        {(stats?.recentBookings?.length ?? 0) > 0 ? (
+                            <ul className="divide-y divide-border/60 -my-3">
+                                {stats!.recentBookings!.map((booking) => (
+                                    <li key={booking.id} className="flex items-center gap-3 py-3">
+                                        <span className="grid place-items-center size-9 rounded-md bg-muted text-muted-foreground shrink-0">
+                                            {booking.type === 'hotel'
+                                                ? <Building2 className="size-4" />
+                                                : <Utensils className="size-4" />}
+                                        </span>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-medium text-foreground truncate">{booking.customerName}</p>
+                                            {booking.customerEmail && (
+                                                <p className="text-xs text-muted-foreground truncate">{booking.customerEmail}</p>
+                                            )}
+                                        </div>
+                                        <div className="text-xs text-muted-foreground shrink-0">
+                                            {new Date(booking.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
+                                        </div>
+                                        <div className="text-sm font-medium tabular-nums shrink-0 min-w-[60px] text-right">
+                                            {booking.amount > 0 ? `€${booking.amount.toLocaleString()}` : '—'}
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <EmptyState
+                                icon={Inbox}
+                                title="Sin reservas recientes"
+                                description="Las nuevas reservas aparecerán aquí en cuanto se confirmen."
+                            />
+                        )}
                     </CardContent>
                 </Card>
 
-                <Card className="col-span-3">
+                <Card className="lg:col-span-3">
                     <CardHeader>
-                        <CardTitle>Acciones Rápidas</CardTitle>
-                        <CardDescription>Acceso directo a herramientas clave</CardDescription>
+                        <CardTitle className="font-display text-lg font-medium tracking-tight">
+                            Acciones rápidas
+                        </CardTitle>
+                        <CardDescription>Acceso directo a herramientas clave.</CardDescription>
                     </CardHeader>
-                    <CardContent className="grid gap-4">
+                    <CardContent className="grid gap-2.5">
                         {(isGlobal || contextType === 'hotel' || entity?.restaurantId) && (
-                            <Link href={getContextLink('/admin/hotels')} className="w-full">
-                                <Button className="w-full justify-start gap-2" variant="outline">
-                                    <Building2 className="w-4 h-4" /> 
-                                    {entity?.restaurantId && contextType === 'restaurant' ? 'Gestionar Hotel Vinculado' : 'Gestionar Habitaciones'}
-                                </Button>
-                            </Link>
+                            <Button variant="outline" asChild className="justify-start h-10">
+                                <Link href={getContextLink('/admin/hotels')}>
+                                    <Building2 className="size-4 text-muted-foreground" />
+                                    {entity?.restaurantId && contextType === 'restaurant'
+                                        ? 'Gestionar hotel vinculado'
+                                        : 'Gestionar habitaciones'}
+                                </Link>
+                            </Button>
                         )}
-                        
+
                         {(isGlobal || contextType === 'restaurant' || entity?.restaurantId) && (
-                            <Link href={getContextLink('/admin/restaurant')} className="w-full">
-                                <Button className="w-full justify-start gap-2" variant="outline">
-                                    <Utensils className="w-4 h-4" /> 
-                                    {entity?.restaurantId && contextType === 'hotel' ? 'Gestionar Restaurante Vinculado' : 'Mesas Restaurante'}
-                                </Button>
-                            </Link>
+                            <Button variant="outline" asChild className="justify-start h-10">
+                                <Link href={getContextLink('/admin/restaurant')}>
+                                    <Utensils className="size-4 text-muted-foreground" />
+                                    {entity?.restaurantId && contextType === 'hotel'
+                                        ? 'Gestionar restaurante vinculado'
+                                        : 'Mesas restaurante'}
+                                </Link>
+                            </Button>
                         )}
 
-                        <Link href={getContextLink('/admin/calendar')} className="w-full">
-                            <Button className="w-full justify-start gap-2 bg-purple-600/10 text-purple-600 hover:bg-purple-600/20 border-purple-600/20 font-semibold" variant="outline">
-                                <Calendar className="w-4 h-4" /> Crear Reserva de Hotel
-                            </Button>
-                        </Link>
+                        <Button variant="tonal" asChild className="justify-start h-10">
+                            <Link href={getContextLink('/admin/calendar')}>
+                                <Calendar className="size-4" />
+                                Crear reserva de hotel
+                            </Link>
+                        </Button>
 
-                        <Link href={getContextLink('/admin/restaurant')} className="w-full">
-                            <Button className="w-full justify-start gap-2 bg-orange-600/10 text-orange-600 hover:bg-orange-600/20 border-orange-600/20 font-semibold" variant="outline">
-                                <Utensils className="w-4 h-4" /> Crear Reserva de Restaurante
-                            </Button>
-                        </Link>
+                        <Button variant="tonal" asChild className="justify-start h-10">
+                            <Link href={getContextLink('/admin/restaurant')}>
+                                <Utensils className="size-4" />
+                                Crear reserva de restaurante
+                            </Link>
+                        </Button>
                     </CardContent>
                 </Card>
-            </div>
+            </section>
         </div>
     );
 }

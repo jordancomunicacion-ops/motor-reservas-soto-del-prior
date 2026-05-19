@@ -1,21 +1,24 @@
 "use client";
 import { useEffect, useState, Suspense } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { fetchAPI } from '@/lib/api';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { 
-    Building2, 
-    BedDouble, 
-    Tags, 
-    Share2, 
-    Settings, 
+import { PageHeader } from '@/components/ui/page-header';
+import { MetricCard } from '@/components/ui/metric-card';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+    BedDouble,
+    Tags,
+    Share2,
     ArrowLeft,
     Calendar,
     Users,
-    TrendingUp
+    TrendingUp,
+    ChevronRight,
 } from 'lucide-react';
 import Link from 'next/link';
+import type { LucideIcon } from 'lucide-react';
 
 interface HotelDetail {
     id: string;
@@ -27,7 +30,6 @@ interface RatePlanRow { id: string }
 
 function HotelDashboardContent() {
     const params = useParams();
-    const router = useRouter();
     const hotelId = params.id as string;
     const [hotel, setHotel] = useState<HotelDetail | null>(null);
     const [stats, setStats] = useState({ rooms: 0, activeRates: 0, connections: 0 });
@@ -58,134 +60,92 @@ function HotelDashboardContent() {
         }
     }
 
-    if (loading) return <div className="p-8">Cargando dashboard...</div>;
-
-    const modules = [
+    const modules: { title: string; description: string; icon: LucideIcon; href: string; stat: string }[] = [
         {
-            title: "Inventario de Habitaciones",
+            title: "Inventario de habitaciones",
             description: "Define tipos de habitación, capacidades y stock.",
             icon: BedDouble,
             href: `/admin/hotels/${hotelId}/inventory`,
-            color: "text-blue-600",
-            bg: "bg-blue-100 dark:bg-blue-900/30",
-            stat: `${stats.rooms} Tipos`
+            stat: `${stats.rooms} tipos`,
         },
         {
-            title: "Tarifas y Precios",
+            title: "Tarifas y precios",
             description: "Gestiona planes de precios y actualizaciones masivas.",
             icon: Tags,
             href: `/admin/hotels/${hotelId}/inventory?tab=rates`,
-            color: "text-orange-600",
-            bg: "bg-orange-100 dark:bg-orange-900/30",
-            stat: `${stats.activeRates} Planes`
+            stat: `${stats.activeRates} planes`,
         },
         {
-            title: "Conexiones y Canales",
+            title: "Conexiones y canales",
             description: "Sincroniza con Booking, Airbnb y otros.",
             icon: Share2,
             href: `/admin/hotels/${hotelId}/connections`,
-            color: "text-purple-600",
-            bg: "bg-purple-100 dark:bg-purple-900/30",
-            stat: `${stats.connections} Activas`
-        }
+            stat: `${stats.connections} activas`,
+        },
     ];
 
     return (
-        <div className="space-y-8 max-w-6xl mx-auto">
-            <header className="flex items-center gap-4">
-                <Link href="/admin/hotels" className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors">
-                    <ArrowLeft className="w-5 h-5" />
-                </Link>
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">{hotel?.name}</h1>
-                    <p className="text-muted-foreground">Panel de gestión centralizada</p>
-                </div>
-            </header>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Card className="bg-white dark:bg-zinc-900 shadow-sm border-none ring-1 ring-gray-100 dark:ring-zinc-800">
-                    <CardContent className="p-6">
-                        <div className="flex items-center gap-4">
-                            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
-                                <Calendar className="w-6 h-6 text-blue-600" />
-                            </div>
-                            <div>
-                                <p className="text-sm font-medium text-muted-foreground">Ocupación Hoy</p>
-                                <h3 className="text-2xl font-bold">85%</h3>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card className="bg-white dark:bg-zinc-900 shadow-sm border-none ring-1 ring-gray-100 dark:ring-zinc-800">
-                    <CardContent className="p-6">
-                        <div className="flex items-center gap-4">
-                            <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-xl">
-                                <TrendingUp className="w-6 h-6 text-green-600" />
-                            </div>
-                            <div>
-                                <p className="text-sm font-medium text-muted-foreground">RevPAR (Media)</p>
-                                <h3 className="text-2xl font-bold">124€</h3>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card className="bg-white dark:bg-zinc-900 shadow-sm border-none ring-1 ring-gray-100 dark:ring-zinc-800">
-                    <CardContent className="p-6">
-                        <div className="flex items-center gap-4">
-                            <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-xl">
-                                <Users className="w-6 h-6 text-purple-600" />
-                            </div>
-                            <div>
-                                <p className="text-sm font-medium text-muted-foreground">Nuevas Reservas</p>
-                                <h3 className="text-2xl font-bold">12</h3>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card className="bg-white dark:bg-zinc-900 shadow-sm border-none ring-1 ring-gray-100 dark:ring-zinc-800">
-                    <CardContent className="p-6">
-                        <div className="flex items-center gap-4">
-                            <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-xl">
-                                <Tags className="w-6 h-6 text-orange-600" />
-                            </div>
-                            <div>
-                                <p className="text-sm font-medium text-muted-foreground">Reservas Activas</p>
-                                <h3 className="text-2xl font-bold">48</h3>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
+        <div className="space-y-8">
+            <div className="flex items-center gap-3">
+                <Button variant="ghost" size="icon-sm" asChild aria-label="Volver">
+                    <Link href="/admin/hotels">
+                        <ArrowLeft className="size-4" />
+                    </Link>
+                </Button>
+                <PageHeader
+                    className="flex-1 pb-0 border-b-0"
+                    eyebrow="Hotel"
+                    title={loading ? <Skeleton className="h-8 w-64" /> : hotel?.name ?? 'Hotel'}
+                    description="Panel de gestión centralizada."
+                />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-                {modules.map((m, i) => (
-                    <Link key={i} href={m.href}>
-                        <Card className="hover:shadow-md transition-all cursor-pointer group border-none ring-1 ring-gray-100 dark:ring-zinc-800 overflow-hidden">
-                            <div className="flex items-center p-6 gap-6">
-                                <div className={`p-4 rounded-2xl ${m.bg} ${m.color} transition-transform group-hover:scale-110`}>
-                                    <m.icon className="w-8 h-8" />
-                                </div>
-                                <div className="flex-1">
-                                    <div className="flex justify-between items-center">
-                                        <h3 className="text-xl font-bold">{m.title}</h3>
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${m.bg} ${m.color}`}>
+            <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <MetricCard label="Ocupación hoy" value="85%" icon={Calendar} />
+                <MetricCard label="RevPAR (media)" value="124€" icon={TrendingUp} />
+                <MetricCard label="Nuevas reservas" value="12" icon={Users} />
+                <MetricCard label="Reservas activas" value="48" icon={Tags} />
+            </section>
+
+            <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {modules.map((m) => (
+                    <Link key={m.href} href={m.href} className="group">
+                        <Card className="transition-shadow hover:shadow-md gap-0 py-5">
+                            <CardContent className="flex items-center gap-4">
+                                <span className="grid place-items-center size-12 rounded-md bg-primary/10 text-primary shrink-0">
+                                    <m.icon className="size-5" />
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <h3 className="font-display text-base font-medium tracking-tight truncate">
+                                            {m.title}
+                                        </h3>
+                                        <span className="text-[11px] font-medium uppercase tracking-wider text-primary bg-primary/10 px-1.5 py-0.5 rounded shrink-0">
                                             {m.stat}
                                         </span>
                                     </div>
-                                    <p className="text-muted-foreground mt-1">{m.description}</p>
+                                    <p className="text-sm text-muted-foreground mt-0.5">{m.description}</p>
                                 </div>
-                            </div>
+                                <ChevronRight className="size-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform shrink-0" />
+                            </CardContent>
                         </Card>
                     </Link>
                 ))}
-            </div>
+            </section>
         </div>
     );
 }
 
 export default function HotelDashboardPage() {
     return (
-        <Suspense fallback={<div>Cargando dashboard...</div>}>
+        <Suspense
+            fallback={
+                <div className="space-y-4">
+                    <Skeleton className="h-8 w-64" />
+                    <Skeleton className="h-32 w-full" />
+                </div>
+            }
+        >
             <HotelDashboardContent />
         </Suspense>
     );

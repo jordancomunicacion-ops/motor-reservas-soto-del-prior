@@ -2,7 +2,13 @@
 import { useEffect, useState, Suspense } from 'react';
 import { fetchAPI } from '@/lib/api';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { PageHeader } from '@/components/ui/page-header';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Inbox, AlertTriangle } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 
 // Forma unificada que combina hotel-booking y restaurant-booking. Solo los
@@ -52,20 +58,23 @@ function BookingsList() {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold">
-                    Listado de Reservas: {contextType === 'hotel' ? 'Hotel' : 'Restaurante'}
-                </h1>
-                <Button onClick={() => alert('Función disponible en próxima actualización')}>+ Nueva Reserva</Button>
-            </div>
+            <PageHeader
+                eyebrow="Operativa"
+                title={`Listado de reservas · ${contextType === 'hotel' ? 'Hotel' : 'Restaurante'}`}
+                description="Consulta todas las reservas del centro seleccionado."
+                actions={<Button onClick={() => alert('Función disponible en próxima actualización')}>+ Nueva Reserva</Button>}
+            />
 
             {!contextId && (
-                <div className="bg-yellow-50 border border-yellow-200 p-4 rounded text-yellow-800 text-sm">
-                    Por favor, selecciona un hotel o restaurante en el selector superior para ver sus reservas.
-                </div>
+                <Card className="border-warning/30 bg-warning/10">
+                    <CardContent className="flex items-start gap-3 text-sm text-warning-foreground">
+                        <AlertTriangle className="size-4 mt-0.5 shrink-0" />
+                        <span>Por favor, selecciona un hotel o restaurante en el selector superior para ver sus reservas.</span>
+                    </CardContent>
+                </Card>
             )}
 
-            <div className="bg-white dark:bg-zinc-800 rounded-lg shadow overflow-hidden border border-gray-100 dark:border-zinc-700">
+            <Card>
                 <Table>
                     <TableHeader>
                         <TableRow>
@@ -79,7 +88,13 @@ function BookingsList() {
                     <TableBody>
                         {loading ? (
                             <TableRow>
-                                <TableCell colSpan={5} className="text-center py-8">Cargando reservas...</TableCell>
+                                <TableCell colSpan={5} className="py-4">
+                                    <div className="space-y-2">
+                                        <Skeleton className="h-4 w-full" />
+                                        <Skeleton className="h-4 w-full" />
+                                        <Skeleton className="h-4 w-3/4" />
+                                    </div>
+                                </TableCell>
                             </TableRow>
                         ) : bookings.map((b) => (
                             <TableRow key={b.id}>
@@ -87,30 +102,34 @@ function BookingsList() {
                                 <TableCell className="font-medium">{b.guestName}</TableCell>
                                 <TableCell>{(b.checkInDate || b.date) ? new Date(b.checkInDate || b.date!).toLocaleDateString() : '—'}</TableCell>
                                 <TableCell>
-                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                                        b.status === 'CONFIRMED' || b.status === 'SEATED' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
-                                    }`}>
+                                    <StatusBadge tone={b.status === 'CONFIRMED' || b.status === 'SEATED' ? 'success' : 'info'}>
                                         {b.status}
-                                    </span>
+                                    </StatusBadge>
                                 </TableCell>
                                 <TableCell>{b.totalPrice ? `€${b.totalPrice}` : `${b.pax} Pax`}</TableCell>
                             </TableRow>
                         ))}
                         {bookings.length === 0 && !loading && contextId && (
                             <TableRow>
-                                <TableCell colSpan={5} className="text-center py-8 text-gray-500">No se encontraron reservas para este período</TableCell>
+                                <TableCell colSpan={5} className="p-0">
+                                    <EmptyState
+                                        icon={Inbox}
+                                        title="Sin reservas"
+                                        description="No se encontraron reservas para este período."
+                                    />
+                                </TableCell>
                             </TableRow>
                         )}
                     </TableBody>
                 </Table>
-            </div>
+            </Card>
         </div>
     );
 }
 
 export default function BookingsPage() {
     return (
-        <Suspense fallback={<div>Cargando...</div>}>
+        <Suspense fallback={<div className="p-8 text-muted-foreground">Cargando...</div>}>
             <BookingsList />
         </Suspense>
     );

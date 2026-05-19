@@ -1,10 +1,11 @@
 'use client';
 
-import { Building2, Utensils, ChevronsUpDown, Check, MapPin, Sparkles, Plus } from 'lucide-react';
-import { useState, useEffect, Suspense, useMemo } from 'react';
+import { Building2, Utensils, ChevronsUpDown, Check, Plus, Loader2 } from 'lucide-react';
+import { useState, useEffect, Suspense, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { fetchAPI } from '@/lib/api';
+import { cn } from '@/lib/utils';
 
 type ContextItem = { id: string; name: string; restaurantId?: string | null };
 
@@ -13,24 +14,32 @@ function LocationSwitcherContent() {
     const searchParams = useSearchParams();
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
 
-    // Remote Data
     const [hotels, setHotels] = useState<ContextItem[]>([]);
     const [restaurants, setRestaurants] = useState<ContextItem[]>([]);
 
-    // Read URL state
-    const contextType = searchParams.get('context') || 'hotel'; // hotel | restaurant
+    const contextType = searchParams.get('context') || 'hotel';
     const contextId = searchParams.get('id');
 
     useEffect(() => {
         loadContexts();
     }, []);
 
-    // Refresh on open to ensure data is fresh, but avoid redundant calls
     useEffect(() => {
-        if (open) {
-            loadContexts();
-        }
+        if (open) loadContexts();
+    }, [open]);
+
+    // Close on outside click
+    useEffect(() => {
+        if (!open) return;
+        const handler = (e: MouseEvent) => {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                setOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
     }, [open]);
 
     async function loadContexts() {
@@ -38,15 +47,10 @@ function LocationSwitcherContent() {
         try {
             const data = await fetchAPI<{ hotels?: ContextItem[]; restaurants?: ContextItem[] }>('/global/contexts');
             if (data && typeof data === 'object') {
-                // Deduplicate items by ID to prevent UI glitches
                 const hList = Array.isArray(data.hotels) ? data.hotels : [];
                 const rList = Array.isArray(data.restaurants) ? data.restaurants : [];
-
-                const uniqueHotels = Array.from(new Map(hList.map(h => [h.id, h])).values());
-                const uniqueRestaurants = Array.from(new Map(rList.map(r => [r.id, r])).values());
-
-                setHotels(uniqueHotels);
-                setRestaurants(uniqueRestaurants);
+                setHotels(Array.from(new Map(hList.map(h => [h.id, h])).values()));
+                setRestaurants(Array.from(new Map(rList.map(r => [r.id, r])).values()));
             }
         } catch (e) {
             console.error("Failed to load contexts", e);
@@ -55,23 +59,13 @@ function LocationSwitcherContent() {
         }
     }
 
-    // Determine active display label
     const activeInfo = useMemo(() => {
         if (contextType === 'hotel') {
             const h = hotels.find(h => h.id === contextId);
-            return {
-                label: h ? h.name : "Hotel (General)",
-                icon: Building2,
-                color: "text-blue-500"
-            };
-        } else {
-            const r = restaurants.find(r => r.id === contextId);
-            return {
-                label: r ? r.name : "Restaurante (General)",
-                icon: Utensils,
-                color: "text-orange-500"
-            };
+            return { label: h ? h.name : 'Todos los hoteles', icon: Building2 };
         }
+        const r = restaurants.find(r => r.id === contextId);
+        return { label: r ? r.name : 'Todos los restaurantes', icon: Utensils };
     }, [contextType, contextId, hotels, restaurants]);
 
     const handleSelect = (type: string, id: string) => {
@@ -82,123 +76,157 @@ function LocationSwitcherContent() {
         router.push(`?${params.toString()}`);
     };
 
-    // Helper to find restaurant by id
     const getRestaurant = (id: string) => restaurants.find(r => r.id === id);
-    
-    // Find restaurants that are NOT linked to any hotel
-    const standaloneRestaurants = restaurants.filter(r => {
-        const isLinked = hotels.some(h => h.restaurantId === r.id);
-        return !isLinked;
-    });
+    const standaloneRestaurants = restaurants.filter(r =>
+        !hotels.some(h => h.restaurantId === r.id),
+    );
+
+    const ActiveIcon = activeInfo.icon;
 
     return (
-        <div className="relative">
+        <div ref={containerRef} className="relative">
             <Button
-                variant="ghost"
+                variant="outline"
                 role="combobox"
                 aria-expanded={open}
-                className={`w-[280px] h-11 justify-between bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm border border-zinc-200 dark:border-zinc-800 hover:bg-white dark:hover:bg-zinc-900 shadow-sm transition-all duration-300 rounded-xl group ${open ? 'ring-2 ring-primary/20 border-primary/30' : ''}`}
+                className={cn(
+                    "h-10 min-w-[260px] justify-between gap-3 px-3",
+                    open && "ring-1 ring-primary/30 border-primary/40",
+                )}
                 onClick={() => setOpen(!open)}
             >
-                <div className="flex items-center gap-3 truncate">
-                    <div className={`p-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 group-hover:scale-110 transition-transform ${activeInfo.color}`}>
-                        <activeInfo.icon className="h-4 w-4 shrink-0" />
-                    </div>
-                    <span className="truncate font-bold text-xs uppercase tracking-widest">{activeInfo.label}</span>
-                </div>
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-30 group-hover:opacity-100 transition-opacity" />
+                <span className="flex items-center gap-2.5 min-w-0">
+                    <ActiveIcon className="size-4 text-muted-foreground shrink-0" />
+                    <span className="truncate text-sm font-medium text-foreground">{activeInfo.label}</span>
+                </span>
+                <ChevronsUpDown className="size-4 text-muted-foreground/60 shrink-0" />
             </Button>
 
             {open && (
-                <div className="absolute top-[52px] left-0 w-[320px] bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-2 z-50 max-h-[550px] overflow-y-auto animate-in fade-in zoom-in-95 duration-200 origin-top">
-                    {/* Header */}
-                    <div className="px-3 py-2 flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-[0.2em]">Propiedades y Servicios</span>
-                        {loading && <div className="h-3 w-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />}
-                    </div>
+                <div className="absolute top-[calc(100%+6px)] left-0 z-50 w-[320px] origin-top-left animate-in fade-in zoom-in-95 duration-150">
+                    <div className="rounded-lg border border-border/80 bg-popover shadow-lg overflow-hidden">
+                        <div className="flex items-center justify-between px-3 py-2 border-b border-border/60">
+                            <span className="text-eyebrow">Propiedades y servicios</span>
+                            {loading && <Loader2 className="size-3 animate-spin text-muted-foreground" />}
+                        </div>
 
-                    {/* Hotels & Their Restaurants */}
-                    <div className="space-y-1">
-                        {hotels.map(h => {
-                            const linkedRest = h.restaurantId ? getRestaurant(h.restaurantId) : null;
-                            const isActive = contextType === 'hotel' && contextId === h.id;
-                            
-                            return (
-                                <div key={h.id} className="group/item">
-                                    <div
-                                        className={`flex items-center gap-3 px-3 py-2.5 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800/50 cursor-pointer rounded-xl transition-all ${isActive ? "bg-primary/10 text-primary font-bold shadow-inner" : "text-zinc-600 dark:text-zinc-400"}`}
-                                        onClick={() => handleSelect('hotel', h.id)}
-                                    >
-                                        <div className={`p-1.5 rounded-lg ${isActive ? 'bg-primary text-white shadow-lg' : 'bg-zinc-100 dark:bg-zinc-800 group-hover/item:bg-white dark:group-hover/item:bg-zinc-700'}`}>
-                                            <Building2 className="h-4 w-4 shrink-0" />
-                                        </div>
-                                        <span className="truncate flex-1">{h.name}</span>
-                                        {isActive && <Check className="h-4 w-4 shrink-0" />}
+                        <div className="max-h-[440px] overflow-y-auto p-1.5">
+                            {hotels.length === 0 && !loading ? (
+                                <div className="px-4 py-8 text-center space-y-3">
+                                    <div className="mx-auto grid place-items-center size-10 rounded-full bg-muted border border-dashed border-border">
+                                        <Building2 className="size-4 text-muted-foreground" />
                                     </div>
-                                    
-                                    {linkedRest && (
-                                        <div
-                                            className={`flex items-center gap-3 ml-8 mr-1 mt-1 px-3 py-2 text-xs hover:bg-orange-50 dark:hover:bg-orange-900/10 cursor-pointer rounded-lg border-l-2 transition-all ${contextType === 'restaurant' && contextId === linkedRest.id ? "bg-orange-50 dark:bg-orange-900/20 text-orange-600 font-bold border-orange-400 shadow-sm" : "text-zinc-500 dark:text-zinc-500 border-zinc-100 dark:border-zinc-800"}`}
-                                            onClick={() => handleSelect('restaurant', linkedRest.id)}
-                                        >
-                                            <Utensils className="h-3.5 w-3.5 opacity-50 shrink-0" />
-                                            <span className="truncate flex-1">{linkedRest.name}</span>
-                                            <span className="text-[8px] bg-blue-100 dark:bg-blue-900/40 text-blue-600 px-1.5 py-0.5 rounded-full font-black uppercase tracking-tighter shadow-sm">Sinergia</span>
-                                            {contextType === 'restaurant' && contextId === linkedRest.id && <Check className="h-3 w-3 shrink-0" />}
-                                        </div>
-                                    )}
+                                    <p className="text-xs text-muted-foreground">No hay hoteles configurados.</p>
+                                    <Button
+                                        size="sm"
+                                        variant="tonal"
+                                        onClick={() => { window.location.href = '/admin/hotels'; }}
+                                    >
+                                        <Plus className="size-3.5" /> Configurar
+                                    </Button>
                                 </div>
-                            );
-                        })}
-                        
-                        {hotels.length === 0 && !loading && (
-                            <div className="px-4 py-8 text-center space-y-3">
-                                <div className="mx-auto w-10 h-10 rounded-full bg-zinc-50 dark:bg-zinc-800/50 flex items-center justify-center border border-dashed border-zinc-200 dark:border-zinc-700">
-                                    <Building2 className="w-5 h-5 text-zinc-300" />
-                                </div>
-                                <div className="text-[10px] text-zinc-400 font-medium italic">No se encontraron hoteles configurados</div>
-                                <Button size="sm" variant="outline" className="h-7 text-[9px] font-bold uppercase rounded-full" onClick={() => window.location.href='/admin/hotels'}>
-                                    <Plus className="w-3 h-3 mr-1" /> Configurar Ahora
-                                </Button>
-                            </div>
-                        )}
-                    </div>
+                            ) : (
+                                <div className="space-y-0.5">
+                                    {hotels.map(h => {
+                                        const linkedRest = h.restaurantId ? getRestaurant(h.restaurantId) : null;
+                                        const isActive = contextType === 'hotel' && contextId === h.id;
+                                        const isLinkedActive = linkedRest && contextType === 'restaurant' && contextId === linkedRest.id;
 
-                    {standaloneRestaurants.length > 0 && (
-                        <>
-                            <div className="my-3 mx-2 border-t border-zinc-100 dark:border-zinc-800" />
-                            <div className="px-3 py-1 flex items-center justify-between mb-2">
-                                <span className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-[0.2em]">Otros Centros</span>
-                            </div>
-                            <div className="space-y-1">
-                                {standaloneRestaurants.map(r => {
-                                    const isActive = contextType === 'restaurant' && contextId === r.id;
-                                    return (
-                                        <div
-                                            key={r.id}
-                                            className={`flex items-center gap-3 px-3 py-2.5 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800/50 cursor-pointer rounded-xl transition-all ${isActive ? "bg-orange-50 dark:bg-orange-900/10 text-orange-600 font-bold shadow-inner" : "text-zinc-600 dark:text-zinc-400"}`}
-                                            onClick={() => handleSelect('restaurant', r.id)}
-                                        >
-                                            <div className={`p-1.5 rounded-lg ${isActive ? 'bg-orange-500 text-white shadow-lg' : 'bg-zinc-100 dark:bg-zinc-800'}`}>
-                                                <Utensils className="h-4 w-4 shrink-0" />
+                                        return (
+                                            <div key={h.id}>
+                                                <ContextRow
+                                                    icon={Building2}
+                                                    label={h.name}
+                                                    active={isActive}
+                                                    onClick={() => handleSelect('hotel', h.id)}
+                                                />
+                                                {linkedRest && (
+                                                    <div className="ml-3 pl-3 border-l border-border/60">
+                                                        <ContextRow
+                                                            icon={Utensils}
+                                                            label={linkedRest.name}
+                                                            active={!!isLinkedActive}
+                                                            badge="Vinculado"
+                                                            indent
+                                                            onClick={() => handleSelect('restaurant', linkedRest.id)}
+                                                        />
+                                                    </div>
+                                                )}
                                             </div>
-                                            <span className="truncate flex-1">{r.name}</span>
-                                            {isActive && <Check className="h-4 w-4 shrink-0" />}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </>
-                    )}
+                                        );
+                                    })}
+                                </div>
+                            )}
+
+                            {standaloneRestaurants.length > 0 && (
+                                <>
+                                    <div className="my-2 mx-2 border-t border-border/60" />
+                                    <div className="px-3 py-1.5">
+                                        <span className="text-eyebrow">Otros centros</span>
+                                    </div>
+                                    <div className="space-y-0.5">
+                                        {standaloneRestaurants.map(r => {
+                                            const isActive = contextType === 'restaurant' && contextId === r.id;
+                                            return (
+                                                <ContextRow
+                                                    key={r.id}
+                                                    icon={Utensils}
+                                                    label={r.name}
+                                                    active={isActive}
+                                                    onClick={() => handleSelect('restaurant', r.id)}
+                                                />
+                                            );
+                                        })}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
     );
 }
 
+interface ContextRowProps {
+    icon: React.ComponentType<{ className?: string }>;
+    label: string;
+    active: boolean;
+    badge?: string;
+    indent?: boolean;
+    onClick: () => void;
+}
+
+function ContextRow({ icon: Icon, label, active, badge, indent, onClick }: ContextRowProps) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={cn(
+                "w-full flex items-center gap-2.5 px-2.5 rounded-md text-left transition-colors",
+                indent ? "py-1.5" : "py-2",
+                active
+                    ? "bg-primary/10 text-primary"
+                    : "text-foreground hover:bg-accent/60",
+            )}
+        >
+            <Icon className={cn(indent ? "size-3.5" : "size-4", "shrink-0", active ? "text-primary" : "text-muted-foreground")} />
+            <span className={cn("truncate flex-1 text-sm", active && "font-medium", indent && "text-[13px]")}>
+                {label}
+            </span>
+            {badge && (
+                <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                    {badge}
+                </span>
+            )}
+            {active && <Check className="size-3.5 shrink-0" />}
+        </button>
+    );
+}
+
 export function LocationSwitcher() {
     return (
-        <Suspense fallback={<div className="w-[280px] h-11 bg-zinc-100 animate-pulse rounded-xl" />}>
+        <Suspense fallback={<div className="h-10 w-[260px] bg-muted/60 animate-pulse rounded-md" />}>
             <LocationSwitcherContent />
         </Suspense>
     );

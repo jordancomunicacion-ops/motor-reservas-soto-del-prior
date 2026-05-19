@@ -2,6 +2,7 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { MoreHorizontal, XCircle, UserCircle, Edit2, Mail, MessageSquare, Utensils, Star, AlertTriangle, Clock, MapPin } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
@@ -49,38 +50,39 @@ interface ReservationListProps {
     onSelectProfile?: (booking: ListBooking) => void;
 }
 
+type StatusTone = 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'accent';
+
+const STATUS_TONE: Record<string, StatusTone> = {
+    NO_SHOW: 'danger',
+    CANCELLED: 'neutral',
+    PENDING_CONFIRMATION: 'warning',
+    CONFIRMED: 'success',
+    BAR_ARRIVAL: 'accent',
+    SEATED: 'success',
+    DESSERT: 'info',
+    BILL_REQUESTED: 'info',
+    CLEANING: 'neutral',
+    RELEASED: 'warning',
+    TO_REVIEW: 'info',
+};
+
+const STATUS_LABELS: Record<string, string> = {
+    NO_SHOW: "No Show",
+    CANCELLED: "Cancelada",
+    PENDING_CONFIRMATION: "Pendiente",
+    CONFIRMED: "Confirmada",
+    BAR_ARRIVAL: "En Barra",
+    SEATED: "Sentada",
+    DESSERT: "Postre",
+    BILL_REQUESTED: "Cuenta",
+    CLEANING: "Limpiar",
+    RELEASED: "Liberada",
+    TO_REVIEW: "A Revisar",
+};
+
 export default function ReservationList({ bookings, zones = [], onStatusChange, onAssignTable, onEdit, onSelectProfile }: ReservationListProps) {
-
-    const statusColors: Record<string, string> = {
-        NO_SHOW: "bg-red-100 text-red-800",
-        CANCELLED: "bg-slate-100 text-slate-800",
-        PENDING_CONFIRMATION: "bg-orange-100 text-orange-800",
-        CONFIRMED: "bg-lime-100 text-lime-800 border border-lime-200",
-        BAR_ARRIVAL: "bg-purple-100 text-purple-800",
-        SEATED: "bg-emerald-100 text-emerald-800 border border-emerald-200",
-        DESSERT: "bg-sky-100 text-sky-800",
-        BILL_REQUESTED: "bg-blue-100 text-blue-800",
-        CLEANING: "bg-lime-50 text-lime-700",
-        RELEASED: "bg-yellow-100 text-yellow-800",
-        TO_REVIEW: "bg-blue-100 text-blue-800 border border-blue-200"
-    };
-
-    const statusLabels: Record<string, string> = {
-        NO_SHOW: "No Show",
-        CANCELLED: "Cancelada",
-        PENDING_CONFIRMATION: "Pendiente",
-        CONFIRMED: "Confirmada",
-        BAR_ARRIVAL: "En Barra",
-        SEATED: "Sentada",
-        DESSERT: "Postre",
-        BILL_REQUESTED: "Cuenta",
-        CLEANING: "Limpiar",
-        RELEASED: "Liberada",
-        TO_REVIEW: "A Revisar"
-    };
-
     return (
-        <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
+        <div className="bg-card rounded-md border border-border overflow-hidden">
             <Table>
                 <TableHeader>
                     <TableRow>
@@ -98,7 +100,7 @@ export default function ReservationList({ bookings, zones = [], onStatusChange, 
                 <TableBody>
                     {bookings.length === 0 ? (
                         <TableRow>
-                            <TableCell colSpan={9} className="text-center h-24 text-gray-500">
+                            <TableCell colSpan={9} className="text-center h-24 text-muted-foreground">
                                 No hay reservas para este turno.
                             </TableCell>
                         </TableRow>
@@ -110,8 +112,8 @@ export default function ReservationList({ bookings, zones = [], onStatusChange, 
                             const isVip = bookingTags.some(t => /vip/i.test(t));
                             const bookingDate = booking.date ? new Date(booking.date) : null;
                             return (
-                            <TableRow key={booking.id} className="hover:bg-gray-50">
-                                <TableCell className="font-medium">
+                            <TableRow key={booking.id} className="hover:bg-muted/30">
+                                <TableCell className="font-medium tabular-nums">
                                     {bookingDate ? `${String(bookingDate.getUTCHours()).padStart(2, '0')}:${String(bookingDate.getUTCMinutes()).padStart(2, '0')}` : '—'}
                                 </TableCell>
                                 <TableCell>
@@ -120,32 +122,32 @@ export default function ReservationList({ bookings, zones = [], onStatusChange, 
                                         if (table) {
                                             return <Badge variant="outline">{table.name}</Badge>;
                                         }
-                                        return <Badge variant="secondary" className="text-gray-500">Sin Mesa</Badge>;
+                                        return <Badge variant="secondary" className="text-muted-foreground">Sin Mesa</Badge>;
                                     })()}
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex flex-col">
                                         <div className="flex items-center gap-1 flex-wrap">
-                                            <span className="font-semibold">{fullName}</span>
+                                            <span className="font-medium text-foreground">{fullName}</span>
                                             {(booking.visitCount ?? 0) > 1 && (
-                                                <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 text-[9px] h-4 px-1">
+                                                <Badge variant="secondary" className="text-[9px] h-4 px-1">
                                                     {booking.visitCount}v
                                                 </Badge>
                                             )}
                                             {isVip && (
-                                                <Badge className="bg-amber-100 text-amber-800 border border-amber-200 text-[9px] h-4 px-1 gap-0.5">
-                                                    <Star className="w-2.5 h-2.5" /> VIP
-                                                </Badge>
+                                                <StatusBadge tone="accent" dot={false} className="text-[9px] h-4 px-1 gap-0.5 py-0">
+                                                    <Star className="size-2.5" /> VIP
+                                                </StatusBadge>
                                             )}
                                             {hasAllergies && (
-                                                <Badge className="bg-red-100 text-red-800 border border-red-200 text-[9px] h-4 px-1 gap-0.5" title="Tiene alergias o intolerancias">
-                                                    <AlertTriangle className="w-2.5 h-2.5" /> Alergias
-                                                </Badge>
+                                                <StatusBadge tone="danger" dot={false} className="text-[9px] h-4 px-1 gap-0.5 py-0" title="Tiene alergias o intolerancias">
+                                                    <AlertTriangle className="size-2.5" /> Alergias
+                                                </StatusBadge>
                                             )}
                                             {booking.isMealPlan && (
-                                                <Badge className="bg-indigo-100 text-indigo-800 border border-indigo-200 text-[9px] h-4 px-1 gap-0.5" title="Reserva en media pensión / pensión completa">
-                                                    <Utensils className="w-2.5 h-2.5" /> MP
-                                                </Badge>
+                                                <StatusBadge tone="accent" dot={false} className="text-[9px] h-4 px-1 gap-0.5 py-0" title="Reserva en media pensión / pensión completa">
+                                                    <Utensils className="size-2.5" /> MP
+                                                </StatusBadge>
                                             )}
                                             {booking.review && (() => {
                                                 const avg = (booking.review.serviceScore + booking.review.ambianceScore + booking.review.foodScore) / 3;
@@ -154,48 +156,48 @@ export default function ReservationList({ bookings, zones = [], onStatusChange, 
                                                         type="button"
                                                         onClick={(e) => { e.stopPropagation(); onSelectProfile?.(booking); }}
                                                         title={`Atención ${booking.review.serviceScore}/5 · Entorno ${booking.review.ambianceScore}/5 · Comida ${booking.review.foodScore}/5${booking.review.advice ? `\n"${booking.review.advice}"` : ''}`}
-                                                        className="inline-flex items-center gap-0.5 bg-amber-100 text-amber-800 border border-amber-200 text-[9px] h-4 px-1 rounded hover:bg-amber-200 transition-colors"
+                                                        className="inline-flex items-center gap-0.5 bg-primary/10 text-primary border border-primary/20 text-[9px] h-4 px-1 rounded hover:bg-primary/15 transition-colors"
                                                     >
-                                                        <Star className="w-2.5 h-2.5 fill-current" /> {avg.toFixed(1)}
+                                                        <Star className="size-2.5 fill-current" /> {avg.toFixed(1)}
                                                     </button>
                                                 );
                                             })()}
                                         </div>
                                         <div className="flex flex-col gap-0">
-                                            {booking.guestPhone && <span className="text-xs text-gray-500">{booking.guestPhone}</span>}
-                                            {booking.guestEmail && <span className="text-[10px] text-gray-400 truncate max-w-[180px]">{booking.guestEmail}</span>}
+                                            {booking.guestPhone && <span className="text-xs text-muted-foreground">{booking.guestPhone}</span>}
+                                            {booking.guestEmail && <span className="text-[10px] text-muted-foreground/80 truncate max-w-[180px]">{booking.guestEmail}</span>}
                                         </div>
                                     </div>
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex items-center space-x-1">
-                                        <span className="font-bold">{booking.pax}</span>
+                                        <span className="font-medium tabular-nums">{booking.pax}</span>
                                     </div>
                                 </TableCell>
                                 <TableCell>
-                                    <Badge className={cn("uppercase text-[10px] whitespace-nowrap", statusColors[booking.status] || "bg-gray-100")}>
-                                        {statusLabels[booking.status] || booking.status}
-                                    </Badge>
+                                    <StatusBadge tone={STATUS_TONE[booking.status] || 'neutral'} dot={false} className="uppercase text-[10px] whitespace-nowrap">
+                                        {STATUS_LABELS[booking.status] || booking.status}
+                                    </StatusBadge>
                                 </TableCell>
                                 <TableCell>
-                                    <span className="text-xs text-gray-400 capitalize">{(booking.origin || booking.source || '').toLowerCase()}</span>
+                                    <span className="text-xs text-muted-foreground capitalize">{(booking.origin || booking.source || '').toLowerCase()}</span>
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex items-center gap-1">
                                         <span title={booking.emailSent ? 'Email enviado' : 'Email pendiente'}>
-                                            <Mail className={cn("w-3.5 h-3.5", booking.emailSent ? "text-emerald-600" : "text-gray-300")} />
+                                            <Mail className={cn("size-3.5", booking.emailSent ? "text-success" : "text-muted-foreground/40")} />
                                         </span>
                                         <span title={booking.smsSent ? 'SMS enviado' : 'SMS no enviado'}>
-                                            <MessageSquare className={cn("w-3.5 h-3.5", booking.smsSent ? "text-emerald-600" : "text-gray-300")} />
+                                            <MessageSquare className={cn("size-3.5", booking.smsSent ? "text-success" : "text-muted-foreground/40")} />
                                         </span>
                                     </div>
                                 </TableCell>
                                 <TableCell>
                                     <span
-                                        className="inline-flex items-center gap-1 text-[10px] text-gray-500 whitespace-nowrap"
+                                        className="inline-flex items-center gap-1 text-[10px] text-muted-foreground whitespace-nowrap"
                                         title={booking.createdAt ? `Reserva creada: ${new Date(booking.createdAt).toLocaleString('es-ES')}` : 'Reserva sin fecha de creación'}
                                     >
-                                        <Clock className="w-3 h-3" />
+                                        <Clock className="size-3" />
                                         {booking.createdAt ? formatRelativeTime(booking.createdAt) : '—'}
                                     </span>
                                 </TableCell>
@@ -204,39 +206,39 @@ export default function ReservationList({ bookings, zones = [], onStatusChange, 
                                         {/* Status Flow Actions */}
                                         {booking.status === 'CONFIRMED' && (
                                             <>
-                                                <Button size="sm" variant="outline" className="h-7 text-[10px] bg-purple-50 text-purple-700 border-purple-200" onClick={() => onStatusChange(booking.id, 'BAR_ARRIVAL')}>
+                                                <Button size="sm" variant="tonal" className="h-7 text-[10px]" onClick={() => onStatusChange(booking.id, 'BAR_ARRIVAL')}>
                                                     Barra
                                                 </Button>
-                                                <Button size="sm" variant="outline" className="h-7 text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200" onClick={() => onStatusChange(booking.id, 'SEATED')}>
+                                                <Button size="sm" variant="success" className="h-7 text-[10px]" onClick={() => onStatusChange(booking.id, 'SEATED')}>
                                                     Sentar
                                                 </Button>
                                             </>
                                         )}
                                         {booking.status === 'BAR_ARRIVAL' && (
-                                            <Button size="sm" variant="outline" className="h-7 text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200" onClick={() => onStatusChange(booking.id, 'SEATED')}>
+                                            <Button size="sm" variant="success" className="h-7 text-[10px]" onClick={() => onStatusChange(booking.id, 'SEATED')}>
                                                 Sentar
                                             </Button>
                                         )}
                                         {booking.status === 'SEATED' && (
-                                            <Button size="sm" variant="outline" className="h-7 text-[10px] bg-sky-50 text-sky-700 border-sky-200" onClick={() => onStatusChange(booking.id, 'DESSERT')}>
+                                            <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => onStatusChange(booking.id, 'DESSERT')}>
                                                 Postre
                                             </Button>
                                         )}
                                         {booking.status === 'DESSERT' && (
-                                            <Button size="sm" variant="outline" className="h-7 text-[10px] bg-blue-50 text-blue-700 border-blue-200" onClick={() => onStatusChange(booking.id, 'BILL_REQUESTED')}>
+                                            <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => onStatusChange(booking.id, 'BILL_REQUESTED')}>
                                                 Cuenta
                                             </Button>
                                         )}
                                         {booking.status === 'BILL_REQUESTED' && (
-                                            <Button size="sm" variant="outline" className="h-7 text-[10px] bg-yellow-50 text-yellow-700 border-yellow-200" onClick={() => onStatusChange(booking.id, 'RELEASED')}>
+                                            <Button size="sm" variant="warning" className="h-7 text-[10px]" onClick={() => onStatusChange(booking.id, 'RELEASED')}>
                                                 Liberar
                                             </Button>
                                         )}
 
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
-                                                <Button size="icon" variant="ghost" className="h-8 w-8">
-                                                    <MoreHorizontal className="w-4 h-4" />
+                                                <Button size="icon-sm" variant="ghost" aria-label="Más acciones">
+                                                    <MoreHorizontal className="size-4" />
                                                 </Button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent
@@ -246,14 +248,14 @@ export default function ReservationList({ bookings, zones = [], onStatusChange, 
                                                 className="max-h-[var(--radix-dropdown-menu-content-available-height)] overflow-y-auto overflow-x-hidden"
                                             >
                                                 <DropdownMenuItem onSelect={() => onSelectProfile?.(booking)}>
-                                                    <UserCircle className="w-4 h-4 mr-2" /> Ficha de Cliente
+                                                    <UserCircle className="size-4 mr-2" /> Ficha de Cliente
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem onSelect={() => onEdit(booking)}>
-                                                    <Edit2 className="w-4 h-4 mr-2" /> Editar Reserva
+                                                    <Edit2 className="size-4 mr-2" /> Editar Reserva
                                                 </DropdownMenuItem>
                                                 <DropdownMenuSub>
                                                     <DropdownMenuSubTrigger>
-                                                        <MapPin className="w-4 h-4 mr-2" /> Cambiar Mesa
+                                                        <MapPin className="size-4 mr-2" /> Cambiar Mesa
                                                     </DropdownMenuSubTrigger>
                                                     <DropdownMenuSubContent
                                                         sideOffset={4}
@@ -261,19 +263,19 @@ export default function ReservationList({ bookings, zones = [], onStatusChange, 
                                                         className="max-h-[var(--radix-dropdown-menu-content-available-height)] overflow-y-auto overflow-x-hidden min-w-[180px]"
                                                     >
                                                         {zones.length === 0 ? (
-                                                            <div className="px-2 py-1.5 text-xs text-gray-500">No hay mesas configuradas</div>
+                                                            <div className="px-2 py-1.5 text-xs text-muted-foreground">No hay mesas configuradas</div>
                                                         ) : (
                                                             zones.map((zone, zIdx) => (
                                                                 <div key={zone.id}>
                                                                     {zIdx > 0 && <DropdownMenuSeparator />}
-                                                                    <DropdownMenuLabel className="text-[10px] font-bold text-gray-400 uppercase py-1">
+                                                                    <DropdownMenuLabel className="text-eyebrow py-1">
                                                                         {zone.name}
                                                                     </DropdownMenuLabel>
                                                                     {zone.tables.map((table) => (
                                                                         <DropdownMenuItem
                                                                             key={table.id}
                                                                             onSelect={() => onAssignTable?.(booking.id, table.id)}
-                                                                            className={cn("text-xs pl-4", booking.tableId === table.id && "bg-gray-100 font-bold")}
+                                                                            className={cn("text-xs pl-4", booking.tableId === table.id && "bg-muted font-medium")}
                                                                         >
                                                                             {table.name} ({table.capacity}p)
                                                                         </DropdownMenuItem>
@@ -284,8 +286,8 @@ export default function ReservationList({ bookings, zones = [], onStatusChange, 
                                                     </DropdownMenuSubContent>
                                                 </DropdownMenuSub>
                                                 <DropdownMenuSeparator />
-                                                <DropdownMenuItem className="text-red-600" onSelect={() => onStatusChange(booking.id, 'CANCELLED')}>
-                                                    <XCircle className="w-4 h-4 mr-2" /> Cancelar
+                                                <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => onStatusChange(booking.id, 'CANCELLED')}>
+                                                    <XCircle className="size-4 mr-2" /> Cancelar
                                                 </DropdownMenuItem>
                                             </DropdownMenuContent>
                                         </DropdownMenu>

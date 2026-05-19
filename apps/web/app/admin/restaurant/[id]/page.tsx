@@ -1,11 +1,12 @@
 "use client";
 import { useState, useEffect, Suspense } from 'react';
-import { useParams, useSearchParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { CalendarIcon, ChevronLeft, ChevronRight, Plus, RefreshCw, Users } from 'lucide-react';
-import { format, addDays, subDays } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Plus, RefreshCw } from 'lucide-react';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 import TablePlan from '@/components/restaurant/TablePlan';
 import WaitlistPanel from '@/components/restaurant/WaitlistPanel';
@@ -28,34 +29,26 @@ import type { TableUpdates } from '@/components/restaurant/TablePlan';
 
 function RestaurantDashboardContent() {
     const params = useParams();
-    const router = useRouter();
     const restaurantId = params.id as string;
-    
+
     const [date, setDate] = useState(new Date());
-    const [view, setView] = useState("PLAN"); // PLAN, LIST, ACCESS
+    const [view] = useState<'PLAN' | 'ACCESS'>('PLAN');
     const [loading, setLoading] = useState(false);
 
-    // Data
     const [zones, setZones] = useState<ZoneWithTables[]>([]);
     const [bookings, setBookings] = useState<RestaurantBooking[]>([]);
     const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
-    const [rawTables, setRawTables] = useState<TableWithZone[]>([]); // Flattened tables
+    const [rawTables, setRawTables] = useState<TableWithZone[]>([]);
     const [restaurant, setRestaurant] = useState<{ name?: string } | null>(null);
 
-    // UI State
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingBooking, setEditingBooking] = useState<GuestBookingProfile | null>(null);
     const [selectedBookingForProfile, setSelectedBookingForProfile] = useState<GuestBookingProfile | null>(null);
 
-    useEffect(() => {
-        loadData();
-    }, [date, restaurantId]);
-
-    async function loadData() {
+    const loadData = async () => {
         if (!restaurantId) return;
         setLoading(true);
         try {
-            // Parallel fetch
             const [tablesRes, bookingsRes, waitlistRes, restRes] = await Promise.all([
                 fetchAPI<ZoneWithTables[]>(`/restaurant/${restaurantId}/tables?date=${format(date, 'yyyy-MM-dd')}`),
                 fetchAPI<RestaurantBooking[]>(`/restaurant/${restaurantId}/bookings?date=${format(date, 'yyyy-MM-dd')}`),
@@ -65,18 +58,22 @@ function RestaurantDashboardContent() {
 
             if (Array.isArray(tablesRes)) {
                 setZones(tablesRes);
-                const flat = tablesRes.flatMap(z =>
-                    z.tables.map(t => ({ ...t, zoneId: z.id })),
-                );
+                const flat = tablesRes.flatMap(z => z.tables.map(t => ({ ...t, zoneId: z.id })));
                 setRawTables(flat);
             }
             if (Array.isArray(bookingsRes)) setBookings(bookingsRes);
             if (Array.isArray(waitlistRes)) setWaitlist(waitlistRes);
             setRestaurant(restRes);
-
-        } catch (e) { console.error("Error loading data", e); }
+        } catch (e) {
+            console.error("Error loading data", e);
+        }
         setLoading(false);
-    }
+    };
+
+    useEffect(() => {
+        loadData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [date, restaurantId]);
 
     const handleCreateBooking = async (data: ReservationFormPayload) => {
         try {
@@ -93,24 +90,16 @@ function RestaurantDashboardContent() {
         }
     };
 
-    const openEditBooking = (booking: GuestBookingProfile) => {
-        setEditingBooking(booking);
-        setIsFormOpen(true);
-    };
-
     const closeForm = () => {
         setIsFormOpen(false);
         setEditingBooking(null);
     };
 
     const handleUpdateTable = async (tableId: string, updates: TableUpdates) => {
-        // If it's a status update from the manual menu
         if (updates.bookingStatus) {
             const table = rawTables.find(t => t.id === tableId);
             const booking = table?.resBookings?.[0];
-            if (booking) {
-                handleStatusChange(booking.id, updates.bookingStatus);
-            }
+            if (booking) handleStatusChange(booking.id, updates.bookingStatus);
             return;
         }
         setRawTables(prev => prev.map(t => t.id === tableId ? { ...t, ...updates } : t));
@@ -118,21 +107,19 @@ function RestaurantDashboardContent() {
 
     const handleStatusChange = async (bookingId: string, status: string) => {
         try {
-            await fetchAPI(`/restaurant/reservation/${bookingId}/status`, { 
-                method: 'PATCH', 
-                body: JSON.stringify({ status }) 
+            await fetchAPI(`/restaurant/reservation/${bookingId}/status`, {
+                method: 'PATCH',
+                body: JSON.stringify({ status }),
             });
             loadData();
-        } catch (e) {
-            console.error("Error updating status", e);
-        }
+        } catch (e) { console.error("Error updating status", e); }
     };
 
     const handleAddWaitlist = async (data: WaitlistFormPayload) => {
         try {
             await fetchAPI(`/restaurant/${restaurantId}/waitlist`, {
                 method: 'POST',
-                body: JSON.stringify({ ...data, date: format(date, 'yyyy-MM-dd') })
+                body: JSON.stringify({ ...data, date: format(date, 'yyyy-MM-dd') }),
             });
             loadData();
         } catch (e) {
@@ -143,101 +130,95 @@ function RestaurantDashboardContent() {
 
     const handleSeatWaitlist = async (waitlistId: string) => {
         try {
-            // First mark as notified if it isn't, so the confirm logic works
-            // In a real scenario, we might want a direct 'Seat' endpoint that bypasses 'NOTIFIED' check
             await fetchAPI(`/restaurant/waitlist/${waitlistId}/confirm`, { method: 'POST' });
             loadData();
-        } catch (e) {
+        } catch {
             alert("Error al sentar cliente");
         }
     };
 
     const handleAssignTable = async (bookingId: string, tableId: string) => {
         try {
-            await fetchAPI(`/restaurant/reservation/${bookingId}/status`, { 
-                method: 'PATCH', 
-                body: JSON.stringify({ tableId, status: 'CONFIRMED' }) 
+            await fetchAPI(`/restaurant/reservation/${bookingId}/status`, {
+                method: 'PATCH',
+                body: JSON.stringify({ tableId, status: 'CONFIRMED' }),
             });
             loadData();
-        } catch (e) {
-            console.error("Error assigning table", e);
-        }
+        } catch (e) { console.error("Error assigning table", e); }
     };
 
     const totalPax = bookings.reduce((sum, b) => sum + (b.status !== 'CANCELLED' ? (b.pax ?? 0) : 0), 0);
     const totalBookings = bookings.filter(b => b.status !== 'CANCELLED').length;
+    const pendingTables = bookings.filter(b => !b.tableId);
 
     return (
         <div className="flex flex-col h-[calc(100vh-120px)] gap-4">
-            <header className="flex justify-between items-center bg-white dark:bg-zinc-800 p-3 rounded-lg shadow-sm border border-gray-100 dark:border-zinc-700">
-                <div className="flex items-center gap-4">
-                    <h1 className="text-xl font-bold tracking-tight">
-                        {restaurant?.name || 'Cargando...'}
+            <div className="flex justify-between items-center rounded-lg border border-border bg-card px-4 py-3 gap-4 flex-wrap">
+                <div className="flex items-center gap-4 min-w-0">
+                    <h1 className="font-display text-xl font-medium tracking-tight truncate">
+                        {restaurant?.name || <Skeleton className="h-6 w-32" />}
                     </h1>
                     <DateSelector date={date} onDateChange={setDate} />
                 </div>
 
-                <div className="flex items-center gap-4">
-                    <div className="flex gap-4 text-sm text-gray-600 dark:text-gray-400">
-                        <div className="flex flex-col items-center">
-                            <span className="font-bold text-black dark:text-white">{totalBookings}</span>
-                            <span className="text-[10px] uppercase font-medium">Reservas</span>
-                        </div>
-                        <div className="flex flex-col items-center">
-                            <span className="font-bold text-black dark:text-white">{totalPax}</span>
-                            <span className="text-[10px] uppercase font-medium">Pax</span>
-                        </div>
+                <div className="flex items-center gap-3">
+                    <div className="hidden md:flex gap-4">
+                        <Stat label="Reservas" value={totalBookings} />
+                        <Stat label="Pax" value={totalPax} />
                     </div>
-                    <div className="h-8 w-px bg-gray-200 dark:bg-zinc-700" />
-                    <Button className="gap-2" onClick={() => setIsFormOpen(true)}>
-                        <Plus className="w-4 h-4" /> Nueva Reserva
+                    <div className="h-6 w-px bg-border" />
+                    <Button onClick={() => setIsFormOpen(true)}>
+                        <Plus className="size-4" /> Nueva reserva
                     </Button>
-                    <Button variant="outline" size="icon" onClick={() => loadData()}>
-                        <RefreshCw className={loading ? "animate-spin w-4 h-4" : "w-4 h-4"} />
+                    <Button variant="outline" size="icon-sm" onClick={loadData} aria-label="Recargar">
+                        <RefreshCw className={cn("size-3.5", loading && "animate-spin")} />
                     </Button>
                 </div>
-            </header>
+            </div>
 
             <div className="flex-1 flex gap-4 overflow-hidden">
-                <aside className="w-80 flex flex-col gap-4">
+                <aside className="w-80 hidden lg:flex flex-col gap-4">
                     <div className="flex-1 h-1/2">
-                        <WaitlistPanel
-                            entries={waitlist}
-                            onAdd={handleAddWaitlist}
-                            onSeat={handleSeatWaitlist}
-                        />
+                        <WaitlistPanel entries={waitlist} onAdd={handleAddWaitlist} onSeat={handleSeatWaitlist} />
                     </div>
-                    <Card className="h-1/2 overflow-hidden flex flex-col border-gray-100 dark:border-zinc-700 shadow-sm">
+                    <Card className="h-1/2 overflow-hidden flex flex-col gap-0 py-0">
+                        <div className="px-3 py-2.5 bg-warning/15 text-warning-foreground text-xs font-medium border-b border-warning/30">
+                            Pendientes de mesa ({pendingTables.length})
+                        </div>
                         <CardContent className="p-0 flex-1 overflow-auto">
-                            <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 text-xs font-semibold border-b border-yellow-100 dark:border-yellow-900/30">
-                                Pendientes de Mesa ({bookings.filter(b => !b.tableId).length})
-                            </div>
-                            <div className="divide-y dark:divide-zinc-700">
-                                {bookings.filter(b => !b.tableId).map(b => {
+                            <div className="divide-y divide-border/60">
+                                {pendingTables.map(b => {
                                     const when = b.date ? new Date(b.date) : null;
                                     return (
-                                    <div key={b.id} className="p-3 text-sm hover:bg-gray-50 dark:hover:bg-zinc-700/50 cursor-pointer draggable transition-colors" draggable onDragStart={(e) => e.dataTransfer.setData("bookingId", b.id)}>
-                                        <div className="flex justify-between">
-                                            <span className="font-bold">
-                                                {when ? `${String(when.getUTCHours()).padStart(2, '0')}:${String(when.getUTCMinutes()).padStart(2, '0')}` : '—'}
-                                            </span>
-                                            <span className="bg-gray-200 dark:bg-zinc-700 px-1.5 rounded text-[10px] font-bold uppercase">{b.pax} Pax</span>
+                                        <div
+                                            key={b.id}
+                                            draggable
+                                            onDragStart={(e) => e.dataTransfer.setData("bookingId", b.id)}
+                                            className="p-3 text-sm hover:bg-accent/50 cursor-pointer transition-colors border-l-2 border-warning/60"
+                                        >
+                                            <div className="flex justify-between items-center">
+                                                <span className="font-medium tabular-nums">
+                                                    {when ? `${String(when.getUTCHours()).padStart(2, '0')}:${String(when.getUTCMinutes()).padStart(2, '0')}` : '—'}
+                                                </span>
+                                                <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                                                    {b.pax} pax
+                                                </span>
+                                            </div>
+                                            <div className="truncate text-muted-foreground mt-0.5">{b.guestName}</div>
                                         </div>
-                                        <div className="truncate text-muted-foreground mt-1">{b.guestName}</div>
-                                    </div>
                                     );
                                 })}
-                                {bookings.filter(b => !b.tableId).length === 0 && (
-                                    <div className="p-8 text-center text-xs text-muted-foreground italic">
-                                        No hay reservas pendientes
-                                    </div>
+                                {pendingTables.length === 0 && (
+                                    <p className="text-xs text-muted-foreground text-center py-6 italic">
+                                        No hay reservas pendientes.
+                                    </p>
                                 )}
                             </div>
                         </CardContent>
                     </Card>
                 </aside>
 
-                <main className="flex-1 flex flex-col bg-white dark:bg-zinc-800 rounded-lg shadow-sm border border-gray-100 dark:border-zinc-700 overflow-hidden">
+                <main className="flex-1 flex flex-col rounded-lg border border-border bg-card overflow-hidden">
                     <div className="flex-1 overflow-hidden relative">
                         {view === 'ACCESS' ? (
                             <div className="h-full overflow-auto p-6">
@@ -252,9 +233,7 @@ function RestaurantDashboardContent() {
                                 onTableUpdate={handleUpdateTable}
                                 onBookingMove={handleAssignTable}
                                 onSelectProfile={(b) => setSelectedBookingForProfile(b)}
-                                onTableSelect={(id) => {
-                                    console.log("Service click table:", id);
-                                }}
+                                onTableSelect={() => { }}
                                 className="h-full w-full"
                             />
                         )}
@@ -279,9 +258,24 @@ function RestaurantDashboardContent() {
     );
 }
 
+function Stat({ label, value }: { label: string; value: number | string }) {
+    return (
+        <div className="flex flex-col items-center leading-tight">
+            <span className="font-display text-base font-medium tabular-nums">{value}</span>
+            <span className="text-eyebrow">{label}</span>
+        </div>
+    );
+}
+
 export default function RestaurantDashboard() {
     return (
-        <Suspense fallback={<div className="flex items-center justify-center h-screen">Cargando dashboard...</div>}>
+        <Suspense
+            fallback={
+                <div className="flex items-center justify-center h-screen text-sm text-muted-foreground">
+                    Cargando dashboard…
+                </div>
+            }
+        >
             <RestaurantDashboardContent />
         </Suspense>
     );

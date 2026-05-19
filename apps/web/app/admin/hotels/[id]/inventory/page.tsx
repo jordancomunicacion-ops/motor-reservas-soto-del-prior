@@ -6,7 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PageHeader } from '@/components/ui/page-header';
+import { EmptyState } from '@/components/ui/empty-state';
 import { 
     ArrowLeft, 
     Plus, 
@@ -207,7 +210,7 @@ function HotelInventoryContent() {
     if (loading) {
         return (
             <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
-                <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                <Loader2 className="size-6 animate-spin text-muted-foreground" />
                 <p className="text-muted-foreground font-medium">Cargando inventario...</p>
             </div>
         );
@@ -215,169 +218,178 @@ function HotelInventoryContent() {
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
-            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                    <Link href="/admin/hotels" className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-all">
-                        <ArrowLeft className="w-5 h-5" />
-                    </Link>
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">{hotel?.name}</h1>
-                        <p className="text-muted-foreground">Gestión de Inventario y Tarifas</p>
-                    </div>
-                </div>
-                
-                <div className="flex gap-2">
-                    <Button variant="outline" className="gap-2" onClick={() => loadAllData()}>
-                        Actualizar Datos
-                    </Button>
-                </div>
-            </header>
+            <PageHeader
+                eyebrow="Hotel"
+                title={`Inventario · ${hotel?.name ?? ''}`}
+                description="Gestión de habitaciones y planes de tarifas."
+                actions={
+                    <>
+                        <Button variant="ghost" size="icon" asChild>
+                            <Link href="/admin/hotels"><ArrowLeft className="size-4" /></Link>
+                        </Button>
+                        <Button variant="outline" onClick={() => loadAllData()}>
+                            Actualizar Datos
+                        </Button>
+                    </>
+                }
+            />
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="grid w-full grid-cols-2 max-w-[400px] mb-8">
                     <TabsTrigger value="rooms" className="gap-2">
-                        <BedDouble className="w-4 h-4" /> Habitaciones
+                        <BedDouble className="size-4" /> Habitaciones
                     </TabsTrigger>
                     <TabsTrigger value="rates" className="gap-2">
-                        <Tags className="w-4 h-4" /> Precios
+                        <Tags className="size-4" /> Precios
                     </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="rooms" className="space-y-6 outline-none">
                     <div className="flex justify-between items-center mb-4">
-                        <div>
-                            <h2 className="text-lg font-semibold">Tipos de Habitación</h2>
+                        <div className="space-y-1">
+                            <h2 className="font-display text-lg font-medium tracking-tight">Tipos de Habitación</h2>
                             <p className="text-sm text-muted-foreground">Define las categorías de alojamiento disponibles.</p>
                         </div>
                         <Button onClick={() => {
                             setRoomFormData({ id: '', name: '', basePrice: 0, capacity: 2, quantity: 1 });
                             setShowRoomForm(true);
                         }} className="gap-2">
-                            <Plus className="w-4 h-4" /> Añadir Categoría
+                            <Plus className="size-4" /> Añadir Categoría
                         </Button>
                     </div>
 
                     {showRoomForm && (
-                        <Card className="border-blue-200 dark:border-blue-900 shadow-lg bg-blue-50/30 dark:bg-blue-900/10">
+                        <Card>
                             <CardHeader>
-                                <CardTitle>{roomFormData.id ? 'Editar Categoría' : 'Nueva Categoría'}</CardTitle>
+                                <CardTitle className="font-display text-base font-medium tracking-tight">{roomFormData.id ? 'Editar Categoría' : 'Nueva Categoría'}</CardTitle>
                             </CardHeader>
                             <CardContent className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                <div className="space-y-2">
-                                    <Label>Nombre</Label>
-                                    <Input 
-                                        value={roomFormData.name} 
+                                <div className="space-y-1.5">
+                                    <Label className="text-eyebrow">Nombre</Label>
+                                    <Input
+                                        className="h-10"
+                                        value={roomFormData.name}
                                         onChange={e => setRoomFormData({...roomFormData, name: e.target.value})}
                                         placeholder="Ej: Suite Deluxe"
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <Label>Capacidad (pax)</Label>
-                                    <Input 
-                                        type="number" 
-                                        value={roomFormData.capacity} 
+                                <div className="space-y-1.5">
+                                    <Label className="text-eyebrow">Capacidad (pax)</Label>
+                                    <Input
+                                        type="number"
+                                        className="h-10"
+                                        value={roomFormData.capacity}
                                         onChange={e => setRoomFormData({...roomFormData, capacity: Number(e.target.value)})}
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <Label>Precio Base (€)</Label>
-                                    <Input 
-                                        type="number" 
-                                        value={roomFormData.basePrice} 
+                                <div className="space-y-1.5">
+                                    <Label className="text-eyebrow">Precio Base (€)</Label>
+                                    <Input
+                                        type="number"
+                                        className="h-10"
+                                        value={roomFormData.basePrice}
                                         onChange={e => setRoomFormData({...roomFormData, basePrice: Number(e.target.value)})}
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <Label>Cantidad Habitaciones</Label>
-                                    <Input 
-                                        type="number" 
-                                        value={roomFormData.quantity} 
+                                <div className="space-y-1.5">
+                                    <Label className="text-eyebrow">Cantidad Habitaciones</Label>
+                                    <Input
+                                        type="number"
+                                        className="h-10"
+                                        value={roomFormData.quantity}
                                         onChange={e => setRoomFormData({...roomFormData, quantity: Number(e.target.value)})}
                                     />
                                 </div>
                             </CardContent>
-                            <div className="p-6 border-t flex justify-end gap-2">
+                            <div className="p-6 border-t border-border/60 flex justify-end gap-2">
                                 <Button variant="ghost" onClick={() => setShowRoomForm(false)}>Cancelar</Button>
                                 <Button onClick={handleSaveRoom} className="gap-2">
-                                    <Save className="w-4 h-4" /> Guardar
+                                    <Save className="size-4" /> Guardar
                                 </Button>
                             </div>
                         </Card>
                     )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {roomTypes.map((type) => (
-                            <Card key={type.id} className="group hover:border-blue-400 transition-all shadow-sm">
-                                <CardHeader className="pb-2">
-                                    <div className="flex justify-between items-start">
-                                        <CardTitle className="text-lg">{type.name}</CardTitle>
-                                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={async () => {
-                                                if (confirm(`¿Estás seguro de que quieres eliminar la categoría "${type.name}"?`)) {
-                                                    try {
-                                                        await fetchAPI(`/property/room-types/${type.id}`, { method: 'DELETE' });
-                                                        loadAllData();
-                                                    } catch (e) {
-                                                        alert("Error al eliminar la categoría");
+                    {roomTypes.length === 0 ? (
+                        <EmptyState
+                            icon={BedDouble}
+                            title="Sin tipos de habitación"
+                            description="Crea la primera categoría para empezar a gestionar el inventario."
+                        />
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {roomTypes.map((type) => (
+                                <Card key={type.id} className="group transition-all">
+                                    <CardHeader className="pb-2">
+                                        <div className="flex justify-between items-start">
+                                            <CardTitle className="font-display text-base font-medium tracking-tight">{type.name}</CardTitle>
+                                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <Button variant="ghost" size="icon-sm" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={async () => {
+                                                    if (confirm(`¿Estás seguro de que quieres eliminar la categoría "${type.name}"?`)) {
+                                                        try {
+                                                            await fetchAPI(`/property/room-types/${type.id}`, { method: 'DELETE' });
+                                                            loadAllData();
+                                                        } catch (e) {
+                                                            alert("Error al eliminar la categoría");
+                                                        }
                                                     }
-                                                }
-                                            }}>
-                                                <Trash2 className="w-4 h-4" />
-                                            </Button>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
-                                                setRoomFormData({
-                                                    id: type.id,
-                                                    name: type.name,
-                                                    basePrice: type.basePrice,
-                                                    capacity: type.capacity,
-                                                    quantity: type.rooms?.length || 1
-                                                });
-                                                setShowRoomForm(true);
-                                            }}>
-                                                <Settings className="w-4 h-4" />
-                                            </Button>
+                                                }}>
+                                                    <Trash2 className="size-4" />
+                                                </Button>
+                                                <Button variant="ghost" size="icon-sm" onClick={() => {
+                                                    setRoomFormData({
+                                                        id: type.id,
+                                                        name: type.name,
+                                                        basePrice: type.basePrice,
+                                                        capacity: type.capacity,
+                                                        quantity: type.rooms?.length || 1
+                                                    });
+                                                    setShowRoomForm(true);
+                                                }}>
+                                                    <Settings className="size-4" />
+                                                </Button>
+                                            </div>
                                         </div>
-                                    </div>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="flex flex-col gap-2">
-                                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                            <Users className="w-4 h-4" />
-                                            <span>Capacidad: {type.capacity} personas</span>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <div className="flex flex-col gap-2">
+                                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                                <Users className="size-4" />
+                                                <span>Capacidad: {type.capacity} personas</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                                <BedDouble className="size-4" />
+                                                <span>Unidades: {type.rooms?.length || 0} habitaciones</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 font-display text-lg font-medium text-primary mt-2">
+                                                <Euro className="size-4" />
+                                                <span>{type.basePrice} / noche</span>
+                                            </div>
                                         </div>
-                                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                            <BedDouble className="w-4 h-4" />
-                                            <span>Unidades: {type.rooms?.length || 0} habitaciones</span>
-                                        </div>
-                                        <div className="flex items-center gap-2 text-lg font-bold text-blue-600 dark:text-blue-400 mt-2">
-                                            <Euro className="w-5 h-5" />
-                                            <span>{type.basePrice} / noche</span>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+                    )}
                 </TabsContent>
 
                 <TabsContent value="rates" className="space-y-6 outline-none">
                     <div className="grid lg:grid-cols-3 gap-6">
-                        <Card className="lg:col-span-1 shadow-sm border-orange-100 dark:border-orange-900/30">
+                        <Card className="lg:col-span-1">
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <Tags className="w-5 h-5 text-orange-500" />
+                                <CardTitle className="font-display text-base font-medium tracking-tight flex items-center gap-2">
+                                    <Tags className="size-4 text-primary" />
                                     Calendario de Precios
                                 </CardTitle>
                                 <CardDescription>Calendariza precios por temporada o días específicos.</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                <div className="space-y-2">
+                                <div className="space-y-1.5">
                                     <div className="flex justify-between items-center">
-                                        <Label>Plan de Tarifas</Label>
-                                        <Button 
-                                            variant="ghost" 
-                                            size="sm" 
-                                            className="h-6 text-[10px] gap-1 px-1"
+                                        <Label className="text-eyebrow">Plan de Tarifas</Label>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
                                             onClick={() => {
                                                 setRatePlanFormData({ id: '', name: '', mealsIncluded: 'Solo alojamiento', isDefault: false });
                                                 setShowRatePlanForm(!showRatePlanForm);
@@ -388,56 +400,59 @@ function HotelInventoryContent() {
                                     </div>
 
                                     {showRatePlanForm ? (
-                                        <div className="p-3 border rounded-lg bg-orange-50/50 dark:bg-orange-900/10 space-y-3 animate-in slide-in-from-top-2 duration-300">
-                                            <div className="space-y-1">
-                                                <Label className="text-[10px]">Nombre del Plan</Label>
-                                                <Input 
-                                                    className="h-8 text-xs" 
-                                                    placeholder="Ej: No Reembolsable" 
+                                        <div className="p-3 border border-border rounded-md bg-muted/40 space-y-3 animate-in slide-in-from-top-2 duration-300">
+                                            <div className="space-y-1.5">
+                                                <Label className="text-eyebrow">Nombre del Plan</Label>
+                                                <Input
+                                                    className="h-10"
+                                                    placeholder="Ej: No Reembolsable"
                                                     value={ratePlanFormData.name}
                                                     onChange={e => setRatePlanFormData({...ratePlanFormData, name: e.target.value})}
                                                 />
                                             </div>
-                                            <div className="space-y-1">
-                                                <Label className="text-[10px]">Régimen</Label>
-                                                <select 
-                                                    className="w-full p-1 text-xs border rounded bg-transparent"
+                                            <div className="space-y-1.5">
+                                                <Label className="text-eyebrow">Régimen</Label>
+                                                <Select
                                                     value={ratePlanFormData.mealsIncluded}
-                                                    onChange={e => setRatePlanFormData({...ratePlanFormData, mealsIncluded: e.target.value})}
+                                                    onValueChange={v => setRatePlanFormData({...ratePlanFormData, mealsIncluded: v})}
                                                 >
-                                                    <option value="Solo alojamiento">Solo alojamiento</option>
-                                                    <option value="Desayuno incluido">Desayuno incluido</option>
-                                                    <option value="Media pensión">Media pensión</option>
-                                                    <option value="Pensión completa">Pensión completa</option>
-                                                </select>
+                                                    <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="Solo alojamiento">Solo alojamiento</SelectItem>
+                                                        <SelectItem value="Desayuno incluido">Desayuno incluido</SelectItem>
+                                                        <SelectItem value="Media pensión">Media pensión</SelectItem>
+                                                        <SelectItem value="Pensión completa">Pensión completa</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
                                             </div>
                                             <div className="flex gap-2 pt-1">
-                                                <Button size="sm" className="h-7 text-[10px] flex-1" onClick={handleSaveRatePlan}>Guardar Plan</Button>
+                                                <Button size="sm" className="flex-1" onClick={handleSaveRatePlan}>Guardar Plan</Button>
                                                 {ratePlanFormData.id && (
-                                                    <Button 
-                                                        variant="ghost" 
-                                                        size="sm" 
-                                                        className="h-7 w-7 p-0 text-red-500" 
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon-sm"
+                                                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
                                                         onClick={() => handleDeleteRatePlan(ratePlanFormData.id)}
                                                     >
-                                                        <Trash2 className="w-3 h-3" />
+                                                        <Trash2 className="size-4" />
                                                     </Button>
                                                 )}
                                             </div>
                                         </div>
                                     ) : (
                                         <div className="flex gap-2">
-                                            <select 
-                                                className="flex-1 p-2 border rounded bg-transparent text-sm"
+                                            <Select
                                                 value={rateFormData.ratePlanId}
-                                                onChange={e => setRateFormData({...rateFormData, ratePlanId: e.target.value})}
+                                                onValueChange={v => setRateFormData({...rateFormData, ratePlanId: v})}
                                             >
-                                                {ratePlans.map(rp => <option key={rp.id} value={rp.id}>{rp.name}</option>)}
-                                            </select>
-                                            <Button 
-                                                variant="outline" 
-                                                size="icon" 
-                                                className="h-9 w-9"
+                                                <SelectTrigger className="h-10 flex-1"><SelectValue placeholder="Selecciona plan..." /></SelectTrigger>
+                                                <SelectContent>
+                                                    {ratePlans.map(rp => <SelectItem key={rp.id} value={rp.id}>{rp.name}</SelectItem>)}
+                                                </SelectContent>
+                                            </Select>
+                                            <Button
+                                                variant="outline"
+                                                size="icon"
                                                 onClick={() => {
                                                     const plan = ratePlans.find(p => p.id === rateFormData.ratePlanId);
                                                     if (plan) {
@@ -451,83 +466,85 @@ function HotelInventoryContent() {
                                                     }
                                                 }}
                                             >
-                                                <Settings className="w-4 h-4" />
+                                                <Settings className="size-4" />
                                             </Button>
                                         </div>
                                     )}
                                 </div>
-                                <div className="space-y-2">
-                                    <Label>Tipo de Habitación</Label>
-                                    <select 
-                                        className="w-full p-2 border rounded bg-transparent text-sm"
+                                <div className="space-y-1.5">
+                                    <Label className="text-eyebrow">Tipo de Habitación</Label>
+                                    <Select
                                         value={rateFormData.roomTypeId}
-                                        onChange={e => setRateFormData({...rateFormData, roomTypeId: e.target.value})}
+                                        onValueChange={v => setRateFormData({...rateFormData, roomTypeId: v})}
                                     >
-                                        {roomTypes.map(rt => <option key={rt.id} value={rt.id}>{rt.name}</option>)}
-                                    </select>
+                                        <SelectTrigger className="h-10"><SelectValue placeholder="Selecciona tipo..." /></SelectTrigger>
+                                        <SelectContent>
+                                            {roomTypes.map(rt => <SelectItem key={rt.id} value={rt.id}>{rt.name}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2">
-                                    <div className="space-y-2">
-                                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">Desde</Label>
-                                        <Input 
-                                            type="date" 
-                                            className="text-xs"
-                                            value={rateFormData.start} 
+                                    <div className="space-y-1.5">
+                                        <Label className="text-eyebrow">Desde</Label>
+                                        <Input
+                                            type="date"
+                                            className="h-10"
+                                            value={rateFormData.start}
                                             onChange={e => setRateFormData({...rateFormData, start: e.target.value})}
                                         />
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">Hasta</Label>
-                                        <Input 
-                                            type="date" 
-                                            className="text-xs"
-                                            value={rateFormData.end} 
+                                    <div className="space-y-1.5">
+                                        <Label className="text-eyebrow">Hasta</Label>
+                                        <Input
+                                            type="date"
+                                            className="h-10"
+                                            value={rateFormData.end}
                                             onChange={e => setRateFormData({...rateFormData, end: e.target.value})}
                                         />
                                     </div>
                                 </div>
 
                                 <div className="space-y-3 pt-2">
-                                    <Label className="text-[10px] uppercase font-bold text-muted-foreground">Días de aplicación</Label>
+                                    <Label className="text-eyebrow">Días de aplicación</Label>
                                     <div className="flex justify-between gap-1">
                                         {['D', 'L', 'M', 'X', 'J', 'V', 'S'].map((d, i) => (
                                             <button
                                                 key={i}
                                                 onClick={() => toggleDay(i)}
-                                                className={`w-8 h-8 rounded-full text-[10px] font-bold transition-all border ${rateFormData.daysOfWeek.includes(i) ? 'bg-orange-500 border-orange-600 text-white' : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-orange-300'}`}
+                                                className={`size-8 rounded-full text-[11px] font-medium transition-all border ${rateFormData.daysOfWeek.includes(i) ? 'bg-primary border-primary text-primary-foreground' : 'bg-muted/40 border-border text-muted-foreground hover:border-primary/50'}`}
                                             >
                                                 {d}
                                             </button>
                                         ))}
                                     </div>
                                     <div className="flex gap-2 pt-1">
-                                        <Button variant="outline" size="sm" className="h-6 text-[9px] px-2 py-0" onClick={() => setPreset('weekends')}>Fines de semana</Button>
-                                        <Button variant="outline" size="sm" className="h-6 text-[9px] px-2 py-0" onClick={() => setPreset('weekdays')}>Entre semana</Button>
-                                        <Button variant="outline" size="sm" className="h-6 text-[9px] px-2 py-0" onClick={() => setPreset('all')}>Todos</Button>
+                                        <Button variant="outline" size="sm" onClick={() => setPreset('weekends')}>Fines de semana</Button>
+                                        <Button variant="outline" size="sm" onClick={() => setPreset('weekdays')}>Entre semana</Button>
+                                        <Button variant="outline" size="sm" onClick={() => setPreset('all')}>Todos</Button>
                                     </div>
                                 </div>
 
-                                <div className="space-y-2 pt-2 border-t mt-4">
-                                    <Label className="text-orange-600 font-bold">Precio Final (€)</Label>
+                                <div className="space-y-1.5 pt-2 border-t border-border/60 mt-4">
+                                    <Label className="text-eyebrow text-primary">Precio Final (€)</Label>
                                     <div className="relative">
-                                        <Euro className="absolute left-3 top-2.5 w-4 h-4 text-orange-400" />
-                                        <Input 
-                                            type="number" 
-                                            className="pl-9 text-lg font-bold border-orange-200 focus:ring-orange-500"
-                                            value={rateFormData.price} 
+                                        <Euro className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                                        <Input
+                                            type="number"
+                                            className="h-10 pl-9 font-medium"
+                                            value={rateFormData.price}
                                             onChange={e => setRateFormData({...rateFormData, price: Number(e.target.value)})}
                                         />
                                     </div>
                                 </div>
-                                <Button onClick={handleBulkPriceUpdate} className="w-full gap-2 mt-4 bg-orange-600 hover:bg-orange-700 shadow-orange-200 shadow-lg">
-                                    <Save className="w-4 h-4" /> Actualizar Calendario
+                                <Button onClick={handleBulkPriceUpdate} className="w-full gap-2 mt-4">
+                                    <Save className="size-4" /> Actualizar Calendario
                                 </Button>
                             </CardContent>
                         </Card>
 
-                        <Card className="lg:col-span-2 shadow-sm">
+                        <Card className="lg:col-span-2">
                             <CardHeader>
-                                <CardTitle>Calendario de Precios (Vista rápida)</CardTitle>
+                                <CardTitle className="font-display text-base font-medium tracking-tight">Calendario de Precios (Vista rápida)</CardTitle>
                                 <CardDescription>Próximos 7 días para el tipo seleccionado.</CardDescription>
                             </CardHeader>
                             <CardContent>
@@ -536,21 +553,21 @@ function HotelInventoryContent() {
                                         const d = new Date();
                                         d.setDate(d.getDate() + i);
                                         return (
-                                            <div key={i} className="min-w-[100px] flex-1 border rounded-lg p-3 text-center bg-gray-50 dark:bg-zinc-900/50">
-                                                <div className="text-[10px] uppercase font-bold text-muted-foreground">
+                                            <div key={i} className="min-w-[100px] flex-1 border border-border rounded-md p-3 text-center bg-muted/40">
+                                                <div className="text-eyebrow">
                                                     {format(d, 'EEE', { locale: undefined })}
                                                 </div>
-                                                <div className="text-lg font-bold">
+                                                <div className="font-display text-lg font-medium mt-1">
                                                     {format(d, 'dd')}
                                                 </div>
-                                                <div className="mt-2 text-sm font-semibold text-blue-600">
+                                                <div className="mt-2 text-sm font-medium text-primary">
                                                     {roomTypes.find(rt => rt.id === rateFormData.roomTypeId)?.basePrice || 0}€
                                                 </div>
                                             </div>
                                         );
                                     })}
                                 </div>
-                                <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded border border-yellow-100 dark:border-yellow-900/30 text-xs text-yellow-800 dark:text-yellow-200">
+                                <div className="mt-4 p-4 bg-warning/10 border border-warning/30 rounded-md text-xs text-warning-foreground">
                                     <strong>Tip:</strong> Puedes usar la herramienta de la izquierda para cambiar los precios de un rango de fechas completo. Los cambios se verán reflejados en el motor de reservas inmediatamente.
                                 </div>
                             </CardContent>
@@ -564,7 +581,7 @@ function HotelInventoryContent() {
 
 export default function HotelInventoryPage() {
     return (
-        <Suspense fallback={<div className="p-8">Cargando inventario...</div>}>
+        <Suspense fallback={<div className="p-8 text-muted-foreground">Cargando inventario...</div>}>
             <HotelInventoryContent />
         </Suspense>
     );

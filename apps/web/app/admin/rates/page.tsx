@@ -2,10 +2,15 @@
 import { useEffect, useState } from 'react';
 import { fetchAPI } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { PageHeader } from '@/components/ui/page-header';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Tags } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface Hotel { id: string; name: string; }
@@ -61,36 +66,43 @@ export default function RatesPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold">Tarifas y Restricciones</h1>
-                <Select value={selectedHotelId} onValueChange={setSelectedHotelId}>
-                    <SelectTrigger className="w-[200px]">
-                        <SelectValue placeholder="Seleccionar Hotel" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {hotels.map(h => <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>)}
-                    </SelectContent>
-                </Select>
-            </div>
+            <PageHeader
+                eyebrow="Pricing"
+                title="Tarifas y restricciones"
+                description="Gestiona los planes de tarifas y actualiza precios masivamente por rango de fechas."
+                actions={
+                    <Select value={selectedHotelId} onValueChange={setSelectedHotelId}>
+                        <SelectTrigger className="h-10 w-[220px]">
+                            <SelectValue placeholder="Seleccionar Hotel" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {hotels.map(h => <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                }
+            />
 
             <div className="grid md:grid-cols-2 gap-6">
                 <Card>
-                    <CardHeader><CardTitle>Actualización Masiva de Precios</CardTitle></CardHeader>
+                    <CardHeader>
+                        <CardTitle className="font-display text-base font-medium tracking-tight">Actualización Masiva de Precios</CardTitle>
+                        <CardDescription>Aplica un precio a un plan y tipo de habitación en un rango de fechas.</CardDescription>
+                    </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="rate-plan-select">Plan de Tarifas</Label>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="rate-plan-select" className="text-eyebrow">Plan de Tarifas</Label>
                                 <Select onValueChange={v => setForm({ ...form, ratePlanId: v })}>
-                                    <SelectTrigger id="rate-plan-select" name="ratePlanId"><SelectValue placeholder="Seleccionar Plan" /></SelectTrigger>
+                                    <SelectTrigger id="rate-plan-select" name="ratePlanId" className="h-10"><SelectValue placeholder="Seleccionar Plan" /></SelectTrigger>
                                     <SelectContent>
                                         {ratePlans.map(rp => <SelectItem key={rp.id} value={rp.id}>{rp.name}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="room-type-select">Tipo de Habitación</Label>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="room-type-select" className="text-eyebrow">Tipo de Habitación</Label>
                                 <Select onValueChange={v => setForm({ ...form, roomTypeId: v })}>
-                                    <SelectTrigger id="room-type-select" name="roomTypeId"><SelectValue placeholder="Seleccionar Habitación" /></SelectTrigger>
+                                    <SelectTrigger id="room-type-select" name="roomTypeId" className="h-10"><SelectValue placeholder="Seleccionar Habitación" /></SelectTrigger>
                                     <SelectContent>
                                         {roomTypes.map(rt => <SelectItem key={rt.id} value={rt.id}>{rt.name}</SelectItem>)}
                                     </SelectContent>
@@ -99,19 +111,19 @@ export default function RatesPage() {
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="date-from">Desde</Label>
-                                <Input id="date-from" name="from" type="date" value={form.start} onChange={e => setForm({ ...form, start: e.target.value })} />
+                            <div className="space-y-1.5">
+                                <Label htmlFor="date-from" className="text-eyebrow">Desde</Label>
+                                <Input id="date-from" name="from" type="date" className="h-10" value={form.start} onChange={e => setForm({ ...form, start: e.target.value })} />
                             </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="date-to">Hasta</Label>
-                                <Input id="date-to" name="to" type="date" value={form.end} onChange={e => setForm({ ...form, end: e.target.value })} />
+                            <div className="space-y-1.5">
+                                <Label htmlFor="date-to" className="text-eyebrow">Hasta</Label>
+                                <Input id="date-to" name="to" type="date" className="h-10" value={form.end} onChange={e => setForm({ ...form, end: e.target.value })} />
                             </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="price-input">Nuevo Precio (€)</Label>
-                            <Input id="price-input" name="price" type="number" value={form.price} onChange={e => setForm({ ...form, price: Number(e.target.value) })} />
+                        <div className="space-y-1.5">
+                            <Label htmlFor="price-input" className="text-eyebrow">Nuevo Precio (€)</Label>
+                            <Input id="price-input" name="price" type="number" className="h-10" value={form.price} onChange={e => setForm({ ...form, price: Number(e.target.value) })} />
                         </div>
 
                         <Button onClick={handleBulkUpdate} className="w-full">Aplicar Precios</Button>
@@ -119,31 +131,41 @@ export default function RatesPage() {
                 </Card>
 
                 <Card>
-                    <CardHeader><CardTitle>Planes de Tarifas Existentes</CardTitle></CardHeader>
+                    <CardHeader>
+                        <CardTitle className="font-display text-base font-medium tracking-tight">Planes de Tarifas Existentes</CardTitle>
+                        <CardDescription>Listado de planes configurados para este hotel.</CardDescription>
+                    </CardHeader>
                     <CardContent>
-                        <div className="rounded-md border">
-                            <table className="w-full text-sm">
-                                <thead className="bg-muted">
-                                    <tr>
-                                        <th className="p-3 text-left">Nombre</th>
-                                        <th className="p-3 text-center">Por Defecto</th>
-                                        <th className="p-3 text-right">Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
+                        {ratePlans.length === 0 ? (
+                            <EmptyState
+                                icon={Tags}
+                                title="Sin planes de tarifas"
+                                description="Crea un plan desde el inventario del hotel para empezar a fijar precios."
+                            />
+                        ) : (
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Nombre</TableHead>
+                                        <TableHead className="text-center">Por Defecto</TableHead>
+                                        <TableHead className="text-right">Acciones</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
                                     {ratePlans.map(rp => (
-                                        <tr key={rp.id} className="border-t">
-                                            <td className="p-3 font-medium">{rp.name}</td>
-                                            <td className="p-3 text-center">{rp.isDefault ? '✅' : ''}</td>
-                                            <td className="p-3 text-right">
+                                        <TableRow key={rp.id}>
+                                            <TableCell className="font-medium">{rp.name}</TableCell>
+                                            <TableCell className="text-center">
+                                                {rp.isDefault ? <StatusBadge tone="success">Default</StatusBadge> : <span className="text-muted-foreground">—</span>}
+                                            </TableCell>
+                                            <TableCell className="text-right">
                                                 <Button variant="ghost" size="sm">Editar</Button>
-                                            </td>
-                                        </tr>
+                                            </TableCell>
+                                        </TableRow>
                                     ))}
-                                    {ratePlans.length === 0 && <tr><td colSpan={3} className="p-4 text-center">No se encontraron planes.</td></tr>}
-                                </tbody>
-                            </table>
-                        </div>
+                                </TableBody>
+                            </Table>
+                        )}
                     </CardContent>
                 </Card>
             </div>

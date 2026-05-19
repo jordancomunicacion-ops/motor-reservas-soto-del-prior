@@ -5,7 +5,9 @@ import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterv
 import { es } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Calendar, Users, Clock, Check, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { fetchAPI } from '@/lib/api';
+import { cn } from '@/lib/utils';
 
 type PublicReservation = {
     id: string;
@@ -24,7 +26,6 @@ type PublicReservation = {
 
 type SlotsResponse = { slots: string[] };
 
-const ACCENT = '#C59D5F';
 const WEEK_DAYS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 
 export function ModifyReservation() {
@@ -110,19 +111,19 @@ export function ModifyReservation() {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-white">
-                <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+            <div className="min-h-screen flex items-center justify-center bg-background">
+                <Loader2 className="size-6 animate-spin text-muted-foreground" />
             </div>
         );
     }
 
     if (error || !reservation) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-white px-4">
-                <div className="max-w-md text-center">
-                    <AlertCircle className="w-12 h-12 mx-auto mb-4 text-red-500" />
-                    <h1 className="text-xl font-bold mb-2" style={{ fontFamily: "'Oswald', sans-serif" }}>No se pudo cargar tu reserva</h1>
-                    <p className="text-sm text-gray-600">{error || 'Enlace inválido o caducado.'}</p>
+            <div className="min-h-screen flex items-center justify-center bg-background px-4">
+                <div className="max-w-md text-center space-y-3">
+                    <AlertCircle className="size-12 mx-auto text-destructive" />
+                    <h1 className="font-display text-xl font-medium tracking-tight">No se pudo cargar tu reserva</h1>
+                    <p className="text-sm text-muted-foreground">{error || 'Enlace inválido o caducado.'}</p>
                 </div>
             </div>
         );
@@ -132,7 +133,7 @@ export function ModifyReservation() {
         if (!reservation) return;
         setSaving(true);
         try {
-            const body: any = {};
+            const body: Record<string, unknown> = {};
             if (slotChanged && selectedDate && selectedTime) {
                 body.date = format(selectedDate, 'yyyy-MM-dd');
                 body.time = selectedTime;
@@ -140,18 +141,25 @@ export function ModifyReservation() {
             if (paxChanged) body.pax = pax;
             if (notesChanged) body.notes = notes;
 
-            const res = await fetchAPI<any>(`/restaurant/public/reservation/${reservation.id}?token=${encodeURIComponent(token)}`, {
+            type SaveResponse = {
+                error?: boolean;
+                message?: string;
+                date?: string;
+                pax?: number;
+                notes?: string | null;
+            };
+            const res = await fetchAPI<SaveResponse>(`/restaurant/public/reservation/${reservation.id}?token=${encodeURIComponent(token)}`, {
                 method: 'PATCH',
-                body: JSON.stringify(body)
+                body: JSON.stringify(body),
             });
             if (res?.error) {
                 alert(res.message || 'No se pudieron guardar los cambios.');
             } else {
-                setReservation({ ...reservation, date: res.date, pax: res.pax, notes: res.notes });
+                setReservation({ ...reservation, date: res.date ?? reservation.date, pax: res.pax ?? reservation.pax, notes: res.notes ?? reservation.notes });
                 setSavedAt(new Date());
             }
-        } catch (e: any) {
-            alert(e?.message || 'Error al guardar los cambios.');
+        } catch (e) {
+            alert((e instanceof Error && e.message) || 'Error al guardar los cambios.');
         } finally {
             setSaving(false);
         }
@@ -162,16 +170,17 @@ export function ModifyReservation() {
         if (!confirm('¿Seguro que quieres cancelar tu reserva? Esta acción no se puede deshacer.')) return;
         setCancelling(true);
         try {
-            const res = await fetchAPI<any>(`/restaurant/public/reservation/${reservation.id}/cancel?token=${encodeURIComponent(token)}`, {
-                method: 'POST'
+            type CancelResponse = { error?: boolean; message?: string };
+            const res = await fetchAPI<CancelResponse>(`/restaurant/public/reservation/${reservation.id}/cancel?token=${encodeURIComponent(token)}`, {
+                method: 'POST',
             });
             if (res?.error) {
                 alert(res.message || 'No se pudo cancelar la reserva.');
             } else {
                 setCancelled(true);
             }
-        } catch (e: any) {
-            alert(e?.message || 'Error al cancelar la reserva.');
+        } catch (e) {
+            alert((e instanceof Error && e.message) || 'Error al cancelar la reserva.');
         } finally {
             setCancelling(false);
         }
@@ -188,18 +197,18 @@ export function ModifyReservation() {
         return (
             <div className="max-w-[280px] mx-auto w-full">
                 <div className="flex justify-between items-center mb-2">
-                    <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-1 hover:bg-gray-100 rounded-full" aria-label="Mes anterior">
-                        <ChevronLeft className="w-4 h-4 text-gray-400" />
-                    </button>
-                    <h3 className="font-bold text-base uppercase tracking-tight" style={{ fontFamily: "'Oswald', sans-serif" }}>
+                    <Button variant="ghost" size="icon-sm" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} aria-label="Mes anterior">
+                        <ChevronLeft className="size-4" />
+                    </Button>
+                    <h3 className="font-display text-base font-medium tracking-tight capitalize">
                         {format(currentMonth, 'MMMM yyyy', { locale: es })}
                     </h3>
-                    <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-1 hover:bg-gray-100 rounded-full" aria-label="Mes siguiente">
-                        <ChevronRight className="w-4 h-4 text-gray-400" />
-                    </button>
+                    <Button variant="ghost" size="icon-sm" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} aria-label="Mes siguiente">
+                        <ChevronRight className="size-4" />
+                    </Button>
                 </div>
-                <div className="grid grid-cols-7 gap-1 mb-2 text-center border-b pb-2">
-                    {WEEK_DAYS.map(d => <div key={d} className="font-black text-[10px] uppercase tracking-widest" style={{ color: ACCENT }}>{d}</div>)}
+                <div className="grid grid-cols-7 gap-1 mb-2 text-center border-b border-border pb-2">
+                    {WEEK_DAYS.map(d => <div key={d} className="text-eyebrow text-primary">{d}</div>)}
                 </div>
                 <div className="grid grid-cols-7 gap-1">
                     {padding.map((_, i) => <div key={`p${i}`} />)}
@@ -207,14 +216,21 @@ export function ModifyReservation() {
                         const isPast = isBefore(d, today);
                         const isSel = selectedDate && isSameDay(d, selectedDate);
                         return (
-                            <div
+                            <button
+                                type="button"
                                 key={d.toISOString()}
                                 onClick={() => { if (!isPast) { setSelectedDate(d); setSelectedTime(null); } }}
-                                className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold mx-auto transition-all ${isPast ? 'cursor-not-allowed text-gray-300' : 'cursor-pointer hover:bg-gray-50'}`}
-                                style={isSel ? { backgroundColor: ACCENT, color: 'white' } : {}}
+                                disabled={isPast}
+                                className={cn(
+                                    "size-8 rounded-full flex items-center justify-center text-xs font-semibold mx-auto transition-all tabular-nums",
+                                    isPast
+                                        ? 'cursor-not-allowed text-muted-foreground/40'
+                                        : 'cursor-pointer hover:bg-muted',
+                                    isSel && 'bg-primary text-primary-foreground hover:bg-primary'
+                                )}
                             >
                                 {format(d, 'd')}
-                            </div>
+                            </button>
                         );
                     })}
                 </div>
@@ -224,62 +240,60 @@ export function ModifyReservation() {
 
     if (cancelled) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-white px-4">
+            <div className="min-h-screen flex items-center justify-center bg-background px-4">
                 <div className="max-w-md text-center">
-                    <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
-                        <Check className="w-8 h-8 text-gray-500" />
+                    <div className="size-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+                        <Check className="size-7 text-muted-foreground" />
                     </div>
-                    <h1 className="text-2xl font-bold mb-2" style={{ fontFamily: "'Oswald', sans-serif" }}>Reserva cancelada</h1>
-                    <p className="text-sm text-gray-600">Hemos cancelado tu reserva en {reservation.restaurantName}. Esperamos verte pronto.</p>
+                    <h1 className="font-display text-2xl font-medium tracking-tight mb-2">Reserva cancelada</h1>
+                    <p className="text-sm text-muted-foreground">Hemos cancelado tu reserva en {reservation.restaurantName}. Esperamos verte pronto.</p>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-white text-[#0A0A0A]" style={{ fontFamily: "'Lato', sans-serif" }}>
+        <div className="min-h-screen bg-background text-foreground">
             <div className="max-w-3xl mx-auto px-4 py-8">
                 <header className="text-center mb-6">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1" style={{ fontFamily: "'Oswald', sans-serif" }}>
-                        {reservation.restaurantName}
-                    </p>
-                    <h1 className="text-3xl font-bold uppercase tracking-tight" style={{ fontFamily: "'Oswald', sans-serif" }}>Tu reserva</h1>
-                    <p className="text-sm text-gray-500 mt-1">Hola {reservation.guestName.split(' ')[0]}, aquí puedes modificar o cancelar tu reserva.</p>
+                    <p className="text-eyebrow mb-1">{reservation.restaurantName}</p>
+                    <h1 className="font-display text-3xl font-medium tracking-tight">Tu reserva</h1>
+                    <p className="text-sm text-muted-foreground mt-1">Hola {reservation.guestName.split(' ')[0]}, aquí puedes modificar o cancelar tu reserva.</p>
                 </header>
 
-                <section className="bg-gray-50 p-4 border-l-4 mb-6 shadow-sm" style={{ borderColor: ACCENT }}>
+                <section className="bg-muted/30 p-4 border-l-4 border-primary mb-6 rounded-r-md">
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
-                        <div className="flex items-center gap-2"><Calendar className="w-4 h-4 text-gray-400" /><span>{format(new Date(reservation.date), "dd/MM/yyyy", { locale: es })}</span></div>
-                        <div className="flex items-center gap-2"><Clock className="w-4 h-4 text-gray-400" /><span>{format(new Date(reservation.date), 'HH:mm')}h</span></div>
-                        <div className="flex items-center gap-2"><Users className="w-4 h-4 text-gray-400" /><span>{reservation.pax} personas</span></div>
+                        <div className="flex items-center gap-2"><Calendar className="size-4 text-muted-foreground" /><span>{format(new Date(reservation.date), "dd/MM/yyyy", { locale: es })}</span></div>
+                        <div className="flex items-center gap-2"><Clock className="size-4 text-muted-foreground" /><span>{format(new Date(reservation.date), 'HH:mm')}h</span></div>
+                        <div className="flex items-center gap-2"><Users className="size-4 text-muted-foreground" /><span>{reservation.pax} personas</span></div>
                     </div>
                 </section>
 
                 {!reservation.editable && (
-                    <div className="mb-6 p-4 bg-amber-50 border-2 border-amber-100 text-sm text-amber-800 flex items-start gap-2">
-                        <AlertCircle className="w-4 h-4 mt-0.5" />
+                    <div className="mb-6 p-4 bg-warning/10 border border-warning/30 text-sm text-warning-foreground flex items-start gap-2 rounded-md">
+                        <AlertCircle className="size-4 mt-0.5 text-warning" />
                         <span>Tu reserva ya no se puede modificar ni cancelar online (faltan menos de {Math.round(reservation.editCutoffMinutes / 60)}h). Llámanos si necesitas cambios.</span>
                     </div>
                 )}
 
                 <fieldset disabled={!reservation.editable || saving || cancelling} className="space-y-6 disabled:opacity-60">
-                    <div className="border border-gray-100 p-4">
-                        <h2 className="text-xs font-bold uppercase tracking-widest mb-3 text-gray-500" style={{ fontFamily: "'Oswald', sans-serif" }}>Personas</h2>
+                    <div className="border border-border p-4 rounded-md">
+                        <h2 className="text-eyebrow mb-3">Personas</h2>
                         <div className="flex items-center gap-4">
-                            <button type="button" onClick={() => setPax(Math.max(1, pax - 1))} className="w-9 h-9 rounded-full border border-gray-200 hover:bg-gray-50">−</button>
-                            <span className="text-xl font-bold w-12 text-center" style={{ fontFamily: "'Oswald', sans-serif" }}>{pax}</span>
-                            <button type="button" onClick={() => setPax(pax + 1)} className="w-9 h-9 rounded-full border border-gray-200 hover:bg-gray-50">+</button>
+                            <Button type="button" variant="outline" size="icon" onClick={() => setPax(Math.max(1, pax - 1))} aria-label="Menos personas">−</Button>
+                            <span className="font-display text-xl font-medium w-12 text-center tabular-nums">{pax}</span>
+                            <Button type="button" variant="outline" size="icon" onClick={() => setPax(pax + 1)} aria-label="Más personas">+</Button>
                         </div>
                     </div>
 
-                    <div className="border border-gray-100 p-4">
-                        <h2 className="text-xs font-bold uppercase tracking-widest mb-3 text-gray-500" style={{ fontFamily: "'Oswald', sans-serif" }}>Fecha y hora</h2>
+                    <div className="border border-border p-4 rounded-md">
+                        <h2 className="text-eyebrow mb-3">Fecha y hora</h2>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                             {renderCalendar()}
                             <div>
                                 {loadingSlots ? (
-                                    <div className="flex items-center justify-center h-32 text-gray-400 text-sm">
-                                        <Loader2 className="w-4 h-4 animate-spin mr-2" /> Cargando horarios…
+                                    <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
+                                        <Loader2 className="size-4 animate-spin mr-2" /> Cargando horarios…
                                     </div>
                                 ) : (
                                     <div className="space-y-4">
@@ -288,7 +302,7 @@ export function ModifyReservation() {
                                             if (list.length === 0) return null;
                                             return (
                                                 <div key={meal}>
-                                                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 border-b pb-1">
+                                                    <h4 className="text-eyebrow mb-2 border-b border-border pb-1">
                                                         {meal === 'lunch' ? 'Comida' : 'Cena'}
                                                     </h4>
                                                     <div className="grid grid-cols-3 gap-2">
@@ -296,13 +310,10 @@ export function ModifyReservation() {
                                                             <Button
                                                                 key={t}
                                                                 type="button"
+                                                                variant={selectedTime === t ? 'default' : 'outline'}
+                                                                size="sm"
                                                                 onClick={() => setSelectedTime(t)}
-                                                                className="text-sm py-2 h-auto font-bold tracking-wider"
-                                                                style={{
-                                                                    backgroundColor: selectedTime === t ? ACCENT : 'transparent',
-                                                                    color: selectedTime === t ? 'white' : '#0A0A0A',
-                                                                    border: `1px solid ${selectedTime === t ? ACCENT : '#E5E7EB'}`
-                                                                }}
+                                                                className="tabular-nums"
                                                             >
                                                                 {t}
                                                             </Button>
@@ -312,7 +323,7 @@ export function ModifyReservation() {
                                             );
                                         })}
                                         {availableTimes.size === 0 && (
-                                            <p className="text-sm text-gray-400 italic">No hay horarios disponibles en este día.</p>
+                                            <p className="text-sm text-muted-foreground italic">No hay horarios disponibles en este día.</p>
                                         )}
                                     </div>
                                 )}
@@ -320,10 +331,10 @@ export function ModifyReservation() {
                         </div>
                     </div>
 
-                    <div className="border border-gray-100 p-4">
-                        <h2 className="text-xs font-bold uppercase tracking-widest mb-3 text-gray-500" style={{ fontFamily: "'Oswald', sans-serif" }}>Comentarios / Alergias</h2>
-                        <textarea
-                            className="w-full border border-gray-200 p-3 text-sm focus:outline-none focus:border-[#C59D5F] bg-white resize-none"
+                    <div className="border border-border p-4 rounded-md">
+                        <h2 className="text-eyebrow mb-3">Comentarios / Alergias</h2>
+                        <Textarea
+                            className="resize-none"
                             rows={3}
                             value={notes}
                             onChange={e => setNotes(e.target.value)}
@@ -336,8 +347,8 @@ export function ModifyReservation() {
                             type="button"
                             onClick={handleSave}
                             disabled={!hasChanges || saving || !reservation.editable}
-                            className="flex-1 h-12 text-sm font-bold uppercase tracking-widest text-white"
-                            style={{ backgroundColor: ACCENT, fontFamily: "'Oswald', sans-serif" }}
+                            size="lg"
+                            className="flex-1"
                         >
                             {saving ? 'Guardando…' : 'Guardar cambios'}
                         </Button>
@@ -345,17 +356,17 @@ export function ModifyReservation() {
                             type="button"
                             onClick={handleCancel}
                             disabled={cancelling || !reservation.editable}
-                            variant="ghost"
-                            className="flex-1 h-12 text-sm font-bold uppercase tracking-widest border border-red-200 text-red-600 hover:bg-red-50"
-                            style={{ fontFamily: "'Oswald', sans-serif" }}
+                            variant="outline"
+                            size="lg"
+                            className="flex-1 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
                         >
                             {cancelling ? 'Cancelando…' : 'Cancelar reserva'}
                         </Button>
                     </div>
 
                     {savedAt && (
-                        <p className="text-xs text-green-700 text-center mt-2 flex items-center justify-center gap-1">
-                            <Check className="w-3 h-3" /> Cambios guardados a las {format(savedAt, 'HH:mm')}
+                        <p className="text-xs text-success text-center mt-2 flex items-center justify-center gap-1">
+                            <Check className="size-3" /> Cambios guardados a las {format(savedAt, 'HH:mm')}
                         </p>
                     )}
                 </fieldset>

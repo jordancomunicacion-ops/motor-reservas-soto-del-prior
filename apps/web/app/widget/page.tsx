@@ -1,71 +1,88 @@
 "use client";
 import { useState, useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { fetchAPI } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { ArrowLeft, Check, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+interface HotelAvailabilityResult {
+    id: string;
+    name: string;
+    totalPrice: number;
+    description?: string;
+}
+interface HotelWidgetConfig {
+    primaryColor?: string | null;
+    customCss?: string | null;
+    restaurantId?: string | null;
+}
+interface HotelBookingResult {
+    id?: string;
+    referenceCode?: string;
+    totalPrice?: number;
+}
+
+function StepHeader({ title, onBack }: { title: string; onBack?: () => void }) {
+    return (
+        <div className="flex items-center justify-between">
+            <h3 className="font-display text-xl font-medium tracking-tight">{title}</h3>
+            {onBack && (
+                <button
+                    onClick={onBack}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                >
+                    <ArrowLeft className="size-3" /> Atrás
+                </button>
+            )}
+        </div>
+    );
+}
 
 function WidgetContent() {
-    const router = useRouter();
     const searchParams = useSearchParams();
     const hotelId = searchParams.get('hotelId') || "DEMO-HOTEL-ID";
 
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
 
-    // Custom Styles
-    const [styles, setStyles] = useState({ primary: '#3b82f6', css: '' });
+    const [stylesPrimary, setStylesPrimary] = useState<string | null>(null);
+    const [customCss, setCustomCss] = useState<string>('');
 
     useEffect(() => {
-        // Load Config
-        fetchAPI(`/config/${hotelId}`).then(res => {
-            if (res && res.primaryColor) setStyles({ primary: res.primaryColor, css: res.customCss || '' });
-        }).catch(err => console.log('Using default styles'));
-    }, [hotelId]);
-
-    // Inject CSS
-    useEffect(() => {
-        if (styles.css) {
+        if (customCss) {
             const style = document.createElement('style');
-            style.innerHTML = styles.css;
+            style.innerHTML = customCss;
             document.head.appendChild(style);
-            return () => { document.head.removeChild(style); }
+            return () => { document.head.removeChild(style); };
         }
-    }, [styles.css]);
+    }, [customCss]);
 
-    // Search State
     const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
     const checkout = new Date(); checkout.setDate(checkout.getDate() + 3);
-    const [dates, setDates] = useState({ from: tomorrow.toISOString().split('T')[0], to: checkout.toISOString().split('T')[0] });
+    const [dates, setDates] = useState({
+        from: tomorrow.toISOString().split('T')[0],
+        to: checkout.toISOString().split('T')[0],
+    });
     const [pax, setPax] = useState(2);
 
-    // Results
-    interface HotelAvailabilityResult {
-        id: string;
-        name: string;
-        totalPrice: number;
-        description?: string;
-    }
-    interface HotelWidgetConfig {
-        primaryColor?: string | null;
-        customCss?: string | null;
-        restaurantId?: string | null;
-    }
-    interface HotelBookingResult {
-        id?: string;
-        referenceCode?: string;
-        totalPrice?: number;
-    }
-
     const [results, setResults] = useState<HotelAvailabilityResult[]>([]);
-
     const [selectedRoom, setSelectedRoom] = useState<HotelAvailabilityResult | null>(null);
     const [guest, setGuest] = useState({ name: '', email: '', phone: '' });
     const [config, setConfig] = useState<HotelWidgetConfig | null>(null);
     const [submitting, setSubmitting] = useState(false);
     const [bookingResult, setBookingResult] = useState<HotelBookingResult | null>(null);
 
-    // Synergy State
     const [meals, setMeals] = useState({ breakfast: false, lunch: false, dinner: false });
     const [lunchTime, setLunchTime] = useState("");
     const [dinnerTime, setDinnerTime] = useState("");
@@ -73,11 +90,11 @@ function WidgetContent() {
     const [dinnerSlots, setDinnerSlots] = useState<string[]>([]);
 
     useEffect(() => {
-        // Load Config
         fetchAPI<HotelWidgetConfig>(`/config/${hotelId}`).then(res => {
             setConfig(res);
-            if (res && res.primaryColor) setStyles({ primary: res.primaryColor, css: res.customCss || '' });
-        }).catch(() => console.log('Using default styles'));
+            if (res?.primaryColor) setStylesPrimary(res.primaryColor);
+            if (res?.customCss) setCustomCss(res.customCss);
+        }).catch(() => { /* defaults */ });
     }, [hotelId]);
 
     useEffect(() => {
@@ -95,7 +112,6 @@ function WidgetContent() {
                 .catch(() => setDinnerSlots(["20:30", "21:00", "21:30"]));
         }
     }, [meals.dinner, config?.restaurantId, dates.from, pax]);
-
 
     async function handleSearch() {
         setLoading(true);
@@ -115,64 +131,123 @@ function WidgetContent() {
         }
     }
 
+    // Override --primary token per hotel (controlled, no inline styles in markup).
+    const wrapperStyle = stylesPrimary
+        ? ({ '--primary': stylesPrimary, '--ring': stylesPrimary } as React.CSSProperties)
+        : undefined;
+
+    const totalSteps = 5;
+
     return (
         <>
             <link rel="stylesheet" href="/custom-widget.css" />
-            <div className="widget-container" style={{ '--primary': styles.primary } as any}>
-                <Card className="w-full max-w-lg shadow-xl overflow-hidden border-none">
+            <div className="widget-container min-h-screen bg-background grid place-items-center p-4 sm:p-6" style={wrapperStyle}>
+                <Card className="w-full max-w-lg border-border/60 shadow-lg gap-0 py-0 overflow-hidden">
+                    {/* Progress */}
+                    <div className="px-6 pt-6 pb-4 border-b border-border/60">
+                        <div className="flex items-center justify-between mb-3">
+                            <p className="text-eyebrow">Reserva tu estancia</p>
+                            <span className="text-[11px] font-medium text-muted-foreground tabular-nums">
+                                Paso {Math.min(step, totalSteps)} / {totalSteps}
+                            </span>
+                        </div>
+                        <div className="flex gap-1">
+                            {Array.from({ length: totalSteps }).map((_, i) => (
+                                <div
+                                    key={i}
+                                    className={cn(
+                                        "h-1 flex-1 rounded-full transition-colors",
+                                        i < step ? "bg-primary" : "bg-muted",
+                                    )}
+                                />
+                            ))}
+                        </div>
+                    </div>
 
                     <CardContent className="p-6">
                         {/* STEP 1: SEARCH */}
                         {step === 1 && (
-                            <div className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-1">
-                                        <label className="text-xs font-bold uppercase opacity-60">Entrada</label>
-                                        <input type="date" className="w-full border-2 border-gray-100 p-3 rounded-xl focus:border-primary outline-none transition-all" value={dates.from} onChange={e => setDates({ ...dates, from: e.target.value })} />
+                            <div className="space-y-5">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="checkin" className="text-eyebrow">Entrada</Label>
+                                        <Input
+                                            id="checkin"
+                                            type="date"
+                                            className="h-11"
+                                            value={dates.from}
+                                            onChange={e => setDates({ ...dates, from: e.target.value })}
+                                        />
                                     </div>
-                                    <div className="space-y-1">
-                                        <label className="text-xs font-bold uppercase opacity-60">Salida</label>
-                                        <input type="date" className="w-full border-2 border-gray-100 p-3 rounded-xl focus:border-primary outline-none transition-all" value={dates.to} onChange={e => setDates({ ...dates, to: e.target.value })} />
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="checkout" className="text-eyebrow">Salida</Label>
+                                        <Input
+                                            id="checkout"
+                                            type="date"
+                                            className="h-11"
+                                            value={dates.to}
+                                            onChange={e => setDates({ ...dates, to: e.target.value })}
+                                        />
                                     </div>
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold uppercase opacity-60">Huéspedes</label>
-                                    <select className="w-full border-2 border-gray-100 p-3 rounded-xl focus:border-primary outline-none transition-all appearance-none" value={pax} onChange={e => setPax(+e.target.value)}>
-                                        <option value="1">1 Adulto</option>
-                                        <option value="2">2 Adultos</option>
-                                        <option value="3">3 Adultos</option>
-                                        <option value="4">4 Adultos</option>
-                                    </select>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="pax" className="text-eyebrow">Huéspedes</Label>
+                                    <Select value={String(pax)} onValueChange={v => setPax(Number(v))}>
+                                        <SelectTrigger id="pax" className="w-full h-11">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {[1, 2, 3, 4].map(n => (
+                                                <SelectItem key={n} value={String(n)}>
+                                                    {n} {n === 1 ? 'Adulto' : 'Adultos'}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
-                                <Button className="w-full py-6 rounded-xl font-bold text-lg shadow-lg hover:translate-y-[-2px] transition-all" style={{ backgroundColor: styles.primary }} onClick={handleSearch} disabled={loading}>
-                                    {loading ? 'Buscando...' : 'Ver Disponibilidad'}
+                                <Button
+                                    size="xl"
+                                    className="w-full"
+                                    onClick={handleSearch}
+                                    disabled={loading}
+                                >
+                                    {loading && <Loader2 className="size-4 animate-spin" />}
+                                    {loading ? 'Buscando disponibilidad…' : 'Ver disponibilidad'}
                                 </Button>
                             </div>
                         )}
 
                         {/* STEP 2: SELECT ROOM */}
                         {step === 2 && (
-                            <div className="space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <h3 className="font-bold text-xl">Selecciona Habitación</h3>
-                                    <button onClick={() => setStep(1)} className="text-xs text-muted-foreground underline">Cambiar fechas</button>
-                                </div>
-
-                                <div className="space-y-3">
-                                    {results.map(r => (
-                                        <div key={r.id} className="border-2 border-gray-50 p-4 rounded-2xl cursor-pointer hover:border-primary hover:bg-primary/5 transition-all group" 
-                                             onClick={() => { setSelectedRoom(r); setStep(3); }}>
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <span className="font-bold text-lg group-hover:text-primary transition-colors">{r.name}</span>
-                                                    <p className="text-sm text-gray-400 mt-1">{r.description}</p>
+                            <div className="space-y-5">
+                                <StepHeader title="Selecciona habitación" onBack={() => setStep(1)} />
+                                <div className="space-y-2.5">
+                                    {results.length === 0 ? (
+                                        <p className="text-sm text-muted-foreground text-center py-8">
+                                            No hay disponibilidad para esas fechas.
+                                        </p>
+                                    ) : results.map(r => (
+                                        <button
+                                            key={r.id}
+                                            type="button"
+                                            onClick={() => { setSelectedRoom(r); setStep(3); }}
+                                            className="w-full text-left rounded-lg border border-border/70 bg-card p-4 transition-all hover:border-primary/50 hover:shadow-sm hover:bg-primary/[0.02] group"
+                                        >
+                                            <div className="flex justify-between items-start gap-4">
+                                                <div className="min-w-0">
+                                                    <span className="block font-display text-base font-medium group-hover:text-primary transition-colors">
+                                                        {r.name}
+                                                    </span>
+                                                    {r.description && (
+                                                        <p className="text-sm text-muted-foreground mt-1">{r.description}</p>
+                                                    )}
                                                 </div>
-                                                <div className="text-right">
-                                                    <span className="block font-black text-xl">€{r.totalPrice}</span>
-                                                    <span className="text-[10px] uppercase font-bold opacity-50">Total Estancia</span>
+                                                <div className="text-right shrink-0">
+                                                    <span className="block font-display text-xl font-medium tabular-nums">€{r.totalPrice}</span>
+                                                    <span className="text-eyebrow">Total estancia</span>
                                                 </div>
                                             </div>
-                                        </div>
+                                        </button>
                                     ))}
                                 </div>
                             </div>
@@ -180,60 +255,39 @@ function WidgetContent() {
 
                         {/* STEP 3: EXTRAS / SYNERGY */}
                         {step === 3 && (
-                            <div className="space-y-6">
-                                <div className="flex items-center justify-between">
-                                    <h3 className="font-bold text-xl">Personaliza tu estancia</h3>
-                                    <button onClick={() => setStep(2)} className="text-xs text-muted-foreground underline">Atrás</button>
-                                </div>
+                            <div className="space-y-5">
+                                <StepHeader title="Personaliza tu estancia" onBack={() => setStep(2)} />
 
-                                <div className="space-y-4">
+                                <div className="space-y-2.5">
                                     {/* Breakfast */}
-                                    <div className={`p-4 border-2 rounded-2xl transition-all cursor-pointer ${meals.breakfast ? 'border-primary bg-primary/5' : 'border-gray-50'}`}
-                                         onClick={() => setMeals({...meals, breakfast: !meals.breakfast})}>
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-5 h-5 border-2 rounded flex items-center justify-center border-gray-300">
-                                                    {meals.breakfast && <div className="w-3 h-3 bg-primary rounded-sm" style={{ backgroundColor: styles.primary }}></div>}
-                                                </div>
-                                                <div>
-                                                    <span className="font-bold">Desayuno Buffet</span>
-                                                    <p className="text-xs text-muted-foreground">Soto del Prior (Sin horario fijo)</p>
-                                                </div>
-                                            </div>
-                                            <span className="font-bold text-sm text-primary">+€12/día</span>
-                                        </div>
-                                    </div>
+                                    <ExtraOption
+                                        selected={meals.breakfast}
+                                        onClick={() => setMeals({ ...meals, breakfast: !meals.breakfast })}
+                                        title="Desayuno buffet"
+                                        subtitle="Soto del Prior · sin horario fijo"
+                                        rightLabel="+€12/día"
+                                    />
 
                                     {/* Lunch */}
                                     {config?.restaurantId && (
-                                        <div className={`p-4 border-2 rounded-2xl transition-all ${meals.lunch ? 'border-primary bg-primary/5' : 'border-gray-50'}`}>
-                                            <div className="flex items-center justify-between cursor-pointer" onClick={() => setMeals({...meals, lunch: !meals.lunch})}>
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-5 h-5 border-2 rounded flex items-center justify-center border-gray-300">
-                                                        {meals.lunch && <div className="w-3 h-3 bg-primary rounded-sm" style={{ backgroundColor: styles.primary }}></div>}
-                                                    </div>
-                                                    <div>
-                                                        <span className="font-bold">Comida</span>
-                                                        <p className="text-xs text-muted-foreground">Turnos de mediodía</p>
-                                                    </div>
-                                                </div>
-                                                <span className="font-bold text-sm text-primary">Cita Previa</span>
-                                            </div>
+                                        <div
+                                            className={cn(
+                                                "rounded-lg border bg-card transition-all",
+                                                meals.lunch ? "border-primary/60 bg-primary/[0.04]" : "border-border/70",
+                                            )}
+                                        >
+                                            <ExtraOption
+                                                selected={meals.lunch}
+                                                onClick={() => setMeals({ ...meals, lunch: !meals.lunch })}
+                                                title="Comida"
+                                                subtitle="Turnos de mediodía"
+                                                rightLabel="Cita previa"
+                                                bare
+                                            />
                                             {meals.lunch && (
-                                                <div className="mt-4 pt-4 border-t border-dashed animate-in fade-in slide-in-from-top-2 duration-300">
-                                                    <label className="text-xs font-bold uppercase opacity-60 block mb-2">Horario Comida</label>
-                                                    <div className="grid grid-cols-4 gap-2">
-                                                        {lunchSlots.map(slot => (
-                                                            <button 
-                                                                key={slot}
-                                                                className={`p-2 text-xs font-bold rounded-lg transition-all ${lunchTime === slot ? 'bg-primary text-white' : 'bg-white border hover:bg-gray-50'}`}
-                                                                style={lunchTime === slot ? { backgroundColor: styles.primary } : {}}
-                                                                onClick={() => setLunchTime(slot)}
-                                                            >
-                                                                {slot}
-                                                            </button>
-                                                        ))}
-                                                    </div>
+                                                <div className="px-4 pb-4 pt-3 border-t border-border/60 animate-in fade-in slide-in-from-top-1 duration-200">
+                                                    <p className="text-eyebrow mb-2">Horario comida</p>
+                                                    <SlotPicker slots={lunchSlots} value={lunchTime} onChange={setLunchTime} />
                                                 </div>
                                             )}
                                         </div>
@@ -241,78 +295,89 @@ function WidgetContent() {
 
                                     {/* Dinner */}
                                     {config?.restaurantId && (
-                                        <div className={`p-4 border-2 rounded-2xl transition-all ${meals.dinner ? 'border-primary bg-primary/5' : 'border-gray-50'}`}>
-                                            <div className="flex items-center justify-between cursor-pointer" onClick={() => setMeals({...meals, dinner: !meals.dinner})}>
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-5 h-5 border-2 rounded flex items-center justify-center border-gray-300">
-                                                        {meals.dinner && <div className="w-3 h-3 bg-primary rounded-sm" style={{ backgroundColor: styles.primary }}></div>}
-                                                    </div>
-                                                    <div>
-                                                        <span className="font-bold">Cena</span>
-                                                        <p className="text-xs text-muted-foreground">Turnos de noche</p>
-                                                    </div>
-                                                </div>
-                                                <span className="font-bold text-sm text-primary">Cita Previa</span>
-                                            </div>
-
+                                        <div
+                                            className={cn(
+                                                "rounded-lg border bg-card transition-all",
+                                                meals.dinner ? "border-primary/60 bg-primary/[0.04]" : "border-border/70",
+                                            )}
+                                        >
+                                            <ExtraOption
+                                                selected={meals.dinner}
+                                                onClick={() => setMeals({ ...meals, dinner: !meals.dinner })}
+                                                title="Cena"
+                                                subtitle="Turnos de noche"
+                                                rightLabel="Cita previa"
+                                                bare
+                                            />
                                             {meals.dinner && (
-                                                <div className="mt-4 pt-4 border-t border-dashed animate-in fade-in slide-in-from-top-2 duration-300">
-                                                    <label className="text-xs font-bold uppercase opacity-60 block mb-2">Horario Cena</label>
-                                                    <div className="grid grid-cols-4 gap-2">
-                                                        {dinnerSlots.map(slot => (
-                                                            <button 
-                                                                key={slot}
-                                                                className={`p-2 text-xs font-bold rounded-lg transition-all ${dinnerTime === slot ? 'bg-primary text-white' : 'bg-white border hover:bg-gray-50'}`}
-                                                                style={dinnerTime === slot ? { backgroundColor: styles.primary } : {}}
-                                                                onClick={() => setDinnerTime(slot)}
-                                                            >
-                                                                {slot}
-                                                            </button>
-                                                        ))}
-                                                    </div>
+                                                <div className="px-4 pb-4 pt-3 border-t border-border/60 animate-in fade-in slide-in-from-top-1 duration-200">
+                                                    <p className="text-eyebrow mb-2">Horario cena</p>
+                                                    <SlotPicker slots={dinnerSlots} value={dinnerTime} onChange={setDinnerTime} />
                                                 </div>
                                             )}
                                         </div>
                                     )}
                                 </div>
 
-                                <Button className="w-full py-6 rounded-xl font-bold text-lg shadow-lg" 
-                                        style={{ backgroundColor: styles.primary }}
-                                        onClick={() => setStep(4)}
-                                        disabled={(meals.lunch && !lunchTime) || (meals.dinner && !dinnerTime)}>
-                                    Continuar al Pago
+                                <Button
+                                    size="xl"
+                                    className="w-full"
+                                    onClick={() => setStep(4)}
+                                    disabled={(meals.lunch && !lunchTime) || (meals.dinner && !dinnerTime)}
+                                >
+                                    Continuar
                                 </Button>
-
                             </div>
                         )}
 
                         {/* STEP 4: GUEST INFO */}
                         {step === 4 && (
-                            <div className="space-y-4">
-                                <h3 className="font-bold text-xl">Datos del Huésped</h3>
-                                <div className="space-y-3">
-                                    <div className="space-y-1">
-                                        <label className="text-xs font-bold uppercase opacity-60">Nombre Completo</label>
-                                        <input type="text" className="w-full border-2 border-gray-100 p-3 rounded-xl focus:border-primary outline-none" value={guest.name} onChange={e => setGuest({ ...guest, name: e.target.value })} />
+                            <div className="space-y-5">
+                                <StepHeader title="Datos del huésped" onBack={() => setStep(3)} />
+                                <div className="space-y-4">
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="g-name" className="text-eyebrow">Nombre completo</Label>
+                                        <Input
+                                            id="g-name"
+                                            type="text"
+                                            className="h-11"
+                                            value={guest.name}
+                                            onChange={e => setGuest({ ...guest, name: e.target.value })}
+                                            required
+                                        />
                                     </div>
-                                    <div className="space-y-1">
-                                        <label className="text-xs font-bold uppercase opacity-60">Email</label>
-                                        <input type="email" className="w-full border-2 border-gray-100 p-3 rounded-xl focus:border-primary outline-none" value={guest.email} onChange={e => setGuest({ ...guest, email: e.target.value })} />
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="g-email" className="text-eyebrow">Email</Label>
+                                        <Input
+                                            id="g-email"
+                                            type="email"
+                                            className="h-11"
+                                            value={guest.email}
+                                            onChange={e => setGuest({ ...guest, email: e.target.value })}
+                                            required
+                                        />
                                     </div>
-                                    <div className="space-y-1">
-                                        <label className="text-xs font-bold uppercase opacity-60">Teléfono</label>
-                                        <input type="tel" className="w-full border-2 border-gray-100 p-3 rounded-xl focus:border-primary outline-none" value={guest.phone} onChange={e => setGuest({ ...guest, phone: e.target.value })} placeholder="+34 600 000 000" />
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="g-phone" className="text-eyebrow">Teléfono</Label>
+                                        <Input
+                                            id="g-phone"
+                                            type="tel"
+                                            className="h-11"
+                                            placeholder="+34 600 000 000"
+                                            value={guest.phone}
+                                            onChange={e => setGuest({ ...guest, phone: e.target.value })}
+                                        />
                                     </div>
                                 </div>
-                                <Button 
-                                    className="w-full py-6 rounded-xl font-bold text-lg shadow-lg" 
-                                    style={{ backgroundColor: styles.primary }} 
+                                <Button
+                                    size="xl"
+                                    className="w-full"
                                     disabled={submitting || !guest.name || !guest.email}
                                     onClick={async () => {
                                         if (!guest.name || !guest.email) { alert('Nombre y email son obligatorios'); return; }
                                         setSubmitting(true);
                                         try {
-                                            const booking = await fetchAPI('/bookings', {
+                                            const booking = await fetchAPI<HotelBookingResult>('/bookings', {
                                                 method: 'POST',
                                                 body: JSON.stringify({
                                                     hotelId,
@@ -326,7 +391,6 @@ function WidgetContent() {
                                                 })
                                             });
                                             setBookingResult(booking);
-                                            // Create synergy reservations if selected
                                             if (config?.restaurantId && booking?.id) {
                                                 if (meals.lunch && lunchTime) {
                                                     await fetchAPI('/restaurant/linked-reservation', {
@@ -350,28 +414,38 @@ function WidgetContent() {
                                         }
                                     }}
                                 >
-                                    {submitting ? 'Procesando...' : `Confirmar y Reservar €${(selectedRoom?.totalPrice ?? 0) + (meals.breakfast ? 12 * 4 : 0)}`}
+                                    {submitting && <Loader2 className="size-4 animate-spin" />}
+                                    {submitting
+                                        ? 'Procesando…'
+                                        : `Confirmar reserva · €${(selectedRoom?.totalPrice ?? 0) + (meals.breakfast ? 12 * 4 : 0)}`}
                                 </Button>
-                                <button onClick={() => setStep(3)} className="w-full text-center text-xs text-muted-foreground mt-2">Revisar extras</button>
                             </div>
                         )}
 
                         {/* STEP 5: SUCCESS */}
                         {step === 5 && (
-                            <div className="space-y-6 text-center py-8">
-                                <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto">
-                                    <svg className="w-10 h-10 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                            <div className="space-y-5 py-4 text-center">
+                                <div className="mx-auto grid place-items-center size-16 rounded-full bg-success/10 text-success">
+                                    <Check className="size-8" strokeWidth={2.5} />
                                 </div>
-                                <h3 className="font-bold text-2xl">¡Reserva Confirmada!</h3>
-                                <p className="text-muted-foreground">Ref: {bookingResult?.referenceCode || 'N/A'}</p>
-                                <div className="bg-gray-50 rounded-xl p-4 text-sm text-left space-y-1">
-                                    <p><strong>Huésped:</strong> {guest.name}</p>
-                                    <p><strong>Check-in:</strong> {dates.from}</p>
-                                    <p><strong>Check-out:</strong> {dates.to}</p>
-                                    <p><strong>Habitación:</strong> {selectedRoom?.name}</p>
-                                    <p><strong>Total:</strong> €{bookingResult?.totalPrice || selectedRoom?.totalPrice}</p>
+                                <div className="space-y-1.5">
+                                    <h3 className="font-display text-2xl font-medium tracking-tight">
+                                        ¡Reserva confirmada!
+                                    </h3>
+                                    <p className="text-sm text-muted-foreground">
+                                        Ref: <span className="font-mono text-foreground">{bookingResult?.referenceCode || 'N/A'}</span>
+                                    </p>
                                 </div>
-                                <p className="text-xs text-muted-foreground">Recibirás un email de confirmación en breve.</p>
+                                <div className="rounded-lg border border-border/60 bg-muted/40 p-4 text-sm text-left space-y-2">
+                                    <SummaryRow label="Huésped" value={guest.name} />
+                                    <SummaryRow label="Check-in" value={dates.from} />
+                                    <SummaryRow label="Check-out" value={dates.to} />
+                                    <SummaryRow label="Habitación" value={selectedRoom?.name ?? '—'} />
+                                    <SummaryRow label="Total" value={`€${bookingResult?.totalPrice || selectedRoom?.totalPrice || 0}`} strong />
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    Recibirás un email de confirmación en breve.
+                                </p>
                             </div>
                         )}
                     </CardContent>
@@ -381,10 +455,99 @@ function WidgetContent() {
     );
 }
 
+function ExtraOption({
+    selected,
+    onClick,
+    title,
+    subtitle,
+    rightLabel,
+    bare,
+}: {
+    selected: boolean;
+    onClick: () => void;
+    title: string;
+    subtitle: string;
+    rightLabel: string;
+    bare?: boolean;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={cn(
+                "w-full text-left transition-all",
+                bare
+                    ? "px-4 py-4"
+                    : cn(
+                        "rounded-lg border bg-card p-4",
+                        selected ? "border-primary/60 bg-primary/[0.04]" : "border-border/70 hover:border-primary/30",
+                    ),
+            )}
+        >
+            <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                    <span
+                        className={cn(
+                            "size-4 rounded border grid place-items-center shrink-0 transition-all",
+                            selected ? "bg-primary border-primary" : "border-input bg-background",
+                        )}
+                    >
+                        {selected && <Check className="size-3 text-primary-foreground" strokeWidth={3} />}
+                    </span>
+                    <div className="min-w-0">
+                        <span className="block font-medium text-sm text-foreground">{title}</span>
+                        <p className="text-xs text-muted-foreground">{subtitle}</p>
+                    </div>
+                </div>
+                <span className="text-xs font-semibold text-primary shrink-0">{rightLabel}</span>
+            </div>
+        </button>
+    );
+}
+
+function SlotPicker({ slots, value, onChange }: { slots: string[]; value: string; onChange: (v: string) => void }) {
+    if (slots.length === 0) {
+        return <p className="text-xs text-muted-foreground">Sin disponibilidad.</p>;
+    }
+    return (
+        <div className="grid grid-cols-4 gap-1.5">
+            {slots.map(slot => (
+                <button
+                    key={slot}
+                    type="button"
+                    onClick={() => onChange(slot)}
+                    className={cn(
+                        "py-2 text-xs font-semibold rounded-md transition-all border tabular-nums",
+                        value === slot
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-card text-foreground border-border/70 hover:border-primary/40",
+                    )}
+                >
+                    {slot}
+                </button>
+            ))}
+        </div>
+    );
+}
+
+function SummaryRow({ label, value, strong }: { label: string; value: React.ReactNode; strong?: boolean }) {
+    return (
+        <div className="flex justify-between items-center">
+            <span className="text-muted-foreground">{label}</span>
+            <span className={cn(strong ? "font-display text-base font-medium" : "font-medium")}>{value}</span>
+        </div>
+    );
+}
 
 export default function WidgetPage() {
     return (
-        <Suspense fallback={<div>Loading widget...</div>}>
+        <Suspense
+            fallback={
+                <div className="min-h-screen grid place-items-center bg-background">
+                    <Loader2 className="size-6 animate-spin text-muted-foreground" />
+                </div>
+            }
+        >
             <WidgetContent />
         </Suspense>
     );

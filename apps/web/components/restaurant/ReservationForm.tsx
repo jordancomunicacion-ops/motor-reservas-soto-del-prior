@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { User, X, ChevronDown, ChevronRight, Utensils, MessageCircle, Instagram, Facebook, Globe, Linkedin } from "lucide-react";
@@ -136,24 +137,32 @@ export default function ReservationForm({ isOpen, onClose, onSubmit, initialDate
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-lg shadow-lg w-full max-w-lg p-6 relative animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
-                <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-black">
-                    <X className="w-5 h-5" />
-                </button>
+            <div className="bg-card text-foreground rounded-lg shadow-lg w-full max-w-lg p-6 relative animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto border border-border">
+                <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={onClose}
+                    aria-label="Cerrar"
+                    className="absolute top-3 right-3"
+                >
+                    <X className="size-4" />
+                </Button>
 
-                <h2 className="text-xl font-bold mb-4">{isEditing ? 'Editar Reserva' : 'Nueva Reserva'}</h2>
+                <h2 className="font-display text-xl font-medium tracking-tight mb-4">
+                    {isEditing ? 'Editar Reserva' : 'Nueva Reserva'}
+                </h2>
 
                 <div className="space-y-4">
                     {/* Fecha, hora, pax, duracion */}
                     <div className="grid grid-cols-2 gap-3">
                         <div className="flex flex-col space-y-1.5">
-                            <Label>Fecha</Label>
-                            <Input type="date" value={dateStr} onChange={(e) => setDateStr(e.target.value)} />
+                            <Label className="text-eyebrow">Fecha</Label>
+                            <Input type="date" className="h-10" value={dateStr} onChange={(e) => setDateStr(e.target.value)} />
                         </div>
                         <div className="flex flex-col space-y-1.5">
-                            <Label>Hora</Label>
+                            <Label className="text-eyebrow">Hora</Label>
                             <Select value={time} onValueChange={setTime}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="w-full h-10"><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                     {['12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '19:00', '19:30', '20:00', '20:30', '21:00', '21:30', '22:00', '22:30'].map(t => (
                                         <SelectItem key={t} value={t}>{t}</SelectItem>
@@ -165,65 +174,65 @@ export default function ReservationForm({ isOpen, onClose, onSubmit, initialDate
 
                     <div className="grid grid-cols-2 gap-3">
                         <div className="flex flex-col space-y-1.5">
-                            <Label className="flex items-center gap-1"><User className="w-3 h-3" /> Pax</Label>
-                            <Input type="number" min="1" max="50" value={pax} onChange={e => setPax(e.target.value)} />
+                            <Label className="text-eyebrow flex items-center gap-1"><User className="size-3" /> Pax</Label>
+                            <Input type="number" min="1" max="50" className="h-10" value={pax} onChange={e => setPax(e.target.value)} />
                         </div>
                         <div className="flex flex-col space-y-1.5">
-                            <Label>Duración (min)</Label>
-                            <Input type="number" min="30" step="15" value={duration} onChange={e => setDuration(e.target.value)} />
+                            <Label className="text-eyebrow">Duración (min)</Label>
+                            <Input type="number" min="30" step="15" className="h-10" value={duration} onChange={e => setDuration(e.target.value)} />
                         </div>
                     </div>
 
                     {/* Cliente */}
                     <div className="grid grid-cols-2 gap-3">
                         <div className="flex flex-col space-y-1.5">
-                            <Label>Nombre y primer apellido *</Label>
-                            <Input value={name} onChange={e => setName(e.target.value)} placeholder="Juan Pérez" />
+                            <Label className="text-eyebrow">Nombre y primer apellido *</Label>
+                            <Input className="h-10" value={name} onChange={e => setName(e.target.value)} placeholder="Juan Pérez" />
                         </div>
                         <div className="flex flex-col space-y-1.5">
-                            <Label>Segundo apellido</Label>
-                            <Input value={surname2} onChange={e => setSurname2(e.target.value)} placeholder="(opcional)" />
+                            <Label className="text-eyebrow">Segundo apellido</Label>
+                            <Input className="h-10" value={surname2} onChange={e => setSurname2(e.target.value)} placeholder="(opcional)" />
                         </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
                         <div className="flex flex-col space-y-1.5">
-                            <Label>Email</Label>
-                            <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="email@ejemplo.com" />
+                            <Label className="text-eyebrow">Email</Label>
+                            <Input type="email" className="h-10" value={email} onChange={e => setEmail(e.target.value)} placeholder="email@ejemplo.com" />
                         </div>
                         <div className="flex flex-col space-y-1.5">
-                            <Label>Teléfono</Label>
-                            <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+34 600..." />
+                            <Label className="text-eyebrow">Teléfono</Label>
+                            <Input className="h-10" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+34 600..." />
                         </div>
                     </div>
 
                     {/* Notas */}
                     <div className="flex flex-col space-y-1.5">
-                        <Label>Notas</Label>
-                        <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Alergias, trona, cumpleaños..." />
+                        <Label className="text-eyebrow">Notas</Label>
+                        <Input className="h-10" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Alergias, trona, cumpleaños..." />
                     </div>
 
                     {/* Toggle: datos adicionales */}
                     <button
                         type="button"
                         onClick={() => setShowExtra(s => !s)}
-                        className="text-xs font-semibold text-stone-600 hover:text-stone-800 flex items-center gap-1"
+                        className="text-xs font-medium text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
                     >
-                        {showExtra ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                        {showExtra ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
                         Datos adicionales (CRM)
                     </button>
 
                     {showExtra && (
-                        <div className="grid grid-cols-1 gap-3 pl-4 border-l-2 border-stone-100">
+                        <div className="grid grid-cols-1 gap-3 pl-4 border-l-2 border-border">
                             <div className="grid grid-cols-3 gap-3">
                                 <div className="flex flex-col space-y-1.5">
-                                    <Label className="text-xs">Edad</Label>
-                                    <Input type="number" min="0" max="120" value={age} onChange={e => setAge(e.target.value)} />
+                                    <Label className="text-eyebrow">Edad</Label>
+                                    <Input type="number" min="0" max="120" className="h-10" value={age} onChange={e => setAge(e.target.value)} />
                                 </div>
                                 <div className="flex flex-col space-y-1.5">
-                                    <Label className="text-xs">Género</Label>
+                                    <Label className="text-eyebrow">Género</Label>
                                     <Select value={gender} onValueChange={setGender}>
-                                        <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                                        <SelectTrigger className="w-full h-10"><SelectValue placeholder="—" /></SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="M">Hombre</SelectItem>
                                             <SelectItem value="F">Mujer</SelectItem>
@@ -232,25 +241,23 @@ export default function ReservationForm({ isOpen, onClose, onSubmit, initialDate
                                     </Select>
                                 </div>
                                 <div className="flex flex-col space-y-1.5">
-                                    <Label className="text-xs flex items-center gap-1"><MessageCircle className="w-3 h-3 text-emerald-600" /> WhatsApp</Label>
-                                    <Input value={whatsapp} onChange={e => setWhatsapp(e.target.value)} placeholder="+34..." />
+                                    <Label className="text-eyebrow flex items-center gap-1"><MessageCircle className="size-3 text-success" /> WhatsApp</Label>
+                                    <Input className="h-10" value={whatsapp} onChange={e => setWhatsapp(e.target.value)} placeholder="+34..." />
                                 </div>
                             </div>
 
                             <div className="flex flex-col space-y-1.5">
-                                <Label className="text-xs">Etiquetas (separadas por comas)</Label>
-                                <Input value={tagsInput} onChange={e => setTagsInput(e.target.value)} placeholder="VIP, Alergias gluten, Cumpleaños" />
+                                <Label className="text-eyebrow">Etiquetas (separadas por comas)</Label>
+                                <Input className="h-10" value={tagsInput} onChange={e => setTagsInput(e.target.value)} placeholder="VIP, Alergias gluten, Cumpleaños" />
                             </div>
 
-                            <label className="flex items-center gap-2 text-sm">
-                                <input
-                                    type="checkbox"
+                            <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                <Checkbox
                                     checked={isMealPlan}
-                                    onChange={(e) => setIsMealPlan(e.target.checked)}
-                                    className="rounded"
+                                    onCheckedChange={(v) => setIsMealPlan(!!v)}
                                 />
-                                <Utensils className="w-3.5 h-3.5 text-indigo-600" />
-                                Reserva en media pensión / pensión completa (hotel)
+                                <Utensils className="size-3.5 text-primary" />
+                                <span>Reserva en media pensión / pensión completa (hotel)</span>
                             </label>
                         </div>
                     )}
@@ -259,39 +266,39 @@ export default function ReservationForm({ isOpen, onClose, onSubmit, initialDate
                     <button
                         type="button"
                         onClick={() => setShowSocial(s => !s)}
-                        className="text-xs font-semibold text-stone-600 hover:text-stone-800 flex items-center gap-1"
+                        className="text-xs font-medium text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
                     >
-                        {showSocial ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                        {showSocial ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
                         Redes sociales
                     </button>
 
                     {showSocial && (
-                        <div className="grid grid-cols-1 gap-2 pl-4 border-l-2 border-stone-100">
+                        <div className="grid grid-cols-1 gap-2 pl-4 border-l-2 border-border">
                             <div className="flex items-center gap-2">
-                                <Instagram className="w-3.5 h-3.5 text-pink-600" />
-                                <Input value={instagram} onChange={e => setInstagram(e.target.value)} placeholder="@usuario o URL" className="text-xs" />
+                                <Instagram className="size-3.5 text-muted-foreground shrink-0" />
+                                <Input className="h-10 text-xs" value={instagram} onChange={e => setInstagram(e.target.value)} placeholder="@usuario o URL" />
                             </div>
                             <div className="flex items-center gap-2">
-                                <Facebook className="w-3.5 h-3.5 text-blue-600" />
-                                <Input value={facebook} onChange={e => setFacebook(e.target.value)} placeholder="usuario o URL" className="text-xs" />
+                                <Facebook className="size-3.5 text-muted-foreground shrink-0" />
+                                <Input className="h-10 text-xs" value={facebook} onChange={e => setFacebook(e.target.value)} placeholder="usuario o URL" />
                             </div>
                             <div className="flex items-center gap-2">
-                                <Globe className="w-3.5 h-3.5 text-stone-700" />
-                                <Input value={tiktok} onChange={e => setTiktok(e.target.value)} placeholder="TikTok @usuario" className="text-xs" />
+                                <Globe className="size-3.5 text-muted-foreground shrink-0" />
+                                <Input className="h-10 text-xs" value={tiktok} onChange={e => setTiktok(e.target.value)} placeholder="TikTok @usuario" />
                             </div>
                             <div className="flex items-center gap-2">
-                                <Linkedin className="w-3.5 h-3.5 text-blue-700" />
-                                <Input value={linkedin} onChange={e => setLinkedinHandle(e.target.value)} placeholder="LinkedIn usuario/URL" className="text-xs" />
+                                <Linkedin className="size-3.5 text-muted-foreground shrink-0" />
+                                <Input className="h-10 text-xs" value={linkedin} onChange={e => setLinkedinHandle(e.target.value)} placeholder="LinkedIn usuario/URL" />
                             </div>
                             <div className="flex items-center gap-2">
-                                <Globe className="w-3.5 h-3.5 text-stone-900" />
-                                <Input value={xTwitter} onChange={e => setXTwitter(e.target.value)} placeholder="X/Twitter @usuario" className="text-xs" />
+                                <Globe className="size-3.5 text-muted-foreground shrink-0" />
+                                <Input className="h-10 text-xs" value={xTwitter} onChange={e => setXTwitter(e.target.value)} placeholder="X/Twitter @usuario" />
                             </div>
                         </div>
                     )}
                 </div>
 
-                <div className="flex justify-end gap-2 mt-6 pt-4 border-t">
+                <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-border">
                     <Button variant="outline" onClick={onClose}>Cancelar</Button>
                     <Button onClick={handleSubmit} disabled={!name}>{isEditing ? 'Guardar' : 'Crear Reserva'}</Button>
                 </div>

@@ -1,8 +1,12 @@
 "use client";
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { AlertCircle, Check, Loader2, Star } from 'lucide-react';
+import Image from 'next/image';
+import { AlertCircle, Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { StarRating } from '@/components/ui/star-rating';
+import { EmptyState } from '@/components/ui/empty-state';
 import { fetchAPI } from '@/lib/api';
 
 type ReviewForm = {
@@ -20,33 +24,6 @@ type SubmitResponse = {
     error?: boolean;
     message?: string;
 };
-
-const ACCENT = '#C59D5F';
-
-function StarRating({ value, onChange, disabled }: { value: number; onChange: (v: number) => void; disabled?: boolean }) {
-    return (
-        <div className="flex items-center gap-1">
-            {[1, 2, 3, 4, 5].map(n => (
-                <button
-                    key={n}
-                    type="button"
-                    onClick={() => !disabled && onChange(n)}
-                    disabled={disabled}
-                    aria-label={`${n} estrella${n > 1 ? 's' : ''}`}
-                    className="p-1 disabled:cursor-not-allowed"
-                >
-                    <Star
-                        className="w-7 h-7 transition-colors"
-                        style={{
-                            color: n <= value ? ACCENT : '#E5E7EB',
-                            fill: n <= value ? ACCENT : 'transparent',
-                        }}
-                    />
-                </button>
-            ))}
-        </div>
-    );
-}
 
 export function ReviewReservation() {
     const sp = useSearchParams();
@@ -112,8 +89,8 @@ export function ReviewReservation() {
                 return;
             }
             setSubmitted(true);
-        } catch (e: any) {
-            alert(e?.message || 'Error al enviar la valoración.');
+        } catch (e) {
+            alert((e instanceof Error && e.message) || 'Error al enviar la valoración.');
         } finally {
             setSubmitting(false);
         }
@@ -121,34 +98,33 @@ export function ReviewReservation() {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-white">
-                <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+            <div className="min-h-screen grid place-items-center bg-background">
+                <Loader2 className="size-6 animate-spin text-muted-foreground" />
             </div>
         );
     }
 
     if (error || !form) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-white px-4">
-                <div className="max-w-md text-center">
-                    <AlertCircle className="w-12 h-12 mx-auto mb-4 text-red-500" />
-                    <h1 className="text-xl font-bold mb-2" style={{ fontFamily: "'Oswald', sans-serif" }}>No se pudo abrir la valoración</h1>
-                    <p className="text-sm text-gray-600">{error || 'Enlace inválido o caducado.'}</p>
-                </div>
+            <div className="min-h-screen grid place-items-center bg-background px-4">
+                <EmptyState
+                    icon={AlertCircle}
+                    tone="danger"
+                    title="No se pudo abrir la valoración"
+                    description={error || 'Enlace inválido o caducado.'}
+                />
             </div>
         );
     }
 
     if (submitted) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-white px-4">
-                <div className="max-w-md text-center">
-                    <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
-                        <Check className="w-8 h-8 text-gray-500" />
-                    </div>
-                    <h1 className="text-2xl font-bold mb-2" style={{ fontFamily: "'Oswald', sans-serif" }}>¡Gracias!</h1>
-                    <p className="text-sm text-gray-600">Hemos recibido tu valoración para {form.restaurantName}. Es un detalle que nos ayuda muchísimo.</p>
-                </div>
+            <div className="min-h-screen grid place-items-center bg-background px-4">
+                <EmptyState
+                    icon={Check}
+                    title="¡Gracias!"
+                    description={`Hemos recibido tu valoración para ${form.restaurantName}. Es un detalle que nos ayuda muchísimo.`}
+                />
             </div>
         );
     }
@@ -156,63 +132,56 @@ export function ReviewReservation() {
     const firstName = form.guestName.split(' ')[0];
 
     return (
-        <div className="min-h-screen bg-white text-[#0A0A0A]" style={{ fontFamily: "'Lato', sans-serif" }}>
-            <div className="max-w-xl mx-auto px-4 py-10">
-                <header className="text-center mb-8">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1" style={{ fontFamily: "'Oswald', sans-serif" }}>
-                        {form.restaurantName}
-                    </p>
-                    <h1 className="text-3xl font-bold uppercase tracking-tight" style={{ fontFamily: "'Oswald', sans-serif" }}>
+        <div className="min-h-screen bg-background text-foreground">
+            <div className="max-w-xl mx-auto px-4 py-12 sm:py-16">
+                <header className="text-center mb-10">
+                    <div className="flex justify-center mb-6">
+                        <Image src="/logo-icon.png" alt="Soto del Prior" width={48} height={48} />
+                    </div>
+                    <p className="text-eyebrow mb-2">{form.restaurantName}</p>
+                    <h1 className="font-display text-4xl font-medium tracking-tight">
                         ¿Qué tal tu experiencia?
                     </h1>
-                    <p className="text-sm text-gray-500 mt-2">
+                    <p className="text-sm text-muted-foreground mt-3 max-w-md mx-auto">
                         Hola {firstName}, gracias por visitarnos. Cuéntanos cómo fue.
                     </p>
                 </header>
 
-                <div className="space-y-6">
-                    <div className="border border-gray-100 p-4">
-                        <h2 className="text-xs font-bold uppercase tracking-widest mb-3 text-gray-500" style={{ fontFamily: "'Oswald', sans-serif" }}>
-                            Atención
-                        </h2>
-                        <StarRating value={service} onChange={setService} disabled={submitting} />
-                    </div>
+                <div className="space-y-4">
+                    {[
+                        { label: 'Atención', value: service, onChange: setService },
+                        { label: 'Entorno', value: ambiance, onChange: setAmbiance },
+                        { label: 'Comida', value: food, onChange: setFood },
+                    ].map(({ label, value, onChange }) => (
+                        <div
+                            key={label}
+                            className="rounded-lg border border-border/60 bg-card p-5 flex items-center justify-between gap-4"
+                        >
+                            <h2 className="text-sm font-medium text-foreground">{label}</h2>
+                            <StarRating value={value} onChange={onChange} disabled={submitting} />
+                        </div>
+                    ))}
 
-                    <div className="border border-gray-100 p-4">
-                        <h2 className="text-xs font-bold uppercase tracking-widest mb-3 text-gray-500" style={{ fontFamily: "'Oswald', sans-serif" }}>
-                            Entorno
-                        </h2>
-                        <StarRating value={ambiance} onChange={setAmbiance} disabled={submitting} />
-                    </div>
-
-                    <div className="border border-gray-100 p-4">
-                        <h2 className="text-xs font-bold uppercase tracking-widest mb-3 text-gray-500" style={{ fontFamily: "'Oswald', sans-serif" }}>
-                            Comida
-                        </h2>
-                        <StarRating value={food} onChange={setFood} disabled={submitting} />
-                    </div>
-
-                    <div className="border border-gray-100 p-4">
-                        <h2 className="text-xs font-bold uppercase tracking-widest mb-3 text-gray-500" style={{ fontFamily: "'Oswald', sans-serif" }}>
-                            Consejos
-                        </h2>
-                        <textarea
-                            className="w-full border border-gray-200 p-3 text-sm focus:outline-none focus:border-[#C59D5F] bg-white resize-none"
-                            rows={4}
+                    <div className="rounded-lg border border-border/60 bg-card p-5 space-y-3">
+                        <h2 className="text-sm font-medium text-foreground">Consejos</h2>
+                        <Textarea
                             value={advice}
                             onChange={e => setAdvice(e.target.value)}
                             placeholder="¿Algo que podamos mejorar? ¿Algún detalle que quieras destacar?"
                             disabled={submitting}
+                            rows={4}
+                            className="resize-none"
                         />
                     </div>
 
                     <Button
                         type="button"
+                        size="xl"
                         onClick={handleSubmit}
                         disabled={!canSubmit}
-                        className="w-full h-12 text-sm font-bold uppercase tracking-widest text-white"
-                        style={{ backgroundColor: ACCENT, fontFamily: "'Oswald', sans-serif" }}
+                        className="w-full mt-4"
                     >
+                        {submitting && <Loader2 className="size-4 animate-spin" />}
                         {submitting ? 'Enviando…' : 'Enviar valoración'}
                     </Button>
                 </div>

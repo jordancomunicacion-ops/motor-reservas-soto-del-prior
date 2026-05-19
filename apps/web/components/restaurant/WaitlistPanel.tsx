@@ -1,13 +1,12 @@
 "use client";
 import { useState } from "react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-// import { Separator } from "@/components/ui/separator";
-import { UserPlus, Clock, ArrowRight } from "lucide-react";
+import { UserPlus, Clock, ArrowRight, X } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 import type { WaitlistEntry } from '@/types/restaurant';
 
@@ -35,52 +34,68 @@ export default function WaitlistPanel({ entries, onAdd, onSeat }: WaitlistProps)
     };
 
     return (
-        <Card className="h-full flex flex-col">
-            <CardHeader className="py-3 px-4 border-b bg-gray-50 flex flex-row justify-between items-center">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <Clock className="w-4 h-4" /> Lista de Espera ({entries.length})
-                </CardTitle>
-                <Button size="sm" variant="ghost" onClick={() => setIsAdding(!isAdding)}>
-                    <UserPlus className="w-4 h-4" />
+        <Card className="h-full flex flex-col overflow-hidden gap-0 py-0">
+            <div className="px-4 py-2.5 border-b border-border bg-muted/40 flex justify-between items-center">
+                <h3 className="text-sm font-medium inline-flex items-center gap-2">
+                    <Clock className="size-3.5 text-muted-foreground" />
+                    Lista de espera
+                    <span className="text-[11px] text-muted-foreground font-normal">({entries.length})</span>
+                </h3>
+                <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    onClick={() => setIsAdding(!isAdding)}
+                    aria-label={isAdding ? 'Cerrar formulario' : 'Añadir cliente'}
+                >
+                    {isAdding ? <X className="size-3.5" /> : <UserPlus className="size-3.5" />}
                 </Button>
-            </CardHeader>
+            </div>
+
             <CardContent className="flex-1 overflow-y-auto p-0">
                 {isAdding && (
-                    <div className="p-3 bg-blue-50 border-b space-y-2">
+                    <div className="p-3 bg-primary/5 border-b border-border space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
                         <Input
-                            placeholder="Nombre Cliente"
-                            className="bg-white h-8 text-sm"
+                            placeholder="Nombre del cliente"
+                            className="h-8 text-sm"
                             value={formData.name}
                             onChange={e => setFormData({ ...formData, name: e.target.value })}
                         />
                         <div className="flex gap-2">
                             <Input
                                 type="number"
-                                className="w-16 bg-white h-8 text-sm"
+                                className="w-16 h-8 text-sm tabular-nums"
+                                aria-label="Pax"
                                 value={formData.pax}
                                 onChange={e => setFormData({ ...formData, pax: parseInt(e.target.value) || 0 })}
                             />
                             <Input
                                 placeholder="Teléfono"
-                                className="flex-1 bg-white h-8 text-sm"
+                                className="flex-1 h-8 text-sm"
                                 value={formData.phone}
                                 onChange={e => setFormData({ ...formData, phone: e.target.value })}
                             />
                         </div>
-                        <Button size="sm" className="w-full h-7" onClick={handleSubmit} disabled={!formData.name}>
+                        <Button size="sm" className="w-full" onClick={handleSubmit} disabled={!formData.name}>
                             Guardar
                         </Button>
                     </div>
                 )}
 
-                <div className="divide-y">
+                <ul className="divide-y divide-border/60">
                     {entries.map(entry => (
-                        <div key={entry.id} className="p-3 hover:bg-gray-50 transition-colors group">
-                            <div className="flex justify-between items-start mb-1">
-                                <span className="font-semibold text-sm">{entry.name}</span>
-                                <Badge variant="secondary" className="bg-gray-200 text-gray-700">{entry.pax}p</Badge>
+                        <li
+                            key={entry.id}
+                            className={cn(
+                                "p-3 hover:bg-accent/40 transition-colors group",
+                            )}
+                        >
+                            <div className="flex justify-between items-start mb-1 gap-2">
+                                <span className="font-medium text-sm truncate">{entry.name}</span>
+                                <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground bg-muted px-1.5 py-0.5 rounded shrink-0">
+                                    {entry.pax}p
+                                </span>
                             </div>
-                            <div className="flex justify-between items-center text-xs text-gray-500">
+                            <div className="flex justify-between items-center text-xs text-muted-foreground">
                                 <span>
                                     {(() => {
                                         if (!entry.createdAt) return 'Hace ??';
@@ -89,18 +104,24 @@ export default function WaitlistPanel({ entries, onAdd, onSeat }: WaitlistProps)
                                         return `Hace ${formatDistanceToNow(created, { locale: es })}`;
                                     })()}
                                 </span>
-                                <Button size="icon" variant="ghost" className="h-6 w-6 opacity-0 group-hover:opacity-100 text-green-600" onClick={() => onSeat(entry.id)}>
-                                    <ArrowRight className="w-4 h-4" />
+                                <Button
+                                    size="icon-sm"
+                                    variant="ghost"
+                                    className="opacity-0 group-hover:opacity-100 text-success hover:bg-success/10 hover:text-success transition-opacity"
+                                    onClick={() => onSeat(entry.id)}
+                                    aria-label="Sentar cliente"
+                                >
+                                    <ArrowRight className="size-3.5" />
                                 </Button>
                             </div>
-                        </div>
+                        </li>
                     ))}
                     {entries.length === 0 && !isAdding && (
-                        <div className="p-8 text-center text-gray-400 text-xs">
+                        <li className="p-8 text-center text-xs text-muted-foreground italic">
                             Lista vacía
-                        </div>
+                        </li>
                     )}
-                </div>
+                </ul>
             </CardContent>
         </Card>
     );

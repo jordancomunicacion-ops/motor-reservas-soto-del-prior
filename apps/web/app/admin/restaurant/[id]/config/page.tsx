@@ -6,7 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Save, Building2, Trash2, Hotel, Users, Sparkles, Mail, Star } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { PageHeader } from '@/components/ui/page-header';
+import { ArrowLeft, Save, Building2, Trash2, Hotel, Users, Sparkles, Mail, Star, Info } from 'lucide-react';
 import Link from 'next/link';
 import { ShiftsManager } from '@/components/admin/ShiftsManager';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -61,7 +63,7 @@ function RestaurantConfigContent() {
     const restaurantId = params.id as string;
     const searchParams = useSearchParams();
     const tab = searchParams.get('tab') || 'general';
-    const [activeTemplate, setActiveTemplate] = useState<'created' | 'confirmed' | 'cancelled' | 'modified' | 'reminder' | 'review'>('created');
+    const [activeTemplate, setActiveTemplate] = useState<'created' | 'confirmed' | 'cancelled' | 'modified' | 'reminder' | 'waitlist_join' | 'waitlist_available' | 'review'>('created');
     
     const [restaurant, setRestaurant] = useState<RestaurantDetail | null>(null);
     const [hotels, setHotels] = useState<HotelOption[]>([]);
@@ -212,57 +214,54 @@ function RestaurantConfigContent() {
         }
     }
 
-    if (loading) return <div className="p-8">Cargando configuración...</div>;
+    if (loading) return <div className="p-8 text-muted-foreground">Cargando configuración...</div>;
 
     return (
-        <div className="space-y-10 max-w-5xl mx-auto pb-20">
-            <div className="flex items-center gap-4">
-                <Link href={`/admin/restaurant/${restaurantId}`} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors">
-                    <ArrowLeft className="w-5 h-5" />
-                </Link>
-                <div>
-                    <h1 className="text-2xl font-bold">
-                        {tab === 'general' ? 'Ajustes' : 'Gestión de Accesos'}
-                        : {restaurant?.name}
-                    </h1>
-                    <p className="text-muted-foreground">
-                        {tab === 'general' ? 'Configuración general y operativa.' : 'Gestión de permisos de personal.'}
-                    </p>
-                </div>
-            </div>
+        <div className="space-y-8 max-w-5xl mx-auto pb-20">
+            <PageHeader
+                eyebrow="Restaurante"
+                title={`${tab === 'general' ? 'Ajustes' : 'Gestión de accesos'} · ${restaurant?.name ?? ''}`}
+                description={tab === 'general' ? 'Configuración general y operativa.' : 'Gestión de permisos de personal.'}
+                actions={
+                    <Button variant="ghost" size="icon" asChild>
+                        <Link href={`/admin/restaurant/${restaurantId}`}><ArrowLeft className="size-4" /></Link>
+                    </Button>
+                }
+            />
 
             {tab === 'general' && (
                 <>
                 <Card>
-
                 <CardHeader>
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg text-blue-600">
-                            <Building2 className="w-5 h-5" />
+                        <div className="grid place-items-center size-9 rounded-md bg-primary/10 text-primary">
+                            <Building2 className="size-4" />
                         </div>
                         <div>
-                            <CardTitle>Información General</CardTitle>
+                            <CardTitle className="font-display text-base font-medium tracking-tight">Información General</CardTitle>
                             <CardDescription>Modifica los datos básicos del restaurante.</CardDescription>
                         </div>
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="grid md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="rest-name">Nombre del Restaurante</Label>
-                            <Input 
+                        <div className="space-y-1.5">
+                            <Label htmlFor="rest-name" className="text-eyebrow">Nombre del Restaurante</Label>
+                            <Input
                                 id="rest-name"
+                                className="h-10"
                                 value={formData.name}
                                 onChange={(e) => setFormData({...formData, name: e.target.value})}
                                 placeholder="Ej: El Cenador de Soto"
                             />
                         </div>
-                        
-                        <div className="space-y-2">
-                            <Label htmlFor="rest-email">Email de Notificaciones</Label>
-                            <Input 
+
+                        <div className="space-y-1.5">
+                            <Label htmlFor="rest-email" className="text-eyebrow">Email de Notificaciones</Label>
+                            <Input
                                 id="rest-email"
                                 type="email"
+                                className="h-10"
                                 value={formData.contactEmail}
                                 onChange={(e) => setFormData({...formData, contactEmail: e.target.value})}
                                 placeholder="reservas@tudominio.com"
@@ -270,31 +269,31 @@ function RestaurantConfigContent() {
                         </div>
                     </div>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="rest-duration">Tiempo por Reserva (minutos)</Label>
+                    <div className="space-y-1.5">
+                        <Label htmlFor="rest-duration" className="text-eyebrow">Tiempo por Reserva (minutos)</Label>
                         <div className="flex items-center gap-2">
-                            <Input 
+                            <Input
                                 id="rest-duration"
                                 type="number"
+                                className="h-10 w-32"
                                 value={formData.defaultDuration}
                                 onChange={(e) => setFormData({...formData, defaultDuration: parseInt(e.target.value)})}
-                                className="w-32"
                             />
                             <span className="text-sm text-muted-foreground italic">Duración estimada de una comida/cena.</span>
                         </div>
                     </div>
 
-                    <div className="pt-4 border-t space-y-4">
-                        <div className="flex items-center gap-2 text-sm font-medium text-purple-600">
-                            <Hotel className="w-4 h-4" /> Hotel Asociado (Sinergia)
+                    <div className="pt-4 border-t border-border/60 space-y-4">
+                        <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                            <Hotel className="size-4" /> Hotel Asociado (Sinergia)
                         </div>
-                        <div className="space-y-2">
-                            <Label>Este restaurante pertenece al hotel:</Label>
-                            <Select 
-                                value={formData.hotelId} 
+                        <div className="space-y-1.5">
+                            <Label className="text-eyebrow">Este restaurante pertenece al hotel:</Label>
+                            <Select
+                                value={formData.hotelId}
                                 onValueChange={(val) => setFormData({...formData, hotelId: val})}
                             >
-                                <SelectTrigger>
+                                <SelectTrigger className="h-10">
                                     <SelectValue placeholder="Selecciona un hotel..." />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -307,12 +306,12 @@ function RestaurantConfigContent() {
                         </div>
                     </div>
                 </CardContent>
-                <CardFooter className="flex justify-between border-t p-6">
+                <CardFooter className="flex justify-between border-t border-border/60 p-6">
                     <div className="text-sm text-muted-foreground">
                         ID: {restaurant?.id}
                     </div>
                     <Button onClick={handleSave} disabled={saving} className="gap-2">
-                        <Save className="w-4 h-4" /> {saving ? 'Guardando...' : 'Guardar Cambios'}
+                        <Save className="size-4" /> {saving ? 'Guardando...' : 'Guardar Cambios'}
                     </Button>
                 </CardFooter>
             </Card>
@@ -330,32 +329,31 @@ function RestaurantConfigContent() {
             <Card>
                 <CardHeader>
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg text-indigo-600">
-                            <Mail className="w-5 h-5" />
+                        <div className="grid place-items-center size-9 rounded-md bg-primary/10 text-primary">
+                            <Mail className="size-4" />
                         </div>
                         <div>
-                            <CardTitle>Notificaciones Automáticas</CardTitle>
+                            <CardTitle className="font-display text-base font-medium tracking-tight">Notificaciones Automáticas</CardTitle>
                             <CardDescription>Personaliza los correos que reciben tus clientes.</CardDescription>
                         </div>
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                    <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 p-4 rounded-lg flex gap-3">
-                        <div className="text-amber-600">⚠️</div>
-                        <p className="text-xs text-amber-800 dark:text-amber-200">
+                    <div className="bg-warning/10 border border-warning/30 p-4 rounded-md flex gap-3 items-start">
+                        <Info className="size-4 text-warning-foreground mt-0.5 shrink-0" />
+                        <p className="text-xs text-warning-foreground">
                             Usa etiquetas como <strong>{"{{name}}"}</strong>, <strong>{"{{date}}"}</strong>, <strong>{"{{time}}"}</strong> o <strong>{"{{modify_link}}"}</strong> para personalizar el contenido dinámicamente.
                         </p>
                     </div>
 
-                    <div className="space-y-8">
+                    <div className="space-y-6">
                         <div className="flex flex-wrap gap-2">
                                 {['created', 'confirmed', 'cancelled', 'modified', 'reminder', 'waitlist_join', 'waitlist_available', 'review'].map((t) => (
                                     <Button
                                         key={t}
                                         variant={activeTemplate === t ? 'default' : 'outline'}
                                         size="sm"
-                                        onClick={() => setActiveTemplate(t as any)}
-                                        className="capitalize"
+                                        onClick={() => setActiveTemplate(t as typeof activeTemplate)}
                                     >
                                         {t === 'created' ? 'Nueva Reserva' :
                                          t === 'confirmed' ? 'Confirmación' :
@@ -368,24 +366,24 @@ function RestaurantConfigContent() {
                                     </Button>
                                 ))}
                                 <div className="flex-1" />
-                                <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    onClick={handleSendTest} 
+                                <Button
+                                    variant="tonal"
+                                    size="sm"
+                                    onClick={handleSendTest}
                                     disabled={sendingTest}
-                                    className="gap-2 border-indigo-200 text-indigo-600 hover:bg-indigo-50"
+                                    className="gap-2"
                                 >
-                                    <Sparkles className="w-4 h-4" /> {sendingTest ? 'Enviando...' : 'Enviar Prueba'}
+                                    <Sparkles className="size-4" /> {sendingTest ? 'Enviando...' : 'Enviar Prueba'}
                                 </Button>
                             </div>
-                        
-                        <div className="space-y-2">
-                            <Label className="text-xs font-bold uppercase text-muted-foreground">Contenido HTML de la Plantilla</Label>
-                            <textarea 
-                                className="w-full h-64 p-4 font-mono text-xs bg-zinc-950 text-green-400 rounded-lg border outline-none focus:ring-2 focus:ring-indigo-500"
+
+                        <div className="space-y-1.5">
+                            <Label className="text-eyebrow">Contenido HTML de la Plantilla</Label>
+                            <Textarea
+                                className="h-64 font-mono text-xs resize-none"
                                 value={formData.emailTemplates[activeTemplate as keyof typeof formData.emailTemplates]}
                                 onChange={(e) => setFormData({
-                                    ...formData, 
+                                    ...formData,
                                     emailTemplates: {
                                         ...formData.emailTemplates,
                                         [activeTemplate]: e.target.value
@@ -400,29 +398,30 @@ function RestaurantConfigContent() {
             <Card>
                 <CardHeader>
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg text-yellow-600">
-                            <Star className="w-5 h-5" />
+                        <div className="grid place-items-center size-9 rounded-md bg-warning/15 text-warning-foreground">
+                            <Star className="size-4" />
                         </div>
                         <div>
-                            <CardTitle>Valoraciones y Google Reseñas</CardTitle>
+                            <CardTitle className="font-display text-base font-medium tracking-tight">Valoraciones y Google Reseñas</CardTitle>
                             <CardDescription>El email de valoración se envía automáticamente 24h después de la reserva. Si la puntuación es alta, redirigimos al cliente a tu página de Google Reseñas.</CardDescription>
                         </div>
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="review-google-url">URL de Google Reseñas</Label>
+                    <div className="space-y-1.5">
+                        <Label htmlFor="review-google-url" className="text-eyebrow">URL de Google Reseñas</Label>
                         <Input
                             id="review-google-url"
                             type="url"
+                            className="h-10"
                             value={formData.googleReviewUrl}
                             onChange={(e) => setFormData({ ...formData, googleReviewUrl: e.target.value })}
                             placeholder="https://g.page/r/.../review"
                         />
                         <p className="text-xs text-muted-foreground">Pega el enlace corto de Google Maps → Compartir → “Obtener más reseñas”. Si lo dejas vacío, el cliente solo verá el mensaje de agradecimiento.</p>
                     </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="review-min-score">Puntuación mínima para redirigir a Google (1-5)</Label>
+                    <div className="space-y-1.5">
+                        <Label htmlFor="review-min-score" className="text-eyebrow">Puntuación mínima para redirigir a Google (1-5)</Label>
                         <Input
                             id="review-min-score"
                             type="number"
@@ -430,7 +429,7 @@ function RestaurantConfigContent() {
                             max={5}
                             value={formData.reviewMinScoreForGoogle}
                             onChange={(e) => setFormData({ ...formData, reviewMinScoreForGoogle: parseInt(e.target.value) || 4 })}
-                            className="w-32"
+                            className="h-10 w-32"
                         />
                         <p className="text-xs text-muted-foreground">Por defecto 4: si Atención, Entorno y Comida son ≥ 4, redirigimos a Google al enviar.</p>
                     </div>
@@ -440,11 +439,11 @@ function RestaurantConfigContent() {
             <Card>
                 <CardHeader>
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg text-orange-600">
-                            <ArrowLeft className="w-5 h-5 rotate-180" />
+                        <div className="grid place-items-center size-9 rounded-md bg-primary/10 text-primary">
+                            <ArrowLeft className="size-4 rotate-180" />
                         </div>
                         <div>
-                            <CardTitle>Gestión de Turnos y Horarios</CardTitle>
+                            <CardTitle className="font-display text-base font-medium tracking-tight">Gestión de Turnos y Horarios</CardTitle>
                             <CardDescription>Define las franjas horarias disponibles para reservas.</CardDescription>
                         </div>
                     </div>
@@ -459,14 +458,16 @@ function RestaurantConfigContent() {
 
             {tab === 'widget' && (
                 <div className="space-y-6">
-                    <div className="bg-indigo-600 p-6 rounded-xl text-white mb-4 shadow-lg">
-                        <h2 className="text-xl font-bold flex items-center gap-2">
-                            <Sparkles className="w-6 h-6" /> Personalización del Motor Web
-                        </h2>
-                        <p className="text-indigo-100 text-sm mt-1">
-                            Configura cómo se ve y se comporta el widget de reservas en tu página web.
-                        </p>
-                    </div>
+                    <Card className="bg-primary text-primary-foreground border-primary/20">
+                        <CardContent className="space-y-1.5">
+                            <h2 className="font-display text-xl font-medium flex items-center gap-2">
+                                <Sparkles className="size-5" /> Personalización del Motor Web
+                            </h2>
+                            <p className="text-sm opacity-90">
+                                Configura cómo se ve y se comporta el widget de reservas en tu página web.
+                            </p>
+                        </CardContent>
+                    </Card>
                     <WidgetConfigSection entityId={restaurantId} type="restaurant" />
                 </div>
             )}
@@ -475,11 +476,11 @@ function RestaurantConfigContent() {
                 <Card>
                     <CardHeader>
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg text-emerald-600">
-                                <Users className="w-5 h-5" />
+                            <div className="grid place-items-center size-9 rounded-md bg-success/10 text-success">
+                                <Users className="size-4" />
                             </div>
                             <div>
-                                <CardTitle>Gestión de Accesos</CardTitle>
+                                <CardTitle className="font-display text-base font-medium tracking-tight">Gestión de Accesos</CardTitle>
                                 <CardDescription>Autoriza a empleados para acceder a la operativa de este restaurante.</CardDescription>
                             </div>
                         </div>
@@ -491,15 +492,14 @@ function RestaurantConfigContent() {
             )}
 
             {tab === 'general' && (
-                <Card className="border-red-100 dark:border-red-900/50 bg-red-50/50 dark:bg-red-900/10">
-
+                <Card className="border-destructive/30 bg-destructive/5">
                 <CardHeader>
-                    <CardTitle className="text-red-600 dark:text-red-400">Zona de Peligro</CardTitle>
+                    <CardTitle className="font-display text-base font-medium tracking-tight text-destructive">Zona de Peligro</CardTitle>
                     <CardDescription>Acciones destructivas para este restaurante.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Button variant="destructive" className="gap-2" onClick={handleDelete}>
-                        <Trash2 className="w-4 h-4" /> Eliminar Restaurante
+                        <Trash2 className="size-4" /> Eliminar Restaurante
                     </Button>
                 </CardContent>
             </Card>
@@ -510,7 +510,7 @@ function RestaurantConfigContent() {
 
 export default function RestaurantConfigPage() {
     return (
-        <Suspense fallback={<div>Cargando...</div>}>
+        <Suspense fallback={<div className="p-8 text-muted-foreground">Cargando...</div>}>
             <RestaurantConfigContent />
         </Suspense>
     );

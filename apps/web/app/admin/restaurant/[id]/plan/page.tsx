@@ -1,8 +1,10 @@
 "use client";
 import { useEffect, useState, Suspense } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { fetchAPI } from '@/lib/api';
-import { ArrowLeft, Layout } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
+import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import TablePlanEditor from '@/components/restaurant/TablePlanEditor';
 
@@ -21,15 +23,18 @@ function RestaurantPlanContent() {
 
     return (
         <div className="flex flex-col h-[calc(100vh-120px)] space-y-4">
-            <header className="flex items-center gap-4 px-2">
-                <Link href={`/admin/restaurant/${restaurantId}`} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-all">
-                    <ArrowLeft className="w-5 h-5" />
-                </Link>
-                <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Plano de Mesas: {restaurant?.name}</h1>
-                    <p className="text-muted-foreground">Configura las áreas y la disposición de las mesas.</p>
-                </div>
-            </header>
+            <PageHeader
+                eyebrow="Restaurante"
+                title={`Plano de mesas · ${restaurant?.name ?? ''}`}
+                description="Configura las áreas y la disposición de las mesas."
+                actions={
+                    <Button variant="ghost" size="icon" asChild>
+                        <Link href={`/admin/restaurant/${restaurantId}`}>
+                            <ArrowLeft className="size-4" />
+                        </Link>
+                    </Button>
+                }
+            />
 
             <div className="flex-1 overflow-hidden">
                 <TablePlanEditor restaurantId={restaurantId} />
@@ -40,7 +45,7 @@ function RestaurantPlanContent() {
 
 export default function RestaurantPlanPage() {
     return (
-        <Suspense fallback={<div className="p-8">Cargando...</div>}>
+        <Suspense fallback={<div className="p-8 text-muted-foreground">Cargando...</div>}>
             <RestaurantPlanContent />
         </Suspense>
     );

@@ -1,8 +1,34 @@
 "use client";
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { fetchAPI } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { Plus, PartyPopper, Settings, Calendar, Users, Euro, Info, Building2, Utensils } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Select,
+    SelectTrigger,
+    SelectValue,
+    SelectContent,
+    SelectItem,
+} from '@/components/ui/select';
+import { PageHeader } from '@/components/ui/page-header';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+    Plus,
+    PartyPopper,
+    Calendar as CalendarIcon,
+    Users,
+    Euro,
+    Building2,
+    Utensils,
+    X,
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -25,22 +51,24 @@ interface HotelSummary { id: string; name: string; restaurantId?: string | null 
 interface RestaurantSummary { id: string; name: string }
 interface ZoneSummary { id: string; name?: string }
 
+const EMPTY_FORM = {
+    name: '',
+    date: '',
+    capacity: 50,
+    price: 0,
+    description: '',
+    hotelId: '',
+    restaurantId: '',
+    zoneIds: [] as string[],
+};
+
 export default function EventsListPage() {
     const [events, setEvents] = useState<EventSummary[]>([]);
     const [loading, setLoading] = useState(true);
     const [showCreate, setShowCreate] = useState(false);
+    const [creating, setCreating] = useState(false);
 
-    // Form state
-    const [formData, setFormData] = useState({
-        name: '',
-        date: '',
-        capacity: 50,
-        price: 0,
-        description: '',
-        hotelId: '',
-        restaurantId: '',
-        zoneIds: [] as string[]
-    });
+    const [formData, setFormData] = useState(EMPTY_FORM);
 
     const [hotels, setHotels] = useState<HotelSummary[]>([]);
     const [restaurants, setRestaurants] = useState<RestaurantSummary[]>([]);
@@ -48,21 +76,17 @@ export default function EventsListPage() {
 
     useEffect(() => {
         async function fetchZones() {
-            if (formData.restaurantId) {
-                try {
+            try {
+                if (formData.restaurantId) {
                     const data = await fetchAPI<ZoneSummary[]>(`/restaurant/${formData.restaurantId}/zones`);
                     setAvailableZones(data);
-                } catch {
-                    setAvailableZones([]);
-                }
-            } else if (formData.hotelId) {
-                try {
+                } else if (formData.hotelId) {
                     const data = await fetchAPI<ZoneSummary[]>(`/property/hotels/${formData.hotelId}/zones`);
                     setAvailableZones(data);
-                } catch {
+                } else {
                     setAvailableZones([]);
                 }
-            } else {
+            } catch {
                 setAvailableZones([]);
             }
         }
@@ -76,9 +100,10 @@ export default function EventsListPage() {
 
     async function loadEstablishments() {
         try {
-            const hotelsData = await fetchAPI<HotelSummary[]>('/property/hotels');
-            const restaurantsData = await fetchAPI<RestaurantSummary[]>('/restaurant');
-
+            const [hotelsData, restaurantsData] = await Promise.all([
+                fetchAPI<HotelSummary[]>('/property/hotels'),
+                fetchAPI<RestaurantSummary[]>('/restaurant'),
+            ]);
             setHotels(Array.isArray(hotelsData) ? hotelsData : []);
             setRestaurants(Array.isArray(restaurantsData) ? restaurantsData : []);
         } catch (e) {
@@ -90,9 +115,7 @@ export default function EventsListPage() {
         setLoading(true);
         try {
             const data = await fetchAPI<EventSummary[]>('/event');
-            if (Array.isArray(data)) {
-                setEvents(data);
-            }
+            if (Array.isArray(data)) setEvents(data);
         } catch (e) {
             console.error(e);
         } finally {
@@ -100,294 +123,351 @@ export default function EventsListPage() {
         }
     }
 
-    // Handle Synergy Logic
     const handleHotelChange = (hotelId: string) => {
         const selectedHotel = hotels.find(h => h.id === hotelId);
         setFormData({
             ...formData,
             hotelId,
-            // If hotel has a linked restaurant, auto-select it
             restaurantId: selectedHotel?.restaurantId || formData.restaurantId,
-            zoneIds: []
+            zoneIds: [],
         });
     };
 
     const handleRestaurantChange = (restaurantId: string) => {
-        // Find if any hotel is linked to this restaurant
         const linkedHotel = hotels.find(h => h.restaurantId === restaurantId);
         setFormData({
             ...formData,
             restaurantId,
             hotelId: linkedHotel?.id || formData.hotelId,
-            zoneIds: []
+            zoneIds: [],
         });
     };
 
-    async function handleCreate() {
+    async function handleCreate(e?: React.FormEvent) {
+        e?.preventDefault();
         if (!formData.name || !formData.date) {
             alert('Nombre y fecha son obligatorios');
             return;
         }
+        setCreating(true);
         try {
             await fetchAPI('/event', {
                 method: 'POST',
                 body: JSON.stringify({
                     ...formData,
                     hotelId: formData.hotelId || null,
-                    restaurantId: formData.restaurantId || null
-                })
+                    restaurantId: formData.restaurantId || null,
+                }),
             });
-            setFormData({
-                name: '',
-                date: '',
-                capacity: 50,
-                price: 0,
-                description: '',
-                hotelId: '',
-                restaurantId: '',
-                zoneIds: []
-            });
+            setFormData(EMPTY_FORM);
             setShowCreate(false);
             loadEvents();
         } catch (e) {
+            console.error(e);
             alert('Error creando evento');
+        } finally {
+            setCreating(false);
         }
     }
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Gestión de Eventos</h1>
-                        <p className="text-xs text-muted-foreground">Crea y gestiona eventos puntuales para tus establecimientos.</p>
-                    </div>
-                </div>
-                <Button onClick={() => setShowCreate(!showCreate)} className={`gap-2 ${showCreate ? 'bg-secondary text-secondary-foreground hover:bg-secondary/80' : 'bg-primary text-white hover:opacity-90 shadow-lg shadow-primary/20'}`}>
-                    {showCreate ? 'Cerrar' : <><Plus className="w-4 h-4" /> Nuevo Evento</>}
-                </Button>
-            </div>
+        <div className="space-y-8">
+            <PageHeader
+                eyebrow="Programación"
+                title="Gestión de eventos"
+                description="Crea y gestiona eventos puntuales para tus establecimientos."
+                actions={
+                    <Button
+                        variant={showCreate ? 'outline' : 'default'}
+                        onClick={() => setShowCreate(!showCreate)}
+                    >
+                        {showCreate
+                            ? <><X className="size-4" /> Cerrar</>
+                            : <><Plus className="size-4" /> Nuevo evento</>}
+                    </Button>
+                }
+            />
 
             {showCreate && (
-                <div className="bg-white dark:bg-zinc-800 p-8 rounded-3xl shadow-2xl border border-primary/5 dark:border-zinc-700 animate-in fade-in slide-in-from-top-4 duration-500">
-                    <div className="flex items-center gap-2 mb-6 text-primary">
-                        <Calendar className="w-5 h-5" />
-                        <h2 className="text-lg font-bold uppercase tracking-widest">Configurar Nuevo Evento</h2>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Nombre del Evento</label>
-                            <input
-                                className="border-2 p-3 rounded-xl w-full dark:bg-zinc-900 focus:border-indigo-500 outline-none transition-all"
-                                placeholder="Ej: Cena de Gala San Juan"
-                                value={formData.name}
-                                onChange={e => setFormData({...formData, name: e.target.value})}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Fecha y Hora</label>
-                            <input
-                                type="datetime-local"
-                                className="border-2 p-3 rounded-xl w-full dark:bg-zinc-900 focus:border-indigo-500 outline-none transition-all"
-                                value={formData.date}
-                                onChange={e => setFormData({...formData, date: e.target.value})}
-                            />
-                        </div>
+                <Card className="animate-in fade-in slide-in-from-top-2 duration-300">
+                    <CardHeader>
+                        <CardTitle className="font-display text-base font-medium tracking-tight flex items-center gap-2">
+                            <CalendarIcon className="size-4 text-primary" />
+                            Configurar nuevo evento
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={handleCreate} className="space-y-5">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <Field id="ev-name" label="Nombre del evento">
+                                    <Input
+                                        id="ev-name"
+                                        placeholder="Ej. Cena de Gala San Juan"
+                                        className="h-10"
+                                        value={formData.name}
+                                        onChange={e => setFormData({ ...formData, name: e.target.value })}
+                                        required
+                                    />
+                                </Field>
+                                <Field id="ev-date" label="Fecha y hora">
+                                    <Input
+                                        id="ev-date"
+                                        type="datetime-local"
+                                        className="h-10"
+                                        value={formData.date}
+                                        onChange={e => setFormData({ ...formData, date: e.target.value })}
+                                        required
+                                    />
+                                </Field>
 
-                        {/* Establishments linkage with Synergy Logic */}
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1">
-                                <Building2 className="w-3 h-3" /> Hotel Vinculado
-                            </label>
-                            <select
-                                className="border-2 p-3 rounded-xl w-full dark:bg-zinc-900 focus:border-indigo-500 outline-none transition-all"
-                                value={formData.hotelId}
-                                onChange={e => handleHotelChange(e.target.value)}
-                            >
-                                <option value="">Ninguno</option>
-                                {hotels.map(h => (
-                                    <option key={h.id} value={h.id}>{h.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1">
-                                <Utensils className="w-3 h-3" /> Restaurante Vinculado
-                            </label>
-                            <select
-                                className="border-2 p-3 rounded-xl w-full dark:bg-zinc-900 focus:border-indigo-500 outline-none transition-all"
-                                value={formData.restaurantId}
-                                onChange={e => handleRestaurantChange(e.target.value)}
-                            >
-                                <option value="">Ninguno</option>
-                                {restaurants.map(r => (
-                                    <option key={r.id} value={r.id}>{r.name}</option>
-                                ))}
-                            </select>
-                            <p className="text-[10px] text-muted-foreground italic">Al vincular un restaurante, se aplicarán sus políticas de Stripe/No-Show.</p>
-                        </div>
+                                <Field id="ev-hotel" label="Hotel vinculado" icon={Building2}>
+                                    <Select value={formData.hotelId || 'none'} onValueChange={v => handleHotelChange(v === 'none' ? '' : v)}>
+                                        <SelectTrigger id="ev-hotel" className="w-full h-10">
+                                            <SelectValue placeholder="Ninguno" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">Ninguno</SelectItem>
+                                            {hotels.map(h => <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                </Field>
+                                <Field id="ev-rest" label="Restaurante vinculado" icon={Utensils}>
+                                    <Select value={formData.restaurantId || 'none'} onValueChange={v => handleRestaurantChange(v === 'none' ? '' : v)}>
+                                        <SelectTrigger id="ev-rest" className="w-full h-10">
+                                            <SelectValue placeholder="Ninguno" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">Ninguno</SelectItem>
+                                            {restaurants.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                    <p className="text-[11px] text-muted-foreground mt-1">
+                                        Al vincular un restaurante, se aplicarán sus políticas de Stripe/No-Show.
+                                    </p>
+                                </Field>
 
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1">
-                                <Users className="w-3 h-3" /> Capacidad Total (Pax)
-                            </label>
-                            <input
-                                type="number"
-                                className="border-2 p-3 rounded-xl w-full dark:bg-zinc-900 focus:border-indigo-500 outline-none transition-all"
-                                value={formData.capacity}
-                                onChange={e => setFormData({...formData, capacity: Number(e.target.value)})}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Precio por Persona (€)</label>
-                            <input
-                                type="number"
-                                className="border-2 p-3 rounded-xl w-full dark:bg-zinc-900 focus:border-indigo-500 outline-none transition-all"
-                                value={formData.price}
-                                onChange={e => setFormData({...formData, price: Number(e.target.value)})}
-                            />
-                        </div>
-                        <div className="md:col-span-2 space-y-4">
-                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1">
-                                <Utensils className="w-3 h-3" /> Salas / Áreas Reservadas
-                            </label>
-                            {(formData.restaurantId || formData.hotelId) ? (
-                                availableZones.length > 0 ? (
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                        {availableZones.map(zone => (
-                                            <label key={zone.id} className="flex items-center gap-2 p-2 rounded-lg border border-zinc-100 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 cursor-pointer transition-colors">
-                                                <input 
-                                                    type="checkbox"
-                                                    className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                                                    checked={formData.zoneIds.includes(zone.id)}
-                                                    onChange={(e) => {
-                                                        const newIds = e.target.checked 
-                                                            ? [...formData.zoneIds, zone.id]
-                                                            : formData.zoneIds.filter(id => id !== zone.id);
-                                                        setFormData({...formData, zoneIds: newIds});
-                                                    }}
-                                                />
-                                                <span className="text-xs font-medium">{zone.name}</span>
-                                            </label>
-                                        ))}
-                                    </div>
+                                <Field id="ev-capacity" label="Capacidad total (pax)" icon={Users}>
+                                    <Input
+                                        id="ev-capacity"
+                                        type="number"
+                                        min={1}
+                                        className="h-10"
+                                        value={formData.capacity}
+                                        onChange={e => setFormData({ ...formData, capacity: Number(e.target.value) })}
+                                    />
+                                </Field>
+                                <Field id="ev-price" label="Precio por persona (€)" icon={Euro}>
+                                    <Input
+                                        id="ev-price"
+                                        type="number"
+                                        min={0}
+                                        step="0.01"
+                                        className="h-10"
+                                        value={formData.price}
+                                        onChange={e => setFormData({ ...formData, price: Number(e.target.value) })}
+                                    />
+                                </Field>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label className="text-eyebrow flex items-center gap-1.5">
+                                    <Utensils className="size-3" />
+                                    Salas / áreas reservadas
+                                </Label>
+                                {(formData.restaurantId || formData.hotelId) ? (
+                                    availableZones.length > 0 ? (
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                            {availableZones.map(zone => {
+                                                const checked = formData.zoneIds.includes(zone.id);
+                                                return (
+                                                    <label
+                                                        key={zone.id}
+                                                        className="flex items-center gap-2 p-2.5 rounded-md border border-border hover:bg-accent/50 cursor-pointer transition-colors"
+                                                    >
+                                                        <Checkbox
+                                                            checked={checked}
+                                                            onCheckedChange={(v) => {
+                                                                const newIds = v
+                                                                    ? [...formData.zoneIds, zone.id]
+                                                                    : formData.zoneIds.filter(id => id !== zone.id);
+                                                                setFormData({ ...formData, zoneIds: newIds });
+                                                            }}
+                                                        />
+                                                        <span className="text-sm font-medium">{zone.name}</span>
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-muted-foreground italic">
+                                            Este establecimiento no tiene salas configuradas.
+                                        </p>
+                                    )
                                 ) : (
-                                    <p className="text-[10px] text-muted-foreground italic">Este establecimiento no tiene salas configuradas.</p>
-                                )
-                            ) : (
-                                <p className="text-[10px] text-muted-foreground italic">Selecciona un hotel o restaurante para ver sus salas.</p>
-                            )}
-                        </div>
-                        <div className="md:col-span-2 space-y-2">
-                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Descripción del Evento</label>
-                            <textarea
-                                className="border-2 p-3 rounded-xl w-full dark:bg-zinc-900 focus:border-indigo-500 outline-none transition-all h-24 resize-none"
-                                placeholder="Detalles, menú, condiciones..."
-                                value={formData.description}
-                                onChange={e => setFormData({...formData, description: e.target.value})}
-                            />
-                        </div>
-                    </div>
-                    <div className="mt-8 flex justify-end gap-3">
-                        <Button variant="ghost" onClick={() => setShowCreate(false)}>Cancelar</Button>
-                        <Button onClick={handleCreate} className="gap-2 bg-primary hover:opacity-90 text-white px-8 rounded-xl font-bold uppercase tracking-widest shadow-lg shadow-primary/20">
-                            Crear Evento
-                        </Button>
-                    </div>
-                </div>
+                                    <p className="text-xs text-muted-foreground italic">
+                                        Selecciona un hotel o restaurante para ver sus salas.
+                                    </p>
+                                )}
+                            </div>
+
+                            <Field id="ev-desc" label="Descripción del evento">
+                                <Textarea
+                                    id="ev-desc"
+                                    placeholder="Detalles, menú, condiciones…"
+                                    className="resize-none"
+                                    rows={4}
+                                    value={formData.description}
+                                    onChange={e => setFormData({ ...formData, description: e.target.value })}
+                                />
+                            </Field>
+
+                            <div className="flex justify-end gap-2 pt-2 border-t border-border/60">
+                                <Button type="button" variant="ghost" onClick={() => setShowCreate(false)}>
+                                    Cancelar
+                                </Button>
+                                <Button type="submit" disabled={creating}>
+                                    {creating ? 'Creando…' : 'Crear evento'}
+                                </Button>
+                            </div>
+                        </form>
+                    </CardContent>
+                </Card>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {loading ? (
-                    <div className="col-span-full py-12 text-center">
-                        <div className="animate-spin w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-                        <p className="text-muted-foreground">Cargando eventos...</p>
-                    </div>
-                ) : events.length === 0 ? (
-                    <div className="col-span-full py-20 text-center bg-zinc-50 dark:bg-zinc-900/50 rounded-3xl border-2 border-dashed border-zinc-200 dark:border-zinc-800">
-                        <PartyPopper className="w-16 h-16 mx-auto text-zinc-300 mb-6" />
-                        <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">No hay eventos activos</h3>
-                        <p className="text-muted-foreground max-w-xs mx-auto">Comienza creando un evento puntual para tus restaurantes u hoteles.</p>
-                    </div>
-                ) : (
-                    events.map(event => (
-                        <div key={event.id} className="bg-white dark:bg-zinc-800 p-6 rounded-2xl shadow-sm border border-zinc-100 dark:border-zinc-700 hover:shadow-xl hover:translate-y-[-4px] transition-all group overflow-hidden relative">
-                            <div className="absolute top-0 right-0 p-4">
-                                <span className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase ${event.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                                    {event.isActive ? 'Activo' : 'Inactivo'}
-                                </span>
-                            </div>
-                            
-                            <div className="flex items-center gap-4 mb-6">
-                                <div className="p-4 bg-indigo-50 dark:bg-indigo-900/30 rounded-2xl text-indigo-600 group-hover:scale-110 transition-transform">
-                                    <PartyPopper className="w-6 h-6" />
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-bold tracking-tight leading-tight">{event.name}</h3>
-                                    <div className="flex flex-col gap-1 mt-1">
-                                        <p className="text-xs text-muted-foreground font-medium flex items-center gap-1">
-                                            <Calendar className="w-3.5 h-3.5" />
-                                            {format(new Date(event.date), "d 'de' MMMM, yyyy 'a las' HH:mm", { locale: es })}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
+            <section>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {loading ? (
+                        Array.from({ length: 3 }).map((_, i) => (
+                            <Card key={i}>
+                                <CardContent className="space-y-4">
+                                    <Skeleton className="size-10 rounded-md" />
+                                    <Skeleton className="h-4 w-2/3" />
+                                    <Skeleton className="h-3 w-1/2" />
+                                    <Skeleton className="h-12 w-full" />
+                                </CardContent>
+                            </Card>
+                        ))
+                    ) : events.length === 0 ? (
+                        <Card className="sm:col-span-2 lg:col-span-3">
+                            <CardContent>
+                                <EmptyState
+                                    icon={PartyPopper}
+                                    title="No hay eventos activos"
+                                    description="Comienza creando un evento puntual para tus restaurantes u hoteles."
+                                    action={
+                                        <Button onClick={() => setShowCreate(true)}>
+                                            <Plus className="size-4" /> Nuevo evento
+                                        </Button>
+                                    }
+                                />
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        events.map(event => <EventCard key={event.id} event={event} />)
+                    )}
+                </div>
+            </section>
+        </div>
+    );
+}
 
-                            <div className="flex flex-wrap gap-2 mb-6">
-                                {event.hotel && (
-                                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-600 text-[10px] font-bold uppercase rounded-lg border border-blue-100">
-                                        <Building2 className="w-3 h-3" /> {event.hotel.name}
-                                    </div>
-                                )}
-                                {event.restaurant && (
-                                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-orange-50 text-orange-600 text-[10px] font-bold uppercase rounded-lg border border-orange-100">
-                                        <Utensils className="w-3 h-3" /> {event.restaurant.name}
-                                    </div>
-                                )}
-                                {event.zones?.map(zone => (
-                                    <div key={zone.id} className="px-2 py-1 bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 text-[9px] font-bold uppercase rounded">
-                                        {zone.name}
-                                    </div>
-                                ))}
-                            </div>
-                            
-                             <div className="space-y-4 mb-6 bg-secondary/50 dark:bg-zinc-900/50 p-4 rounded-2xl border border-primary/5">
-                                <div className="flex justify-between text-xs font-bold uppercase tracking-wider">
-                                    <span className="text-muted-foreground flex items-center gap-1.5"><Users className="w-4 h-4" /> Ocupación</span>
-                                    <span className="text-primary">{event._count.bookings} / {event.capacity} pax</span>
-                                </div>
-                                <div className="w-full bg-zinc-200 dark:bg-zinc-800 rounded-full h-2 overflow-hidden">
-                                    <div 
-                                        className="bg-primary h-full rounded-full transition-all duration-700" 
-                                        style={{ width: `${Math.min(100, (event._count.bookings / event.capacity) * 100)}%` }}
-                                    />
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5"><Euro className="w-4 h-4" /> Precio</span>
-                                    <span className="text-2xl font-black text-primary tracking-tighter">{event.price}€</span>
-                                </div>
-                            </div>
-                            
-                            <div className="grid grid-cols-2 gap-3">
-                                <Button 
-                                    variant="outline" 
-                                    className="rounded-xl text-xs font-bold uppercase tracking-widest transition-colors hover:bg-secondary" 
-                                    onClick={() => window.location.href = `/admin/events/${event.id}`}
-                                >
-                                    Detalles
-                                </Button>
-                                <Button 
-                                    className="bg-primary hover:opacity-90 text-white rounded-xl text-xs font-bold uppercase tracking-widest shadow-md shadow-primary/10" 
-                                    onClick={() => window.location.href = `/admin/events/${event.id}/config`}
-                                >
-                                    Gestionar
-                                </Button>
-                            </div>
-                        </div>
-                    ))
+function EventCard({ event }: { event: EventSummary }) {
+    const occupancy = Math.min(100, (event._count.bookings / event.capacity) * 100);
+
+    return (
+        <Card className="transition-shadow hover:shadow-md gap-4">
+            <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
+                <div className="flex items-center gap-3 min-w-0">
+                    <span className="grid place-items-center size-10 rounded-md bg-primary/10 text-primary shrink-0">
+                        <PartyPopper className="size-5" />
+                    </span>
+                    <div className="min-w-0">
+                        <h3 className="font-display text-base font-medium tracking-tight truncate">{event.name}</h3>
+                        <p className="text-xs text-muted-foreground mt-0.5 inline-flex items-center gap-1">
+                            <CalendarIcon className="size-3" />
+                            {format(new Date(event.date), "d 'de' MMMM 'a las' HH:mm", { locale: es })}
+                        </p>
+                    </div>
+                </div>
+                <StatusBadge tone={event.isActive ? 'success' : 'neutral'}>
+                    {event.isActive ? 'Activo' : 'Inactivo'}
+                </StatusBadge>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {(event.hotel || event.restaurant || (event.zones?.length ?? 0) > 0) && (
+                    <div className="flex flex-wrap gap-1.5">
+                        {event.hotel && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-muted text-foreground text-xs rounded">
+                                <Building2 className="size-3 text-muted-foreground" /> {event.hotel.name}
+                            </span>
+                        )}
+                        {event.restaurant && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-muted text-foreground text-xs rounded">
+                                <Utensils className="size-3 text-muted-foreground" /> {event.restaurant.name}
+                            </span>
+                        )}
+                        {event.zones?.map(zone => (
+                            <span key={zone.id} className="px-2 py-0.5 text-[11px] uppercase tracking-wider font-medium bg-accent text-accent-foreground rounded">
+                                {zone.name}
+                            </span>
+                        ))}
+                    </div>
                 )}
-            </div>
+
+                <div className="rounded-md border border-border/60 bg-muted/30 p-3 space-y-3">
+                    <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground inline-flex items-center gap-1.5">
+                            <Users className="size-3.5" /> Ocupación
+                        </span>
+                        <span className="font-medium tabular-nums">
+                            {event._count.bookings} / {event.capacity} pax
+                        </span>
+                    </div>
+                    <div className="w-full bg-border/60 rounded-full h-1.5 overflow-hidden">
+                        <div
+                            className="bg-primary h-full rounded-full transition-all duration-700"
+                            style={{ width: `${occupancy}%` }}
+                        />
+                    </div>
+                    <div className="flex justify-between items-baseline">
+                        <span className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
+                            <Euro className="size-3.5" /> Precio
+                        </span>
+                        <span className="font-display text-xl font-medium tabular-nums">{event.price ?? 0}€</span>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                    <Button variant="outline" size="sm" asChild>
+                        <Link href={`/admin/events/${event.id}`}>Detalles</Link>
+                    </Button>
+                    <Button variant="default" size="sm" asChild>
+                        <Link href={`/admin/events/${event.id}/config`}>Gestionar</Link>
+                    </Button>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+function Field({
+    id,
+    label,
+    icon: Icon,
+    children,
+}: {
+    id?: string;
+    label: string;
+    icon?: React.ComponentType<{ className?: string }>;
+    children: React.ReactNode;
+}) {
+    return (
+        <div className="space-y-1.5">
+            <Label htmlFor={id} className="text-eyebrow flex items-center gap-1.5">
+                {Icon && <Icon className="size-3" />}
+                {label}
+            </Label>
+            {children}
         </div>
     );
 }

@@ -1,10 +1,13 @@
 "use client";
 import { useEffect, useState } from 'react';
-import { Star, ExternalLink } from 'lucide-react';
+import { Star, ExternalLink, Loader2, MessageSquareQuote } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { fetchAPI } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { EmptyState } from '@/components/ui/empty-state';
+import { cn } from '@/lib/utils';
 
 export type ReviewItem = {
     id: string;
@@ -25,17 +28,16 @@ export type ReviewsResponse = {
 };
 
 export function Stars({ value, size = 'sm' }: { value: number; size?: 'sm' | 'md' }) {
-    const px = size === 'md' ? 'w-4 h-4' : 'w-3.5 h-3.5';
+    const px = size === 'md' ? 'size-4' : 'size-3.5';
     return (
         <div className="flex items-center gap-0.5">
             {[1, 2, 3, 4, 5].map(n => (
                 <Star
                     key={n}
-                    className={px}
-                    style={{
-                        color: n <= value ? '#C59D5F' : '#E5E7EB',
-                        fill: n <= value ? '#C59D5F' : 'transparent',
-                    }}
+                    className={cn(
+                        px,
+                        n <= value ? 'fill-primary text-primary' : 'fill-transparent text-border'
+                    )}
                 />
             ))}
         </div>
@@ -46,11 +48,11 @@ function AverageCard({ label, value }: { label: string; value: number | null }) 
     return (
         <Card>
             <CardHeader className="pb-2">
-                <CardDescription className="text-xs uppercase font-semibold">{label}</CardDescription>
+                <CardDescription className="text-eyebrow">{label}</CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-bold">{value !== null ? value.toFixed(1) : '—'}</span>
+                    <span className="font-display text-3xl font-medium tabular-nums">{value !== null ? value.toFixed(1) : '—'}</span>
                     <span className="text-sm text-muted-foreground">/ 5</span>
                 </div>
             </CardContent>
@@ -78,8 +80,23 @@ export default function ReviewsPanel({ endpoint, headerBanner }: ReviewsPanelPro
         return () => { aborted = true; };
     }, [endpoint]);
 
-    if (loading) return <div className="p-8 text-muted-foreground">Cargando valoraciones…</div>;
-    if (!data) return <div className="p-8 text-red-600">No se pudieron cargar las valoraciones.</div>;
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center gap-2 py-12 text-muted-foreground">
+                <Loader2 className="size-5 animate-spin" />
+                <span className="text-sm">Cargando valoraciones…</span>
+            </div>
+        );
+    }
+    if (!data) {
+        return (
+            <EmptyState
+                tone="danger"
+                title="No se pudieron cargar las valoraciones"
+                description="Inténtalo de nuevo en unos minutos."
+            />
+        );
+    }
 
     return (
         <div className="space-y-6">
@@ -94,27 +111,31 @@ export default function ReviewsPanel({ endpoint, headerBanner }: ReviewsPanelPro
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Histórico</CardTitle>
+                    <CardTitle className="font-display text-base font-medium tracking-tight">Histórico</CardTitle>
                     <CardDescription>{data.total} valoraciones · {data.redirectedToGoogleCount} fueron a Google Reseñas.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     {data.items.length === 0 ? (
-                        <p className="text-sm italic text-muted-foreground py-8 text-center">Aún no hay valoraciones. El primer email se envía 24h después de la primera reserva finalizada.</p>
+                        <EmptyState
+                            icon={MessageSquareQuote}
+                            title="Aún no hay valoraciones"
+                            description="El primer email se envía 24h después de la primera reserva finalizada."
+                        />
                     ) : (
-                        <div className="divide-y">
+                        <div className="divide-y divide-border/60">
                             {data.items.map(r => (
                                 <div key={r.id} className="py-4 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4">
                                     <div className="space-y-2">
                                         <div className="flex items-center gap-2 text-sm flex-wrap">
-                                            <span className="font-bold">{r.booking.guestName}</span>
+                                            <span className="font-medium text-foreground">{r.booking.guestName}</span>
                                             <span className="text-muted-foreground">·</span>
                                             <span className="text-muted-foreground">{format(new Date(r.booking.date), "d MMM yyyy 'a las' HH:mm", { locale: es })}</span>
                                             <span className="text-muted-foreground">·</span>
                                             <span className="text-muted-foreground">{r.booking.pax} pax</span>
                                             {r.redirectedToGoogle && (
-                                                <span className="inline-flex items-center gap-1 text-[10px] uppercase font-bold bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
-                                                    <ExternalLink className="w-3 h-3" /> Google
-                                                </span>
+                                                <StatusBadge tone="success" dot={false} className="gap-1">
+                                                    <ExternalLink className="size-3" /> Google
+                                                </StatusBadge>
                                             )}
                                         </div>
                                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
@@ -123,7 +144,7 @@ export default function ReviewsPanel({ endpoint, headerBanner }: ReviewsPanelPro
                                             <div className="flex items-center gap-2"><span className="text-muted-foreground w-16">Comida</span><Stars value={r.foodScore} /></div>
                                         </div>
                                         {r.advice && (
-                                            <blockquote className="text-sm italic text-muted-foreground border-l-2 border-gray-200 pl-3 mt-2">
+                                            <blockquote className="text-sm italic text-muted-foreground border-l-2 border-border pl-3 mt-2">
                                                 {r.advice}
                                             </blockquote>
                                         )}

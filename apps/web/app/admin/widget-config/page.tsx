@@ -1,90 +1,155 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { PageHeader } from '@/components/ui/page-header';
 import { fetchAPI } from '@/lib/api';
+import { Check, Copy, Info } from 'lucide-react';
+
+const HOTEL_ID = "DEMO-HOTEL-ID";
 
 export default function WidgetConfigPage() {
     const [config, setConfig] = useState({
-        primaryColor: '#3b82f6',
+        primaryColor: '#C59D5F',
         customCss: '',
-        showLogo: true
+        showLogo: true,
     });
-
-    const HOTEL_ID = "DEMO-HOTEL-ID";
-
-    useEffect(() => {
-        // Fetch config...
-    }, []);
+    const [saving, setSaving] = useState(false);
+    const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
     async function saveConfig() {
-        await fetchAPI(`/config/${HOTEL_ID}`, {
-            method: 'POST',
-            body: JSON.stringify(config)
-        });
-        alert('Saved!');
+        setSaving(true);
+        try {
+            await fetchAPI(`/config/${HOTEL_ID}`, {
+                method: 'POST',
+                body: JSON.stringify(config),
+            });
+        } finally {
+            setSaving(false);
+        }
     }
 
+    const copy = async (key: string, value: string) => {
+        try {
+            await navigator.clipboard.writeText(value);
+            setCopiedKey(key);
+            setTimeout(() => setCopiedKey(null), 1500);
+        } catch { /* ignore */ }
+    };
+
+    const hotelUrl = `https://motor.sotodelprior.com/widget?hotelId=${HOTEL_ID}`;
+    const restaurantUrl = `https://motor.sotodelprior.com/widget/restaurant?id=${HOTEL_ID}`;
+
     return (
-        <div className="space-y-6 max-w-4xl">
-            <h2 className="text-2xl font-bold">Widget Configuration</h2>
+        <div className="space-y-8 max-w-5xl">
+            <PageHeader
+                eyebrow="Integraciones"
+                title="Configuración del widget"
+                description="Personaliza la apariencia del motor de reservas y obtén los enlaces para integrarlo."
+            />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-                {/* VISUAL SETTINGS */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <Card>
-                    <CardHeader><CardTitle>Appearance</CardTitle></CardHeader>
-                    <CardContent className="space-y-4">
-                        <div>
-                            <label className="text-sm font-medium">Primary Color</label>
+                    <CardHeader>
+                        <CardTitle className="font-display text-base font-medium tracking-tight">
+                            Apariencia
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-5">
+                        <div className="space-y-1.5">
+                            <Label htmlFor="primary-color" className="text-eyebrow">Color principal</Label>
                             <div className="flex gap-2">
-                                <input type="color" className="w-12 h-10 p-0 border-0" value={config.primaryColor} onChange={e => setConfig({ ...config, primaryColor: e.target.value })} />
-                                <input className="border p-2 rounded flex-1" value={config.primaryColor} onChange={e => setConfig({ ...config, primaryColor: e.target.value })} />
+                                <input
+                                    type="color"
+                                    aria-label="Selector de color"
+                                    className="w-10 h-10 rounded-md border border-border cursor-pointer bg-transparent"
+                                    value={config.primaryColor}
+                                    onChange={e => setConfig({ ...config, primaryColor: e.target.value })}
+                                />
+                                <Input
+                                    id="primary-color"
+                                    className="flex-1 font-mono"
+                                    value={config.primaryColor}
+                                    onChange={e => setConfig({ ...config, primaryColor: e.target.value })}
+                                />
                             </div>
                         </div>
-                        <div>
-                            <label className="text-sm font-medium">Custom CSS</label>
-                            <textarea
-                                className="w-full border p-2 rounded h-32 font-mono text-xs"
+                        <div className="space-y-1.5">
+                            <Label htmlFor="custom-css" className="text-eyebrow">CSS personalizado</Label>
+                            <Textarea
+                                id="custom-css"
+                                rows={6}
+                                className="font-mono text-xs resize-none"
                                 value={config.customCss}
                                 onChange={e => setConfig({ ...config, customCss: e.target.value })}
                                 placeholder=".widget-container { background: transparent; }"
                             />
                         </div>
-                        <Button onClick={saveConfig}>Save Changes</Button>
+                        <Button onClick={saveConfig} disabled={saving}>
+                            {saving ? 'Guardando…' : 'Guardar cambios'}
+                        </Button>
                     </CardContent>
                 </Card>
 
-                {/* INTEGRATION LINKS */}
                 <Card>
-                    <CardHeader><CardTitle>Integration Code</CardTitle></CardHeader>
-                    <CardContent className="space-y-4">
-                        <div>
-                            <label className="text-sm font-medium">Hotel Widget Link</label>
-                            <div className="flex gap-2">
-                                <code className="bg-gray-100 p-2 rounded text-xs flex-1 block overflow-x-auto whitespace-nowrap">
-                                    https://motor.sotodelprior.com/widget?hotelId={HOTEL_ID}
-                                </code>
-                                <Button variant="outline" size="sm">Copy</Button>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="text-sm font-medium">Restaurant Widget Link</label>
-                            <div className="flex gap-2">
-                                <code className="bg-gray-100 p-2 rounded text-xs flex-1 block overflow-x-auto whitespace-nowrap">
-                                    https://motor.sotodelprior.com/widget/restaurant?id={HOTEL_ID}
-                                </code>
-                                <Button variant="outline" size="sm">Copy</Button>
-                            </div>
-                        </div>
-
-                        <div className="p-4 bg-yellow-50 text-yellow-800 text-sm rounded">
-                            <strong>Tip:</strong> You can embed these links in an <code>&lt;iframe&gt;</code> on your main website.
+                    <CardHeader>
+                        <CardTitle className="font-display text-base font-medium tracking-tight">
+                            Código de integración
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-5">
+                        <CopyField
+                            label="Widget de hotel"
+                            value={hotelUrl}
+                            copied={copiedKey === 'hotel'}
+                            onCopy={() => copy('hotel', hotelUrl)}
+                        />
+                        <CopyField
+                            label="Widget de restaurante"
+                            value={restaurantUrl}
+                            copied={copiedKey === 'restaurant'}
+                            onCopy={() => copy('restaurant', restaurantUrl)}
+                        />
+                        <div className="flex items-start gap-2 rounded-md border border-info/20 bg-info/5 p-3 text-xs text-info-foreground/80">
+                            <Info className="size-4 text-info shrink-0 mt-0.5" />
+                            <span>
+                                Puedes integrar estos enlaces en un{' '}
+                                <code className="font-mono bg-muted px-1 py-0.5 rounded text-foreground">&lt;iframe&gt;</code>{' '}
+                                en tu web principal.
+                            </span>
                         </div>
                     </CardContent>
                 </Card>
+            </div>
+        </div>
+    );
+}
 
+function CopyField({
+    label,
+    value,
+    copied,
+    onCopy,
+}: {
+    label: string;
+    value: string;
+    copied: boolean;
+    onCopy: () => void;
+}) {
+    return (
+        <div className="space-y-1.5">
+            <p className="text-eyebrow">{label}</p>
+            <div className="flex gap-2">
+                <code className="flex-1 min-w-0 bg-muted/60 border border-border px-3 h-9 inline-flex items-center text-xs font-mono rounded-md overflow-x-auto whitespace-nowrap">
+                    {value}
+                </code>
+                <Button variant="outline" size="sm" onClick={onCopy}>
+                    {copied ? <Check className="size-3.5 text-success" /> : <Copy className="size-3.5" />}
+                    {copied ? 'Copiado' : 'Copiar'}
+                </Button>
             </div>
         </div>
     );

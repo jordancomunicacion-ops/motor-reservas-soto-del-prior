@@ -1,7 +1,7 @@
 "use client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/components/ui/status-badge";
 import {
     User, Mail, Phone, MessageSquare, MessageCircle,
     Star, CheckCircle2, AlertTriangle, ExternalLink,
@@ -83,7 +83,7 @@ function fmtDate(date: string | Date | null | undefined, withTime = false): stri
     if (isNaN(d.getTime())) return '—';
     return d.toLocaleString('es-ES', {
         day: '2-digit', month: '2-digit', year: 'numeric',
-        ...(withTime ? { hour: '2-digit', minute: '2-digit' } : {})
+        ...(withTime ? { hour: '2-digit', minute: '2-digit' } : {}),
     });
 }
 
@@ -104,7 +104,7 @@ export default function GuestProfileSheet({ booking, isOpen, onClose }: GuestPro
         firstVisit: null,
         cancelledCount: 0,
         totalBookings: booking?.visitCount || 1,
-        cancelledOrNoShowRate: 0
+        cancelledOrNoShowRate: 0,
     };
 
     if (!booking) return null;
@@ -132,61 +132,65 @@ export default function GuestProfileSheet({ booking, isOpen, onClose }: GuestPro
 
     return (
         <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <SheetContent className="sm:max-w-md overflow-y-auto">
-                <SheetHeader className="border-b pb-4 mb-6 relative">
-                    <div className="absolute right-8 top-0">
+            <SheetContent className="sm:max-w-md overflow-y-auto p-6">
+                <SheetHeader className="border-b border-border/60 pb-4 mb-6 relative px-0">
+                    <div className="absolute right-0 top-0">
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                    <MoreVertical className="w-4 h-4" />
+                                <Button variant="ghost" size="icon-sm" aria-label="Acciones">
+                                    <MoreVertical className="size-4" />
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                                 <DropdownMenuItem>
-                                    <Settings className="w-4 h-4 mr-2" /> Editar Perfil
+                                    <Settings className="size-4 mr-2" /> Editar perfil
                                 </DropdownMenuItem>
                                 <DropdownMenuItem>
-                                    <Star className="w-4 h-4 mr-2 text-amber-500" /> Marcar como VIP
+                                    <Star className="size-4 mr-2 text-primary" /> Marcar como VIP
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem className="text-red-600">
-                                    <UserMinus className="w-4 h-4 mr-2" /> Bloquear Cliente
+                                <DropdownMenuItem className="text-destructive focus:text-destructive">
+                                    <UserMinus className="size-4 mr-2" /> Bloquear cliente
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <div className="bg-stone-100 p-3 rounded-full">
-                            <User className="w-6 h-6 text-stone-600" />
+                    <div className="flex items-center gap-3 pr-10 text-left">
+                        <div className="grid place-items-center size-11 rounded-full bg-muted text-muted-foreground shrink-0">
+                            <User className="size-5" />
                         </div>
-                        <div className="flex-1">
-                            <SheetTitle className="text-xl font-bold">{fullName || 'Sin nombre'}</SheetTitle>
-                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                        <div className="flex-1 min-w-0">
+                            <SheetTitle className="font-display text-xl font-medium tracking-tight truncate">
+                                {fullName || 'Sin nombre'}
+                            </SheetTitle>
+                            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                                 {guestStats.visitCount > 0 && (
-                                    <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 border-yellow-200">
+                                    <StatusBadge tone="accent" dot={false}>
                                         {guestStats.visitCount} {guestStats.visitCount === 1 ? 'visita' : 'visitas'}
-                                    </Badge>
+                                    </StatusBadge>
                                 )}
                                 {isVip && (
-                                    <Badge className="bg-amber-100 text-amber-800 border border-amber-200 gap-0.5">
-                                        <Star className="w-3 h-3" /> VIP
-                                    </Badge>
+                                    <StatusBadge tone="accent" dot={false} className="gap-1">
+                                        <Star className="size-3 fill-current" /> VIP
+                                    </StatusBadge>
                                 )}
                                 {hasAllergies && (
-                                    <Badge className="bg-red-100 text-red-800 border border-red-200 gap-0.5">
-                                        <AlertTriangle className="w-3 h-3" /> Alergias
-                                    </Badge>
+                                    <StatusBadge tone="danger" dot={false} className="gap-1">
+                                        <AlertTriangle className="size-3" /> Alergias
+                                    </StatusBadge>
                                 )}
                                 {guestStats.cancelledOrNoShowRate > 0 && (
-                                    <Badge variant="outline" className={cn(
-                                        "text-[10px] px-1.5 h-5",
-                                        guestStats.cancelledOrNoShowRate > 20 ? "text-red-600 border-red-200 bg-red-50" : "text-amber-600 border-amber-200 bg-amber-50"
-                                    )}>
-                                        {guestStats.cancelledOrNoShowRate}% Canc./No-show
-                                    </Badge>
+                                    <StatusBadge
+                                        tone={guestStats.cancelledOrNoShowRate > 20 ? 'danger' : 'warning'}
+                                        dot={false}
+                                    >
+                                        {guestStats.cancelledOrNoShowRate}% canc./no-show
+                                    </StatusBadge>
                                 )}
                                 {firstVisitYear && (
-                                    <span className="text-xs text-stone-400">Cliente desde {firstVisitYear}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                        Cliente desde {firstVisitYear}
+                                    </span>
                                 )}
                             </div>
                         </div>
@@ -194,257 +198,202 @@ export default function GuestProfileSheet({ booking, isOpen, onClose }: GuestPro
                 </SheetHeader>
 
                 <div className="space-y-6">
-                    <section>
-                        <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-3">Contacto</h3>
-                        <div className="grid grid-cols-1 gap-2">
-                            <div className="flex items-center gap-3 p-2.5 bg-stone-50 rounded-lg">
-                                <Mail className="w-4 h-4 text-stone-400 shrink-0" />
-                                <span className="text-sm truncate">{booking.guestEmail || <span className="text-stone-400 italic">Sin email</span>}</span>
-                            </div>
-                            <div className="flex items-center gap-3 p-2.5 bg-stone-50 rounded-lg">
-                                <Phone className="w-4 h-4 text-stone-400 shrink-0" />
-                                <span className="text-sm">{booking.guestPhone || <span className="text-stone-400 italic">Sin teléfono</span>}</span>
-                            </div>
-                            {booking.guestWhatsapp && (
-                                <a
-                                    href={`https://wa.me/${booking.guestWhatsapp.replace(/\D/g, '')}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-3 p-2.5 bg-emerald-50 hover:bg-emerald-100 transition-colors rounded-lg"
-                                >
-                                    <MessageCircle className="w-4 h-4 text-emerald-600 shrink-0" />
-                                    <span className="text-sm flex-1">{booking.guestWhatsapp}</span>
-                                    <ExternalLink className="w-3 h-3 text-emerald-600" />
-                                </a>
-                            )}
-                        </div>
-                    </section>
+                    <Section title="Contacto">
+                        <ContactRow icon={Mail} value={booking.guestEmail} placeholder="Sin email" />
+                        <ContactRow icon={Phone} value={booking.guestPhone} placeholder="Sin teléfono" />
+                        {booking.guestWhatsapp && (
+                            <a
+                                href={`https://wa.me/${booking.guestWhatsapp.replace(/\D/g, '')}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-3 p-2.5 bg-success/10 hover:bg-success/15 transition-colors rounded-md text-success"
+                            >
+                                <MessageCircle className="size-4 shrink-0" />
+                                <span className="text-sm flex-1">{booking.guestWhatsapp}</span>
+                                <ExternalLink className="size-3" />
+                            </a>
+                        )}
+                    </Section>
 
                     {(booking.guestAge || booking.guestGender) && (
-                        <section>
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-3">Datos personales</h3>
-                            <div className="flex flex-wrap gap-2">
+                        <Section title="Datos personales">
+                            <div className="flex flex-wrap gap-1.5">
                                 {booking.guestAge && (
-                                    <Badge variant="outline" className="gap-1">
-                                        <Cake className="w-3 h-3" /> {booking.guestAge} años
-                                    </Badge>
+                                    <StatusBadge tone="neutral" dot={false} className="gap-1">
+                                        <Cake className="size-3" /> {booking.guestAge} años
+                                    </StatusBadge>
                                 )}
                                 {booking.guestGender && (
-                                    <Badge variant="outline" className="gap-1">
-                                        <UsersIcon className="w-3 h-3" />
+                                    <StatusBadge tone="neutral" dot={false} className="gap-1">
+                                        <UsersIcon className="size-3" />
                                         {booking.guestGender === 'M' ? 'Hombre' : booking.guestGender === 'F' ? 'Mujer' : booking.guestGender}
-                                    </Badge>
+                                    </StatusBadge>
                                 )}
                             </div>
-                        </section>
+                        </Section>
                     )}
 
                     {socialNetworks.length > 0 && (
-                        <section>
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-3">Redes sociales</h3>
+                        <Section title="Redes sociales">
                             <div className="space-y-1.5">
                                 {socialNetworks.map(({ key, label, Icon, value, baseUrl }) => {
                                     const url = value.startsWith('http') ? value : `${baseUrl}${value.replace(/^@/, '')}`;
                                     return (
-                                        <a key={key} href={url} target="_blank" rel="noopener noreferrer"
-                                            className="flex items-center gap-2 p-2 bg-stone-50 hover:bg-stone-100 transition-colors rounded text-sm">
-                                            <Icon className="w-3.5 h-3.5 text-stone-500" />
-                                            <span className="text-stone-700 font-medium">{label}:</span>
-                                            <span className="text-stone-600 flex-1 truncate">{value}</span>
-                                            <ExternalLink className="w-3 h-3 text-stone-400" />
+                                        <a
+                                            key={key}
+                                            href={url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-2 p-2 bg-muted/40 hover:bg-accent/60 transition-colors rounded text-sm"
+                                        >
+                                            <Icon className="size-3.5 text-muted-foreground" />
+                                            <span className="font-medium text-foreground">{label}:</span>
+                                            <span className="text-muted-foreground flex-1 truncate">{value}</span>
+                                            <ExternalLink className="size-3 text-muted-foreground" />
                                         </a>
                                     );
                                 })}
                             </div>
-                        </section>
+                        </Section>
                     )}
 
-                    <section>
-                        <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-3">Esta reserva</h3>
-                        <div className="space-y-2 text-sm">
-                            <div className="flex justify-between p-2 bg-stone-50 rounded">
-                                <span className="text-stone-500 flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> Fecha y hora</span>
-                                <span className="font-medium">{fmtDate(booking.date, true)}</span>
-                            </div>
-                            <div className="flex justify-between p-2 bg-stone-50 rounded">
-                                <span className="text-stone-500 flex items-center gap-1"><UsersIcon className="w-3.5 h-3.5" /> Comensales</span>
-                                <span className="font-medium">{booking.pax}</span>
-                            </div>
-                            <div className="flex justify-between p-2 bg-stone-50 rounded">
-                                <span className="text-stone-500 flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> Duración</span>
-                                <span className="font-medium">{booking.duration || 90} min</span>
-                            </div>
-                            <div className="flex justify-between p-2 bg-stone-50 rounded">
-                                <span className="text-stone-500 flex items-center gap-1"><Globe className="w-3.5 h-3.5" /> Origen</span>
-                                <span className="font-medium">{(booking.origin && originLabels[booking.origin]) || booking.origin || '—'}</span>
-                            </div>
-                            <div className="flex justify-between p-2 bg-stone-50 rounded">
-                                <span className="text-stone-500 flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> Recibida</span>
-                                <span className="font-medium">{fmtDate(booking.createdAt, true)}</span>
-                            </div>
+                    <Section title="Esta reserva">
+                        <div className="space-y-1.5 text-sm">
+                            <DataRow icon={Calendar} label="Fecha y hora" value={fmtDate(booking.date, true)} />
+                            <DataRow icon={UsersIcon} label="Comensales" value={String(booking.pax ?? '—')} />
+                            <DataRow icon={Clock} label="Duración" value={`${booking.duration || 90} min`} />
+                            <DataRow icon={Globe} label="Origen" value={(booking.origin && originLabels[booking.origin]) || booking.origin || '—'} />
+                            <DataRow icon={Clock} label="Recibida" value={fmtDate(booking.createdAt, true)} />
                             {booking.isMealPlan && (
-                                <div className="flex items-center gap-2 p-2 bg-indigo-50 border border-indigo-100 rounded">
-                                    <Utensils className="w-4 h-4 text-indigo-600" />
-                                    <span className="text-indigo-800 text-xs font-semibold">Reserva en media pensión / pensión completa</span>
-                                </div>
+                                <Tag icon={Utensils} tone="info">Reserva en media pensión / pensión completa</Tag>
                             )}
                             {booking.hotelBookingId && (
-                                <div className="flex items-center gap-2 p-2 bg-blue-50 border border-blue-100 rounded">
-                                    <Hotel className="w-4 h-4 text-blue-600" />
-                                    <span className="text-blue-800 text-xs font-semibold">Asociada a estancia de hotel</span>
-                                </div>
+                                <Tag icon={Hotel} tone="info">Asociada a estancia de hotel</Tag>
                             )}
                             {booking.stripePaymentMethodId && (
-                                <div className="flex items-center gap-2 p-2 bg-emerald-50 border border-emerald-100 rounded">
-                                    <CreditCard className="w-4 h-4 text-emerald-600" />
-                                    <span className="text-emerald-800 text-xs font-semibold">Tarjeta de garantía registrada</span>
-                                </div>
+                                <Tag icon={CreditCard} tone="success">Tarjeta de garantía registrada</Tag>
                             )}
                         </div>
-                    </section>
+                    </Section>
 
                     {booking.review && (
-                        <section>
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-3 flex items-center gap-1">
-                                <Star className="w-3 h-3 text-amber-500" /> Valoración recibida
-                            </h3>
-                            <div className="bg-amber-50/40 border border-amber-100 rounded-lg p-3 space-y-2 text-sm">
-                                <div className="grid grid-cols-1 gap-1.5">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs text-stone-500">Atención</span>
-                                        <Stars value={booking.review.serviceScore} />
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs text-stone-500">Entorno</span>
-                                        <Stars value={booking.review.ambianceScore} />
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs text-stone-500">Comida</span>
-                                        <Stars value={booking.review.foodScore} />
-                                    </div>
+                        <Section
+                            title={
+                                <span className="inline-flex items-center gap-1">
+                                    <Star className="size-3 text-primary fill-primary" /> Valoración recibida
+                                </span>
+                            }
+                        >
+                            <div className="bg-primary/5 border border-primary/20 rounded-md p-3 space-y-2 text-sm">
+                                <div className="space-y-1.5">
+                                    <ReviewLine label="Atención" score={booking.review.serviceScore} />
+                                    <ReviewLine label="Entorno" score={booking.review.ambianceScore} />
+                                    <ReviewLine label="Comida" score={booking.review.foodScore} />
                                 </div>
                                 {booking.review.advice && (
-                                    <blockquote className="text-xs italic text-stone-600 border-l-2 border-amber-300 pl-2 mt-2">
+                                    <blockquote className="text-xs italic text-muted-foreground border-l-2 border-primary/40 pl-2 mt-2">
                                         {booking.review.advice}
                                     </blockquote>
                                 )}
-                                <div className="flex items-center justify-between text-[10px] text-stone-400 pt-1">
+                                <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1">
                                     <span>Enviada {fmtDate(booking.review.createdAt, true)}</span>
                                     {booking.review.redirectedToGoogle && (
-                                        <span className="inline-flex items-center gap-1 bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold uppercase">
-                                            <ExternalLink className="w-2.5 h-2.5" /> Google
-                                        </span>
+                                        <StatusBadge tone="success" dot={false} className="gap-1 text-[10px]">
+                                            <ExternalLink className="size-2.5" /> Google
+                                        </StatusBadge>
                                     )}
                                 </div>
                             </div>
-                        </section>
+                        </Section>
                     )}
 
-                    <section>
-                        <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-3">Notificaciones enviadas</h3>
+                    <Section title="Notificaciones enviadas">
                         <div className="grid grid-cols-2 gap-2">
-                            <div className={cn(
-                                "p-3 rounded-lg border flex items-center gap-2",
-                                booking.emailSent ? "bg-emerald-50 border-emerald-200" : "bg-stone-50 border-stone-200"
-                            )}>
-                                <Mail className={cn("w-4 h-4", booking.emailSent ? "text-emerald-600" : "text-stone-400")} />
-                                <div>
-                                    <p className="text-[10px] uppercase font-bold text-stone-500">Email</p>
-                                    <p className={cn("text-xs font-semibold", booking.emailSent ? "text-emerald-700" : "text-stone-500")}>
-                                        {booking.emailSent ? 'Enviado' : 'Pendiente'}
-                                    </p>
-                                </div>
-                            </div>
-                            <div className={cn(
-                                "p-3 rounded-lg border flex items-center gap-2",
-                                booking.smsSent ? "bg-emerald-50 border-emerald-200" : "bg-stone-50 border-stone-200"
-                            )}>
-                                <MessageSquare className={cn("w-4 h-4", booking.smsSent ? "text-emerald-600" : "text-stone-400")} />
-                                <div>
-                                    <p className="text-[10px] uppercase font-bold text-stone-500">SMS</p>
-                                    <p className={cn("text-xs font-semibold", booking.smsSent ? "text-emerald-700" : "text-stone-500")}>
-                                        {booking.smsSent ? 'Enviado' : 'No enviado'}
-                                    </p>
-                                </div>
-                            </div>
+                            <NotificationCard
+                                icon={Mail}
+                                label="Email"
+                                sent={!!booking.emailSent}
+                                sentText="Enviado"
+                                pendingText="Pendiente"
+                            />
+                            <NotificationCard
+                                icon={MessageSquare}
+                                label="SMS"
+                                sent={!!booking.smsSent}
+                                sentText="Enviado"
+                                pendingText="No enviado"
+                            />
                         </div>
-                    </section>
+                    </Section>
 
                     {tags.length > 0 && (
-                        <section>
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-3">Etiquetas</h3>
+                        <Section title="Etiquetas">
                             <div className="flex flex-wrap gap-1.5">
                                 {tags.map((tag, i) => (
-                                    <Badge key={i} variant="outline">{tag}</Badge>
+                                    <StatusBadge key={i} tone="neutral" dot={false}>{tag}</StatusBadge>
                                 ))}
                             </div>
-                        </section>
+                        </Section>
                     )}
 
-                    <section>
-                        <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-3">Historial</h3>
+                    <Section title="Historial">
                         <div className="grid grid-cols-3 gap-2">
-                            <div className="bg-stone-50 p-3 rounded-lg text-center border border-stone-100">
-                                <p className="text-[10px] text-stone-500 uppercase font-bold">Total</p>
-                                <p className="text-lg font-bold">{guestStats.totalBookings}</p>
-                            </div>
-                            <div className="bg-emerald-50 p-3 rounded-lg text-center border border-emerald-100">
-                                <p className="text-[10px] text-emerald-600 uppercase font-bold">Visitas</p>
-                                <p className="text-lg font-bold text-emerald-700">{guestStats.visitCount}</p>
-                            </div>
-                            <div className="bg-red-50 p-3 rounded-lg text-center border border-red-100">
-                                <p className="text-[10px] text-red-600 uppercase font-bold">Canc.</p>
-                                <p className="text-lg font-bold text-red-700">{guestStats.cancelledCount}</p>
-                            </div>
+                            <StatBox label="Total" value={guestStats.totalBookings} />
+                            <StatBox label="Visitas" value={guestStats.visitCount} tone="success" />
+                            <StatBox label="Canc." value={guestStats.cancelledCount} tone="destructive" />
                         </div>
                         {guestStats.firstVisit && (
-                            <p className="text-[10px] text-stone-400 mt-2 text-center">
+                            <p className="text-[10px] text-muted-foreground mt-2 text-center">
                                 Primera visita: {fmtDate(guestStats.firstVisit)}
                             </p>
                         )}
-                    </section>
+                    </Section>
 
-                    <section>
-                        <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-3">Notas</h3>
+                    <Section title="Notas">
                         <div className={cn(
-                            "p-3 rounded-lg flex gap-2 text-sm",
-                            booking.notes ? "bg-amber-50 border border-amber-100 text-amber-900" : "bg-stone-50 border border-stone-100 text-stone-500"
+                            "p-3 rounded-md flex gap-2 text-sm border",
+                            booking.notes
+                                ? "bg-warning/10 border-warning/30 text-warning-foreground"
+                                : "bg-muted/40 border-border text-muted-foreground",
                         )}>
-                            <MessageSquare className={cn("w-4 h-4 shrink-0 mt-0.5", booking.notes ? "text-amber-500" : "text-stone-400")} />
+                            <MessageSquare className={cn("size-4 shrink-0 mt-0.5", booking.notes ? "text-warning" : "text-muted-foreground")} />
                             <p>{booking.notes || 'Sin notas para esta reserva.'}</p>
                         </div>
-                    </section>
+                    </Section>
 
                     {(booking.preferredTable || (booking.topItems && booking.topItems.length > 0)) && (
-                        <section>
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-3">
-                                Hábitos (TPV)
-                                <Badge variant="outline" className="ml-2 text-[9px]">Beta</Badge>
-                            </h3>
+                        <Section
+                            title={
+                                <span className="inline-flex items-center gap-2">
+                                    Hábitos (TPV)
+                                    <StatusBadge tone="neutral" dot={false} className="text-[9px]">Beta</StatusBadge>
+                                </span>
+                            }
+                        >
                             <div className="space-y-3">
                                 {booking.preferredTable && (
                                     <div className="flex items-start gap-3">
-                                        <div className="bg-emerald-50 p-2 rounded-md">
-                                            <Star className="w-4 h-4 text-emerald-600" />
-                                        </div>
+                                        <span className="grid place-items-center size-8 rounded-md bg-primary/10 text-primary shrink-0">
+                                            <Star className="size-4" />
+                                        </span>
                                         <div>
-                                            <p className="text-xs text-stone-500">Mesa preferida</p>
-                                            <p className="text-sm font-semibold">{booking.preferredTable}</p>
+                                            <p className="text-eyebrow">Mesa preferida</p>
+                                            <p className="text-sm font-medium">{booking.preferredTable}</p>
                                         </div>
                                     </div>
                                 )}
                                 {booking.topItems && booking.topItems.length > 0 && (
                                     <div className="flex items-start gap-3">
-                                        <div className="bg-blue-50 p-2 rounded-md">
-                                            <Utensils className="w-4 h-4 text-blue-600" />
-                                        </div>
+                                        <span className="grid place-items-center size-8 rounded-md bg-muted text-muted-foreground shrink-0">
+                                            <Utensils className="size-4" />
+                                        </span>
                                         <div className="flex-1">
-                                            <p className="text-xs text-stone-500 mb-2">Top consumos</p>
+                                            <p className="text-eyebrow mb-2">Top consumos</p>
                                             <div className="space-y-1.5">
-                                                {booking.topItems.slice(0, 3).map((item: string, i: number) => (
-                                                    <div key={i} className="flex items-center justify-between bg-stone-50 px-3 py-1.5 rounded text-sm">
+                                                {booking.topItems.slice(0, 3).map((item, i) => (
+                                                    <div key={i} className="flex items-center justify-between bg-muted/40 px-3 py-1.5 rounded text-sm">
                                                         <span>{item}</span>
-                                                        <Badge variant="outline" className="text-[10px] h-4">TOP {i + 1}</Badge>
+                                                        <StatusBadge tone="neutral" dot={false} className="text-[10px]">TOP {i + 1}</StatusBadge>
                                                     </div>
                                                 ))}
                                             </div>
@@ -452,36 +401,166 @@ export default function GuestProfileSheet({ booking, isOpen, onClose }: GuestPro
                                     </div>
                                 )}
                             </div>
-                        </section>
+                        </Section>
                     )}
 
                     {booking.emails && booking.emails.length > 0 && (
-                        <section>
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-3">Comunicaciones</h3>
-                            <div className="border rounded-lg divide-y">
+                        <Section title="Comunicaciones">
+                            <div className="border border-border rounded-md divide-y divide-border/60">
                                 {booking.emails.map((email) => (
-                                    <div key={email.id} className="p-3 flex items-center justify-between hover:bg-stone-50 transition-colors">
+                                    <div key={email.id} className="p-3 flex items-center justify-between hover:bg-accent/40 transition-colors">
                                         <div className="flex flex-col">
                                             <span className="text-sm font-medium">{email.type}</span>
-                                            <span className="text-[10px] text-stone-400">{fmtDate(email.date)}</span>
+                                            <span className="text-[10px] text-muted-foreground">{fmtDate(email.date)}</span>
                                         </div>
                                         {email.status === 'opened' && (
-                                            <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] gap-1">
-                                                <CheckCircle2 className="w-3 h-3" /> Abierto
-                                            </Badge>
+                                            <StatusBadge tone="success" dot={false} className="gap-1 text-[10px]">
+                                                <CheckCircle2 className="size-3" /> Abierto
+                                            </StatusBadge>
                                         )}
                                         {email.status === 'clicked' && (
-                                            <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] gap-1">
-                                                <ExternalLink className="w-3 h-3" /> Clicked
-                                            </Badge>
+                                            <StatusBadge tone="info" dot={false} className="gap-1 text-[10px]">
+                                                <ExternalLink className="size-3" /> Clicked
+                                            </StatusBadge>
                                         )}
                                     </div>
                                 ))}
                             </div>
-                        </section>
+                        </Section>
                     )}
                 </div>
             </SheetContent>
         </Sheet>
+    );
+}
+
+/* ============================================================
+   Subcomponents
+   ============================================================ */
+
+function Section({ title, children }: { title: React.ReactNode; children: React.ReactNode }) {
+    return (
+        <section>
+            <h3 className="text-eyebrow mb-3">{title}</h3>
+            <div className="space-y-2">{children}</div>
+        </section>
+    );
+}
+
+function ContactRow({
+    icon: Icon,
+    value,
+    placeholder,
+}: {
+    icon: React.ComponentType<{ className?: string }>;
+    value: string | null | undefined;
+    placeholder: string;
+}) {
+    return (
+        <div className="flex items-center gap-3 p-2.5 bg-muted/40 rounded-md">
+            <Icon className="size-4 text-muted-foreground shrink-0" />
+            <span className="text-sm truncate">
+                {value || <span className="text-muted-foreground italic">{placeholder}</span>}
+            </span>
+        </div>
+    );
+}
+
+function DataRow({
+    icon: Icon,
+    label,
+    value,
+}: {
+    icon: React.ComponentType<{ className?: string }>;
+    label: string;
+    value: React.ReactNode;
+}) {
+    return (
+        <div className="flex justify-between items-center px-2.5 py-1.5 bg-muted/30 rounded">
+            <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
+                <Icon className="size-3.5" /> {label}
+            </span>
+            <span className="font-medium tabular-nums">{value}</span>
+        </div>
+    );
+}
+
+function Tag({
+    icon: Icon,
+    tone,
+    children,
+}: {
+    icon: React.ComponentType<{ className?: string }>;
+    tone: 'info' | 'success';
+    children: React.ReactNode;
+}) {
+    const cls = tone === 'success'
+        ? "bg-success/10 border-success/20 text-success"
+        : "bg-info/10 border-info/20 text-info";
+    return (
+        <div className={cn("flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-xs font-medium", cls)}>
+            <Icon className="size-4" />
+            {children}
+        </div>
+    );
+}
+
+function ReviewLine({ label, score }: { label: string; score: number }) {
+    return (
+        <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">{label}</span>
+            <Stars value={score} />
+        </div>
+    );
+}
+
+function NotificationCard({
+    icon: Icon,
+    label,
+    sent,
+    sentText,
+    pendingText,
+}: {
+    icon: React.ComponentType<{ className?: string }>;
+    label: string;
+    sent: boolean;
+    sentText: string;
+    pendingText: string;
+}) {
+    return (
+        <div className={cn(
+            "p-3 rounded-md border flex items-center gap-2.5",
+            sent ? "bg-success/10 border-success/20" : "bg-muted/40 border-border",
+        )}>
+            <Icon className={cn("size-4", sent ? "text-success" : "text-muted-foreground")} />
+            <div>
+                <p className="text-eyebrow">{label}</p>
+                <p className={cn("text-xs font-medium", sent ? "text-success" : "text-muted-foreground")}>
+                    {sent ? sentText : pendingText}
+                </p>
+            </div>
+        </div>
+    );
+}
+
+function StatBox({
+    label,
+    value,
+    tone,
+}: {
+    label: string;
+    value: number;
+    tone?: 'success' | 'destructive';
+}) {
+    const styles = tone === 'success'
+        ? "bg-success/10 border-success/20 text-success"
+        : tone === 'destructive'
+            ? "bg-destructive/10 border-destructive/20 text-destructive"
+            : "bg-muted/40 border-border text-foreground";
+    return (
+        <div className={cn("p-3 rounded-md border text-center", styles)}>
+            <p className="text-eyebrow">{label}</p>
+            <p className="font-display text-lg font-medium tabular-nums">{value}</p>
+        </div>
     );
 }

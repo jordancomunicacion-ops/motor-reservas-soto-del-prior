@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { format, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { DayPicker } from 'react-day-picker';
+import { es as esCalendar } from 'react-day-picker/locale';
 import 'react-day-picker/dist/style.css';
 import { Button } from '@/components/ui/button';
 
@@ -22,76 +23,81 @@ export function DateSelector({ date, onDateChange }: DatePickerProps) {
     };
 
     return (
-        <div className="relative flex items-center bg-gray-100 rounded-md p-1 border border-gray-200 shadow-sm">
+        <div className="relative inline-flex items-center gap-0.5 rounded-md border border-border bg-muted/40 p-0.5">
             <Button
                 variant="ghost"
-                size="icon"
+                size="icon-sm"
                 onClick={() => onDateChange(subDays(date, 1))}
-                className="hover:bg-gray-200"
+                aria-label="Día anterior"
             >
-                <ChevronLeft className="w-4 h-4 text-gray-600" />
+                <ChevronLeft className="size-3.5" />
             </Button>
 
             <button
+                type="button"
                 onClick={() => setIsOpen(!isOpen)}
-                className="px-6 py-2 mx-1 font-bold text-sm flex items-center gap-2 bg-transparent text-yellow-500 hover:bg-gray-200 rounded transition-colors uppercase"
+                className="px-4 h-8 inline-flex items-center text-sm font-medium text-foreground hover:bg-accent/60 rounded transition-colors capitalize tabular-nums"
             >
                 {format(date, "EEEE d/MM/yyyy", { locale: es })}
             </button>
 
             <Button
                 variant="ghost"
-                size="icon"
+                size="icon-sm"
                 onClick={() => onDateChange(addDays(date, 1))}
-                className="hover:bg-gray-200"
+                aria-label="Día siguiente"
             >
-                <ChevronRight className="w-4 h-4 text-gray-600" />
+                <ChevronRight className="size-3.5" />
             </Button>
 
             <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => onDateChange(new Date())}
-                className="ml-2 text-xs font-bold text-gray-600"
+                className="ml-1 h-8 text-xs"
             >
-                HOY
+                Hoy
             </Button>
 
             {isOpen && (
-                <div className="absolute top-14 left-1/2 -translate-x-1/2 bg-white rounded-lg shadow-xl border p-4 z-50 animate-in fade-in zoom-in-95 duration-200">
-                    <div className="flex justify-between items-center mb-2 px-2">
-                        <span className="font-bold text-sm">Selecciona fecha</span>
-                        <button onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-black">✕</button>
+                <>
+                    <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+                    <div className="absolute top-[calc(100%+6px)] left-1/2 -translate-x-1/2 bg-popover text-popover-foreground rounded-md shadow-lg border border-border p-4 z-50 animate-in fade-in zoom-in-95 duration-150">
+                        <div className="flex justify-between items-center mb-2 px-1">
+                            <span className="text-sm font-medium">Selecciona fecha</span>
+                            <button
+                                onClick={() => setIsOpen(false)}
+                                className="text-muted-foreground hover:text-foreground transition-colors"
+                                aria-label="Cerrar"
+                            >
+                                <X className="size-3.5" />
+                            </button>
+                        </div>
+                        <DayPicker
+                            mode="single"
+                            selected={date}
+                            onSelect={handleSelect}
+                            locale={esCalendar}
+                            styles={{
+                                head_cell: { width: '36px' },
+                                cell: { width: '36px' },
+                                day: { margin: 'auto' },
+                            }}
+                            modifiersClassNames={{
+                                selected: 'bg-primary text-primary-foreground rounded-md',
+                                today: 'border border-primary/40',
+                            }}
+                        />
+                        <div className="flex justify-end mt-3">
+                            <Button
+                                size="sm"
+                                onClick={() => { onDateChange(new Date()); setIsOpen(false); }}
+                            >
+                                Hoy
+                            </Button>
+                        </div>
                     </div>
-                    <DayPicker
-                        mode="single"
-                        selected={date}
-                        onSelect={handleSelect}
-                        locale={es as any}
-                        styles={{
-                            head_cell: { width: '40px' },
-                            cell: { width: '40px' },
-                            day: { margin: 'auto' },
-                            caption: { display: 'flex', justifyContent: 'space-between' }
-                        }}
-                        modifiersClassNames={{
-                            selected: 'bg-yellow-400 text-black font-bold rounded-lg'
-                        }}
-                    />
-                    <div className="flex justify-end mt-4">
-                        <Button
-                            className="bg-yellow-400 text-black hover:bg-yellow-500 font-bold"
-                            onClick={() => { onDateChange(new Date()); setIsOpen(false); }}
-                        >
-                            HOY
-                        </Button>
-                    </div>
-                </div>
-            )}
-
-            {/* Backdrop */}
-            {isOpen && (
-                <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)}></div>
+                </>
             )}
         </div>
     );
