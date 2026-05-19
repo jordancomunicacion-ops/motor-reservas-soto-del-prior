@@ -3,12 +3,11 @@ import { useState, useEffect, Suspense } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { CalendarIcon, ChevronLeft, ChevronRight, Plus, RefreshCw, LayoutGrid, List, Users } from 'lucide-react';
+import { CalendarIcon, ChevronLeft, ChevronRight, Plus, RefreshCw, Users } from 'lucide-react';
 import { format, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 import TablePlan from '@/components/restaurant/TablePlan';
-import ReservationList from '@/components/restaurant/ReservationList';
 import WaitlistPanel from '@/components/restaurant/WaitlistPanel';
 import ReservationForm from '@/components/restaurant/ReservationForm';
 import GuestProfileSheet from '@/components/restaurant/GuestProfileSheet';
@@ -239,38 +238,12 @@ function RestaurantDashboardContent() {
                 </aside>
 
                 <main className="flex-1 flex flex-col bg-white dark:bg-zinc-800 rounded-lg shadow-sm border border-gray-100 dark:border-zinc-700 overflow-hidden">
-                    <div className="border-b dark:border-zinc-700 px-4 py-2 flex justify-between items-center bg-gray-50 dark:bg-zinc-900/50">
-                        <div className="flex bg-gray-200 dark:bg-zinc-900 p-1 rounded-lg">
-                            <button
-                                onClick={() => setView('PLAN')}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${view === 'PLAN' ? 'bg-white dark:bg-zinc-800 shadow text-black dark:text-white' : 'text-gray-500 hover:text-black dark:hover:text-white'}`}
-                            >
-                                <LayoutGrid className="w-4 h-4" /> Plano
-                            </button>
-                            <button
-                                onClick={() => setView('LIST')}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${view === 'LIST' ? 'bg-white dark:bg-zinc-800 shadow text-black dark:text-white' : 'text-gray-500 hover:text-black dark:hover:text-white'}`}
-                            >
-                                <List className="w-4 h-4" /> Lista
-                            </button>
-                        </div>
-
-                        <div className="flex gap-2">
-                            <select className="text-sm border rounded p-1.5 bg-white dark:bg-zinc-900 dark:border-zinc-700 outline-none focus:ring-2 focus:ring-blue-500">
-                                <option>Servicio: Comida</option>
-                                <option>Servicio: Cena</option>
-                            </select>
-                        </div>
-                    </div>
-
                     <div className="flex-1 overflow-hidden relative">
-                        {view === 'ACCESS' && (
+                        {view === 'ACCESS' ? (
                             <div className="h-full overflow-auto p-6">
                                 <AccessManager contextId={restaurantId} contextType="restaurant" />
                             </div>
-                        )}
-
-                        {view === 'PLAN' && (
+                        ) : (
                             <TablePlan
                                 zones={zones}
                                 tables={rawTables}
@@ -284,19 +257,6 @@ function RestaurantDashboardContent() {
                                 }}
                                 className="h-full w-full"
                             />
-                        )}
-
-                        {view === 'LIST' && (
-                            <div className="h-full overflow-auto p-4">
-                                <ReservationList
-                                    bookings={bookings}
-                                    zones={zones}
-                                    onStatusChange={handleStatusChange}
-                                    onAssignTable={handleAssignTable}
-                                    onSelectProfile={(b) => setSelectedBookingForProfile(b)}
-                                    onEdit={openEditBooking}
-                                />
-                            </div>
                         )}
                     </div>
                 </main>
