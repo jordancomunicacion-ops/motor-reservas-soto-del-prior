@@ -65,8 +65,12 @@ export default function AdminDashboard() {
     async function loadData() {
         setLoading(true);
         try {
+            const statsUrl = contextId
+                ? `/global/stats?ctxType=${contextType}&ctxId=${encodeURIComponent(contextId)}`
+                : '/global/stats';
+
             const [statsData, entityData] = await Promise.all([
-                fetchAPI<DashboardStats>('/global/stats'),
+                fetchAPI<DashboardStats>(statsUrl),
                 contextId
                     ? fetchAPI<ContextEntity>(contextType === 'hotel' ? `/property/hotels/${contextId}` : `/restaurant/${contextId}`)
                     : Promise.resolve(null),

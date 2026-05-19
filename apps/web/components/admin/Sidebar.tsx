@@ -73,12 +73,16 @@ export function Sidebar({ userRole }: { userRole?: string }) {
 
     return (
         <aside className="hidden md:flex w-64 flex-col border-r border-sidebar-border bg-sidebar h-screen fixed left-0 top-0 z-30">
-            <div className="h-[72px] px-6 flex items-center border-b border-sidebar-border">
-                <Link href="/admin" className="flex items-center gap-2.5">
-                    <Image src="/logo-icon.png" alt="" width={28} height={28} className="shrink-0" />
-                    <span className="font-display text-base font-medium tracking-tight text-sidebar-foreground">
-                        Soto del Prior
-                    </span>
+            <div className="h-[72px] px-6 flex items-center justify-center border-b border-sidebar-border">
+                <Link href="/admin" aria-label="Soto del Prior" className="flex items-center justify-center">
+                    <Image
+                        src="/logo-text.png"
+                        alt="Soto del Prior"
+                        width={180}
+                        height={50}
+                        priority
+                        className="h-9 w-auto"
+                    />
                 </Link>
             </div>
 
