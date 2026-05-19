@@ -541,11 +541,6 @@ function HotelConfigContent() {
                             />
                             <p className="text-xs text-muted-foreground">Por defecto 4: si Atención, Habitación y Limpieza son ≥ 4, redirigimos a Google al enviar.</p>
                         </div>
-                        <div className="pt-2">
-                            <Link href={`/admin/hotels/${hotelId}/reviews`} className="text-sm font-medium text-blue-600 hover:underline inline-flex items-center gap-1">
-                                <Star className="w-4 h-4" /> Ver valoraciones recibidas →
-                            </Link>
-                        </div>
                     </CardContent>
                 </Card>
             )}
