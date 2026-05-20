@@ -72,16 +72,54 @@ export class RestaurantAvailabilityService {
             },
         });
 
-        const activeShifts = shifts.filter(s => {
-            const days = s.daysOfWeek.split(',').map(d => d.trim());
-            return days.includes(dayOfWeek.toString());
+        const { start: startOfDay, end: endOfDay } = zonedDayRangeUtc(dayStr, timezone);
+
+        // Apertura excepcional: si cubre el día, sustituye el filtro por daysOfWeek
+        // y permite operar aunque haya un cierre solapado.
+        const opening = await this.prisma.restaurantOpening.findFirst({
+            where: {
+                restaurantId,
+                date: { lte: endOfDay },
+                OR: [
+                    { endDate: null, date: { gte: startOfDay, lte: endOfDay } },
+                    { endDate: { gte: startOfDay } }
+                ]
+            }
         });
+
+        type SlotShift = { startTime: string; endTime: string; slotInterval: number; type?: string };
+        let activeShifts: SlotShift[];
+
+        if (opening) {
+            const allowed = new Set(opening.shiftIds.split(',').map(x => x.trim()).filter(Boolean));
+            const reused: SlotShift[] = shifts.filter(s => allowed.has(s.id));
+            const rawCustom = (opening.customShifts as Array<{
+                name?: string;
+                type?: string;
+                startTime?: string;
+                endTime?: string;
+                slotInterval?: number;
+            }> | null) ?? [];
+            const custom: SlotShift[] = rawCustom
+                .filter(cs => cs?.startTime && cs?.endTime && cs?.slotInterval)
+                .map(cs => ({
+                    startTime: cs.startTime as string,
+                    endTime: cs.endTime as string,
+                    slotInterval: cs.slotInterval as number,
+                    type: cs.type
+                }))
+                .filter(cs => !type || cs.type === type);
+            activeShifts = [...reused, ...custom];
+        } else {
+            activeShifts = shifts.filter(s => {
+                const days = s.daysOfWeek.split(',').map(d => d.trim());
+                return days.includes(dayOfWeek.toString());
+            });
+        }
 
         if (activeShifts.length === 0) {
             return { slots: [], closed: true, message: 'No hay turnos para este día' };
         }
-
-        const { start: startOfDay, end: endOfDay } = zonedDayRangeUtc(dayStr, timezone);
 
         const dayEvents = await this.prisma.event.findMany({
             where: {

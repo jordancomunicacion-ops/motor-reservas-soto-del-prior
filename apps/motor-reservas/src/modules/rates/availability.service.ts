@@ -51,13 +51,25 @@ export class AvailabilityService {
             const effectiveCTA = specific?.closedToArrival ?? roomGlobal?.closedToArrival ?? hotelGlobal?.closedToArrival ?? false;
             const effectiveMinStay = specific?.minStay ?? roomGlobal?.minStay ?? hotelGlobal?.minStay ?? 0;
 
+            // Apertura excepcional: si cubre el día, anula stopSell y CTA (CTD se gestiona al final).
+            const opening = await this.prisma.hotelOpening.findFirst({
+                where: {
+                    hotelId,
+                    date: { lte: currentDate },
+                    OR: [
+                        { endDate: null, date: { equals: currentDate } },
+                        { endDate: { gte: currentDate } }
+                    ]
+                }
+            });
+
             // A. Stop Sell
-            if (effectiveStopSell) {
+            if (effectiveStopSell && !opening) {
                 throw new Error(`Stop Sell active on ${currentDate.toDateString()}`);
             }
 
             // B. CTA (Only on CheckIn date)
-            if (currentDate.getTime() === checkIn.getTime() && effectiveCTA) {
+            if (currentDate.getTime() === checkIn.getTime() && effectiveCTA && !opening) {
                 throw new Error(`Closed to Arrival on ${currentDate.toDateString()}`);
             }
 
@@ -91,7 +103,6 @@ export class AvailabilityService {
         }
 
         // Check CTD on Checkout Date
-        // Check CTD on Checkout Date
         const ctdRestriction = await this.prisma.restriction.findFirst({
             where: {
                 hotelId,
@@ -100,7 +111,19 @@ export class AvailabilityService {
             }
         });
         if (ctdRestriction?.closedToDeparture) {
-            throw new Error(`Closed to Departure on ${checkOut.toDateString()}`);
+            const checkoutOpening = await this.prisma.hotelOpening.findFirst({
+                where: {
+                    hotelId,
+                    date: { lte: checkOut },
+                    OR: [
+                        { endDate: null, date: { equals: checkOut } },
+                        { endDate: { gte: checkOut } }
+                    ]
+                }
+            });
+            if (!checkoutOpening) {
+                throw new Error(`Closed to Departure on ${checkOut.toDateString()}`);
+            }
         }
 
         return true;

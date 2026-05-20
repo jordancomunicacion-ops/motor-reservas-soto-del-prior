@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ShiftType } from '../../common/enums';
 import { getUserScope, assertHotelAccess, ensureHotelAccess } from '../../common/scope';
@@ -307,5 +307,45 @@ export class PropertyService {
         const restaurantZones = hotel.restaurant?.zones || [];
 
         return [...hotelZones, ...restaurantZones];
+    }
+
+    // HOTEL OPENINGS (aperturas excepcionales que saltan stopSell/CTA/CTD)
+    private async hotelIdForOpening(openingId: string): Promise<string> {
+        const o = await this.prisma.hotelOpening.findUnique({
+            where: { id: openingId },
+            select: { hotelId: true }
+        });
+        if (!o) throw new NotFoundException('Apertura no encontrada');
+        return o.hotelId;
+    }
+
+    async getHotelOpenings(hotelId: string, user?: any) {
+        if (user) await ensureHotelAccess(user, this.prisma, hotelId);
+        return this.prisma.hotelOpening.findMany({
+            where: { hotelId },
+            orderBy: { date: 'asc' }
+        });
+    }
+
+    async createHotelOpening(
+        hotelId: string,
+        data: { date: string; endDate?: string; reason?: string },
+        user?: any
+    ) {
+        if (user) await ensureHotelAccess(user, this.prisma, hotelId);
+        if (!data?.date) throw new BadRequestException('La fecha es obligatoria');
+        return this.prisma.hotelOpening.create({
+            data: {
+                hotelId,
+                date: new Date(data.date),
+                endDate: data.endDate ? new Date(data.endDate) : null,
+                reason: data.reason
+            }
+        });
+    }
+
+    async deleteHotelOpening(id: string, user?: any) {
+        if (user) await ensureHotelAccess(user, this.prisma, await this.hotelIdForOpening(id));
+        return this.prisma.hotelOpening.delete({ where: { id } });
     }
 }

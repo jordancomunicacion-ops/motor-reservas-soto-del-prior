@@ -9,11 +9,12 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { PageHeader } from '@/components/ui/page-header';
-import { ArrowLeft, Save, Building2, Trash2, Utensils, Sparkles, Settings, CreditCard, Star } from 'lucide-react';
+import { ArrowLeft, Save, Building2, Trash2, Utensils, Sparkles, Settings, CreditCard, Star, CalendarCheck } from 'lucide-react';
 import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { WidgetConfigSection } from '@/components/admin/WidgetConfigSection';
 import { MailConfigSection, type MailConfigValue } from '@/components/admin/MailConfigSection';
+import { HotelOpeningsManager } from '@/components/admin/HotelOpeningsManager';
 
 
 
@@ -545,6 +546,25 @@ function HotelConfigContent() {
                             />
                             <p className="text-xs text-muted-foreground">Por defecto 4: si Atención, Habitación y Limpieza son ≥ 4, redirigimos a Google al enviar.</p>
                         </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            {tab === 'general' && (
+                <Card>
+                    <CardHeader>
+                        <div className="flex items-center gap-3">
+                            <div className="grid place-items-center size-9 rounded-md bg-emerald-500/10 text-emerald-600">
+                                <CalendarCheck className="size-4" />
+                            </div>
+                            <div>
+                                <CardTitle className="font-display text-base font-medium tracking-tight">Días de Apertura Excepcional</CardTitle>
+                                <CardDescription>Abre el hotel días concretos aunque tengas stopSell, CTA o CTD activos en las restricciones.</CardDescription>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <HotelOpeningsManager hotelId={hotelId} />
                     </CardContent>
                 </Card>
             )}

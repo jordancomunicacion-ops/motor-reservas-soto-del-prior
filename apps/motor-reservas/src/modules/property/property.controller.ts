@@ -76,4 +76,22 @@ export class PropertyController {
     getHotelZones(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
         return this.propertyService.getHotelZones(id, req?.user);
     }
+
+    @Roles('ADMIN')
+    @Get('hotels/:id/openings')
+    getHotelOpenings(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+        return this.propertyService.getHotelOpenings(id, req?.user);
+    }
+
+    @Roles('ADMIN')
+    @Post('hotels/:id/openings')
+    createHotelOpening(@Param('id') id: string, @Body() body: any, @Req() req: AuthenticatedRequest) {
+        return this.propertyService.createHotelOpening(id, body, req?.user);
+    }
+
+    @Roles('ADMIN')
+    @Delete('hotels/:id/openings/:openingId')
+    deleteHotelOpening(@Param('openingId') openingId: string, @Req() req: AuthenticatedRequest) {
+        return this.propertyService.deleteHotelOpening(openingId, req?.user);
+    }
 }

@@ -15,6 +15,12 @@ export type Closure = {
     endDate?: string | null;
 };
 
+export type Opening = {
+    date: string;
+    endDate?: string | null;
+    shiftIds: string;
+};
+
 export type Shift = {
     daysOfWeek: string;
 };

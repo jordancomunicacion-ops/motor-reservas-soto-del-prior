@@ -284,6 +284,24 @@ export class RestaurantController {
         return this.service.deleteClosure(closureId, req?.user);
     }
 
+    @Roles('ADMIN')
+    @Get(':id/openings')
+    getOpenings(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+        return this.service.getOpenings(id, req?.user);
+    }
+
+    @Roles('ADMIN')
+    @Post(':id/openings')
+    createOpening(@Param('id') id: string, @Body() body: any, @Req() req: AuthenticatedRequest) {
+        return this.service.createOpening(id, body, req?.user);
+    }
+
+    @Roles('ADMIN')
+    @Delete(':id/openings/:openingId')
+    deleteOpening(@Param('openingId') openingId: string, @Req() req: AuthenticatedRequest) {
+        return this.service.deleteOpening(openingId, req?.user);
+    }
+
     @Public()
     @Post('waitlist/:id/confirm')
     confirmWaitlist(@Param('id') id: string) {

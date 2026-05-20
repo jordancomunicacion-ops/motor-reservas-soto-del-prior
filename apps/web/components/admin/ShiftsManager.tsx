@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, Clock, Coffee, Utensils, Moon, CalendarOff } from 'lucide-react';
+import { Plus, Trash2, Clock, Coffee, Utensils, Moon, CalendarOff, CalendarCheck } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -17,6 +17,23 @@ interface Closure {
     date: string;
     endDate?: string;
     reason?: string;
+}
+
+interface CustomShift {
+    name: string;
+    type: 'BREAKFAST' | 'LUNCH' | 'DINNER';
+    startTime: string;
+    endTime: string;
+    slotInterval: number;
+}
+
+interface Opening {
+    id: string;
+    date: string;
+    endDate?: string;
+    reason?: string;
+    shiftIds: string;
+    customShifts?: CustomShift[] | null;
 }
 
 interface Shift {
@@ -71,9 +88,15 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
     const [closureType, setClosureType] = useState<'SINGLE' | 'PERIOD'>('SINGLE');
     const [newClosure, setNewClosure] = useState({ date: '', endDate: '', reason: '' });
 
+    const [openings, setOpenings] = useState<Opening[]>([]);
+    const [openingType, setOpeningType] = useState<'SINGLE' | 'PERIOD'>('SINGLE');
+    const [newOpening, setNewOpening] = useState<{ date: string; endDate: string; reason: string; shiftIds: string[]; customShifts: CustomShift[] }>({ date: '', endDate: '', reason: '', shiftIds: [], customShifts: [] });
+    const [draftCustomShift, setDraftCustomShift] = useState<CustomShift>({ name: 'Comida', type: 'LUNCH', startTime: '13:00', endTime: '16:00', slotInterval: 30 });
+
     useEffect(() => {
         loadShifts();
         loadClosures();
+        loadOpenings();
     }, [restaurantId]);
 
     async function loadShifts() {
@@ -91,6 +114,15 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
         try {
             const data = await fetchAPI(`/restaurant/${restaurantId}/closures`);
             setClosures(data);
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    async function loadOpenings() {
+        try {
+            const data = await fetchAPI(`/restaurant/${restaurantId}/openings`);
+            setOpenings(data);
         } catch (e) {
             console.error(e);
         }
@@ -175,6 +207,75 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
             console.error(e);
             alert('Error al eliminar el cierre');
         }
+    }
+
+    async function handleAddOpening() {
+        if (!newOpening.date) return alert('La fecha es obligatoria');
+        if (openingType === 'PERIOD' && !newOpening.endDate) return alert('La fecha de fin es obligatoria');
+        if (newOpening.shiftIds.length === 0 && newOpening.customShifts.length === 0) {
+            return alert('Reutiliza al menos un turno o añade un turno puntual');
+        }
+
+        try {
+            const payload = {
+                date: newOpening.date,
+                reason: newOpening.reason,
+                endDate: openingType === 'PERIOD' ? newOpening.endDate : undefined,
+                shiftIds: newOpening.shiftIds,
+                customShifts: newOpening.customShifts,
+            };
+
+            await fetchAPI(`/restaurant/${restaurantId}/openings`, {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+            setNewOpening({ date: '', endDate: '', reason: '', shiftIds: [], customShifts: [] });
+            loadOpenings();
+        } catch (e) {
+            console.error(e);
+            const message = e instanceof Error ? e.message : 'Error desconocido';
+            alert(`Error al añadir la apertura: ${message}`);
+        }
+    }
+
+    function handleAddCustomShift() {
+        const cs = draftCustomShift;
+        if (!cs.name) return alert('El nombre del turno puntual es obligatorio');
+        if (cs.startTime >= cs.endTime) return alert('La hora de inicio debe ser anterior a la de fin');
+        if (cs.slotInterval < 5 || cs.slotInterval > 240) return alert('El intervalo debe estar entre 5 y 240 minutos');
+        setNewOpening(prev => ({ ...prev, customShifts: [...prev.customShifts, cs] }));
+        setDraftCustomShift({ name: 'Comida', type: 'LUNCH', startTime: '13:00', endTime: '16:00', slotInterval: 30 });
+    }
+
+    function handleRemoveCustomShift(idx: number) {
+        setNewOpening(prev => ({ ...prev, customShifts: prev.customShifts.filter((_, i) => i !== idx) }));
+    }
+
+    async function handleDeleteOpening(id: string) {
+        if (!confirm('¿Estás seguro de que quieres eliminar esta apertura?')) return;
+
+        try {
+            await fetchAPI(`/restaurant/${restaurantId}/openings/${id}`, {
+                method: 'DELETE'
+            });
+            loadOpenings();
+        } catch (e) {
+            console.error(e);
+            alert('Error al eliminar la apertura');
+        }
+    }
+
+    function toggleOpeningShift(shiftId: string) {
+        setNewOpening(prev => {
+            const has = prev.shiftIds.includes(shiftId);
+            return { ...prev, shiftIds: has ? prev.shiftIds.filter(x => x !== shiftId) : [...prev.shiftIds, shiftId] };
+        });
+    }
+
+    function shiftIconFor(type: 'BREAKFAST' | 'LUNCH' | 'DINNER') {
+        if (type === 'BREAKFAST') return Coffee;
+        if (type === 'LUNCH') return Utensils;
+        return Moon;
     }
 
     return (
@@ -446,6 +547,304 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
                     {closures.length === 0 && (
                         <div className="col-span-full text-center py-6 text-sm text-muted-foreground border border-dashed border-border rounded-md">
                             No hay días bloqueados excepcionalmente.
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            <div className="pt-8 border-t border-dashed border-border mt-8">
+                <div className="flex items-center gap-3 mb-6">
+                    <span className="grid place-items-center size-10 rounded-md bg-emerald-500/10 text-emerald-600">
+                        <CalendarCheck className="size-5" />
+                    </span>
+                    <div>
+                        <h3 className="font-display text-lg font-medium tracking-tight">Días de Apertura Excepcional</h3>
+                        <p className="text-sm text-muted-foreground">Abre un día que normalmente cerraría — anula los días sin turnos y los cierres que solapen. Elige qué turnos se ofrecen ese día.</p>
+                    </div>
+                </div>
+
+                <div className="bg-emerald-500/5 p-5 rounded-md border border-dashed border-emerald-500/20 mb-6">
+                    <div className="flex gap-2 mb-4">
+                        <Button
+                            variant={openingType === 'SINGLE' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setOpeningType('SINGLE')}
+                            className={openingType === 'SINGLE' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}
+                        >
+                            Día Suelto
+                        </Button>
+                        <Button
+                            variant={openingType === 'PERIOD' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setOpeningType('PERIOD')}
+                            className={openingType === 'PERIOD' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}
+                        >
+                            Periodo
+                        </Button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                        <div className="space-y-2">
+                            <Label className="text-eyebrow">{openingType === 'SINGLE' ? 'Fecha a Abrir' : 'Fecha Inicio'}</Label>
+                            <Input
+                                type="date"
+                                className="h-10"
+                                value={newOpening.date}
+                                onChange={(e) => setNewOpening({ ...newOpening, date: e.target.value })}
+                            />
+                        </div>
+                        {openingType === 'PERIOD' && (
+                            <div className="space-y-2 animate-in fade-in slide-in-from-left-4 duration-300">
+                                <Label className="text-eyebrow">Fecha Fin</Label>
+                                <Input
+                                    type="date"
+                                    className="h-10"
+                                    value={newOpening.endDate}
+                                    onChange={(e) => setNewOpening({ ...newOpening, endDate: e.target.value })}
+                                />
+                            </div>
+                        )}
+                        <div className={cn("space-y-2", openingType === 'SINGLE' && 'md:col-span-1')}>
+                            <Label className="text-eyebrow">Motivo (Opcional)</Label>
+                            <Input
+                                type="text"
+                                className="h-10"
+                                placeholder={openingType === 'PERIOD' ? "Ej: Puente festivo" : "Ej: Cena especial"}
+                                value={newOpening.reason}
+                                onChange={(e) => setNewOpening({ ...newOpening, reason: e.target.value })}
+                            />
+                        </div>
+                        <Button
+                            onClick={handleAddOpening}
+                            className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                        >
+                            <Plus className="size-4" /> {openingType === 'SINGLE' ? 'Abrir Día' : 'Abrir Periodo'}
+                        </Button>
+                    </div>
+
+                    <div className="mt-5 space-y-5">
+                        <div>
+                            <Label className="text-eyebrow mb-2 block">Reutilizar turnos existentes</Label>
+                            {shifts.length === 0 ? (
+                                <p className="text-xs text-muted-foreground">No hay turnos configurados; añade abajo turnos puntuales.</p>
+                            ) : (
+                                <div className="space-y-3">
+                                    {categories.map(cat => {
+                                        const catShifts = shifts.filter(s => s.type === cat.value);
+                                        if (catShifts.length === 0) return null;
+                                        const Icon = cat.icon;
+                                        return (
+                                            <div key={cat.value} className="space-y-1.5">
+                                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                    <Icon className="size-3.5" />
+                                                    <span className="uppercase tracking-wider">{cat.label}</span>
+                                                </div>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {catShifts.map(s => {
+                                                        const ShiftIcon = shiftIconFor(s.type);
+                                                        const selected = newOpening.shiftIds.includes(s.id);
+                                                        return (
+                                                            <button
+                                                                key={s.id}
+                                                                type="button"
+                                                                onClick={() => toggleOpeningShift(s.id)}
+                                                                className={cn(
+                                                                    "inline-flex items-center gap-2 px-3 h-9 rounded-md text-sm transition-colors border",
+                                                                    selected
+                                                                        ? 'bg-emerald-600 border-emerald-600 text-white'
+                                                                        : 'bg-card border-border text-muted-foreground hover:bg-muted'
+                                                                )}
+                                                            >
+                                                                <ShiftIcon className="size-3.5" />
+                                                                <span>{s.name}</span>
+                                                                <span className="opacity-70 text-xs">{s.startTime}</span>
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="pt-4 border-t border-dashed border-emerald-500/30">
+                            <Label className="text-eyebrow mb-2 block">Turnos puntuales sólo para esta apertura</Label>
+                            <p className="text-xs text-muted-foreground mb-3">
+                                Define turnos que no existen en el calendario normal (ej. un almuerzo especial sólo para ese día).
+                            </p>
+
+                            <div className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end bg-card/60 p-3 rounded-md border border-dashed border-emerald-500/20">
+                                <div className="space-y-1.5 md:col-span-1">
+                                    <Label className="text-eyebrow">Categoría</Label>
+                                    <Select
+                                        value={draftCustomShift.type}
+                                        onValueChange={(val: 'BREAKFAST' | 'LUNCH' | 'DINNER') =>
+                                            setDraftCustomShift({ ...draftCustomShift, type: val, name: getCategoryLabel(val) })
+                                        }
+                                    >
+                                        <SelectTrigger className="w-full h-9">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="BREAKFAST">Desayuno</SelectItem>
+                                            <SelectItem value="LUNCH">Comida</SelectItem>
+                                            <SelectItem value="DINNER">Cena</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-1.5 md:col-span-1">
+                                    <Label className="text-eyebrow">Nombre</Label>
+                                    <Input
+                                        className="h-9"
+                                        value={draftCustomShift.name}
+                                        onChange={(e) => setDraftCustomShift({ ...draftCustomShift, name: e.target.value })}
+                                        placeholder="Brunch especial"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-eyebrow">Inicio</Label>
+                                    <Input
+                                        type="time"
+                                        className="h-9"
+                                        value={draftCustomShift.startTime}
+                                        onChange={(e) => setDraftCustomShift({ ...draftCustomShift, startTime: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-eyebrow">Fin</Label>
+                                    <Input
+                                        type="time"
+                                        className="h-9"
+                                        value={draftCustomShift.endTime}
+                                        onChange={(e) => setDraftCustomShift({ ...draftCustomShift, endTime: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-eyebrow">Intervalo</Label>
+                                    <Input
+                                        type="number"
+                                        className="h-9"
+                                        value={draftCustomShift.slotInterval}
+                                        onChange={(e) => setDraftCustomShift({ ...draftCustomShift, slotInterval: parseInt(e.target.value) || 30 })}
+                                    />
+                                </div>
+                                <Button
+                                    type="button"
+                                    onClick={handleAddCustomShift}
+                                    variant="outline"
+                                    className="h-9 gap-2 border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10"
+                                >
+                                    <Plus className="size-4" /> Añadir
+                                </Button>
+                            </div>
+
+                            {newOpening.customShifts.length > 0 && (
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                    {newOpening.customShifts.map((cs, idx) => {
+                                        const Icon = shiftIconFor(cs.type);
+                                        return (
+                                            <span
+                                                key={idx}
+                                                className="inline-flex items-center gap-2 pl-2 pr-1 h-8 rounded-md bg-emerald-600/10 border border-emerald-600/30 text-sm"
+                                            >
+                                                <Icon className="size-3.5 text-emerald-700" />
+                                                <span className="text-emerald-800">{cs.name}</span>
+                                                <span className="opacity-70 text-xs text-emerald-700">{cs.startTime}–{cs.endTime} · {cs.slotInterval}m</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemoveCustomShift(idx)}
+                                                    className="size-6 grid place-items-center rounded text-emerald-700 hover:bg-emerald-600/20"
+                                                    aria-label="Quitar turno puntual"
+                                                >
+                                                    <Trash2 className="size-3.5" />
+                                                </button>
+                                            </span>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                    {openings.map(opening => {
+                        const selectedShiftIds = new Set(opening.shiftIds.split(',').map(x => x.trim()).filter(Boolean));
+                        const selectedShifts = shifts.filter(s => selectedShiftIds.has(s.id));
+                        return (
+                            <div key={opening.id} className="flex items-center justify-between p-4 bg-card rounded-md border border-border">
+                                <div className="flex items-center gap-3">
+                                    <span className="grid place-items-center size-9 rounded-md bg-emerald-500/10 text-emerald-600">
+                                        <CalendarCheck className="size-4" />
+                                    </span>
+                                    <div>
+                                        <div className="font-medium flex items-center gap-2">
+                                            {opening.endDate && <Badge className="text-[9px] h-4 px-1 uppercase tracking-tighter bg-emerald-600 hover:bg-emerald-600 text-white">Periodo</Badge>}
+                                            <span className="capitalize">
+                                                {(() => {
+                                                    try {
+                                                        const start = format(new Date(opening.date), "eeee d 'de' MMMM", { locale: es });
+                                                        if (opening.endDate) {
+                                                            return (
+                                                                <span className="flex flex-col md:flex-row md:items-center gap-1">
+                                                                    <span className="text-emerald-700">{format(new Date(opening.date), "d MMM yyyy", { locale: es })}</span>
+                                                                    <span className="opacity-40 text-xs">al</span>
+                                                                    <span className="text-emerald-700">{format(new Date(opening.endDate), "d MMM yyyy", { locale: es })}</span>
+                                                                </span>
+                                                            );
+                                                        }
+                                                        return start;
+                                                    } catch (e) {
+                                                        return 'Fecha no válida';
+                                                    }
+                                                })()}
+                                            </span>
+                                        </div>
+                                        {opening.reason && <div className="text-xs text-muted-foreground mt-0.5">{opening.reason}</div>}
+                                        <div className="flex flex-wrap gap-1 mt-1">
+                                            {selectedShifts.length === 0 && (!opening.customShifts || opening.customShifts.length === 0) ? (
+                                                <span className="text-[10px] text-muted-foreground italic">Sin turnos asignados</span>
+                                            ) : (
+                                                <>
+                                                    {selectedShifts.map(s => {
+                                                        const Icon = shiftIconFor(s.type);
+                                                        return (
+                                                            <span key={s.id} className="inline-flex items-center gap-1 px-1.5 h-5 rounded text-[10px] bg-emerald-500/10 text-emerald-700">
+                                                                <Icon className="size-3" />
+                                                                {s.name}
+                                                            </span>
+                                                        );
+                                                    })}
+                                                    {(opening.customShifts || []).map((cs, idx) => {
+                                                        const Icon = shiftIconFor(cs.type);
+                                                        return (
+                                                            <span key={`cs-${idx}`} className="inline-flex items-center gap-1 px-1.5 h-5 rounded text-[10px] bg-emerald-600/20 text-emerald-800 border border-emerald-600/30">
+                                                                <Icon className="size-3" />
+                                                                {cs.name} <span className="opacity-70">{cs.startTime}</span>
+                                                            </span>
+                                                        );
+                                                    })}
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteOpening(opening.id)}
+                                    className="text-emerald-700 hover:text-emerald-800 hover:bg-emerald-500/10"
+                                >
+                                    Eliminar
+                                </Button>
+                            </div>
+                        );
+                    })}
+                    {openings.length === 0 && (
+                        <div className="col-span-full text-center py-6 text-sm text-muted-foreground border border-dashed border-border rounded-md">
+                            No hay aperturas excepcionales configuradas.
                         </div>
                     )}
                 </div>

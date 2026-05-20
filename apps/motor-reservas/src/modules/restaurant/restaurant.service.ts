@@ -80,6 +80,16 @@ export class RestaurantService {
         return c.restaurantId;
     }
 
+    /** Resuelve el restaurantId al que pertenece un RestaurantOpening. */
+    private async restaurantIdForOpening(openingId: string): Promise<string> {
+        const o = await this.prisma.restaurantOpening.findUnique({
+            where: { id: openingId },
+            select: { restaurantId: true }
+        });
+        if (!o) throw new NotFoundException('Apertura no encontrada');
+        return o.restaurantId;
+    }
+
     private async getRestaurantConfig(restaurantId: string): Promise<{ timezone: string; defaultDuration: number; bufferMinutes: number }> {
         const r = await this.prisma.restaurant.findUnique({
             where: { id: restaurantId },
@@ -822,7 +832,7 @@ export class RestaurantService {
             newStart = zonedDateToUtc(dayStr, body.time, timezone);
             this.ensureWithinEditCutoff(newStart);
 
-            const closures = await this.prisma.restaurantClosure.findMany({
+            const opening = await this.prisma.restaurantOpening.findFirst({
                 where: {
                     restaurantId: booking.restaurantId,
                     date: { lte: newStart },
@@ -832,8 +842,20 @@ export class RestaurantService {
                     ]
                 }
             });
-            if (closures.length > 0) {
-                throw new BadRequestException('Restaurante cerrado en la nueva fecha.');
+            if (!opening) {
+                const closures = await this.prisma.restaurantClosure.findMany({
+                    where: {
+                        restaurantId: booking.restaurantId,
+                        date: { lte: newStart },
+                        OR: [
+                            { endDate: null, date: { equals: newStart } },
+                            { endDate: { gte: newStart } }
+                        ]
+                    }
+                });
+                if (closures.length > 0) {
+                    throw new BadRequestException('Restaurante cerrado en la nueva fecha.');
+                }
             }
 
             if (newPax <= 12) {
@@ -906,8 +928,8 @@ export class RestaurantService {
         const dayStr = toDateOnlyString(data.date);
         const start = zonedDateToUtc(dayStr, data.time, timezone);
 
-        // Pre-check: cierres del restaurante.
-        const closures = await this.prisma.restaurantClosure.findMany({
+        // Pre-check: cierres del restaurante. Una apertura excepcional para esa fecha anula el cierre.
+        const opening = await this.prisma.restaurantOpening.findFirst({
             where: {
                 restaurantId: data.restaurantId,
                 date: { lte: start },
@@ -917,8 +939,20 @@ export class RestaurantService {
                 ]
             }
         });
-        if (closures.length > 0) {
-            throw new BadRequestException('Restaurante cerrado en la fecha solicitada.');
+        if (!opening) {
+            const closures = await this.prisma.restaurantClosure.findMany({
+                where: {
+                    restaurantId: data.restaurantId,
+                    date: { lte: start },
+                    OR: [
+                        { endDate: null, date: { equals: start } },
+                        { endDate: { gte: start } }
+                    ]
+                }
+            });
+            if (closures.length > 0) {
+                throw new BadRequestException('Restaurante cerrado en la fecha solicitada.');
+            }
         }
 
         // Pre-check: disponibilidad para grupos ≤ 12 (los grandes se gestionan a mano).
@@ -1027,6 +1061,84 @@ export class RestaurantService {
     async deleteClosure(id: string, user?: AuthenticatedUser) {
         if (user) await ensureRestaurantAccess(user, this.prisma, await this.restaurantIdForClosure(id));
         return this.prisma.restaurantClosure.delete({
+            where: { id }
+        });
+    }
+
+    async getOpenings(restaurantId: string, user?: AuthenticatedUser) {
+        if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
+        return this.prisma.restaurantOpening.findMany({
+            where: { restaurantId },
+            orderBy: { date: 'asc' }
+        });
+    }
+
+    async createOpening(
+        restaurantId: string,
+        data: {
+            date: string;
+            endDate?: string;
+            reason?: string;
+            shiftIds?: string[];
+            customShifts?: Array<{ name: string; type: string; startTime: string; endTime: string; slotInterval: number }>;
+        },
+        user?: AuthenticatedUser
+    ) {
+        if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
+        if (!data.date) throw new BadRequestException('La fecha es obligatoria');
+
+        const shiftIds = Array.isArray(data.shiftIds) ? data.shiftIds.filter(Boolean) : [];
+        const customShifts = Array.isArray(data.customShifts) ? data.customShifts : [];
+
+        if (shiftIds.length === 0 && customShifts.length === 0) {
+            throw new BadRequestException('Selecciona al menos un turno existente o define uno puntual');
+        }
+
+        if (shiftIds.length > 0) {
+            const shifts = await this.prisma.shift.findMany({
+                where: { restaurantId, id: { in: shiftIds } },
+                select: { id: true }
+            });
+            if (shifts.length !== shiftIds.length) {
+                throw new BadRequestException('Alguno de los turnos no pertenece a este restaurante');
+            }
+        }
+
+        const validTypes = new Set(['BREAKFAST', 'LUNCH', 'DINNER']);
+        const timeRe = /^\d{2}:\d{2}$/;
+        for (const cs of customShifts) {
+            if (!cs.name || !cs.type || !cs.startTime || !cs.endTime) {
+                throw new BadRequestException('Cada turno puntual necesita nombre, tipo, hora inicio y hora fin');
+            }
+            if (!validTypes.has(cs.type)) {
+                throw new BadRequestException(`Tipo de turno no válido: ${cs.type}`);
+            }
+            if (!timeRe.test(cs.startTime) || !timeRe.test(cs.endTime)) {
+                throw new BadRequestException('Las horas deben tener formato HH:mm');
+            }
+            if (cs.startTime >= cs.endTime) {
+                throw new BadRequestException(`Turno "${cs.name}": la hora de inicio debe ser anterior a la de fin`);
+            }
+            if (!cs.slotInterval || cs.slotInterval < 5 || cs.slotInterval > 240) {
+                throw new BadRequestException(`Turno "${cs.name}": intervalo de slots fuera de rango (5-240 min)`);
+            }
+        }
+
+        return this.prisma.restaurantOpening.create({
+            data: {
+                restaurantId,
+                date: new Date(data.date),
+                endDate: data.endDate ? new Date(data.endDate) : null,
+                reason: data.reason,
+                shiftIds: shiftIds.join(','),
+                customShifts: customShifts.length > 0 ? customShifts : undefined
+            }
+        });
+    }
+
+    async deleteOpening(id: string, user?: AuthenticatedUser) {
+        if (user) await ensureRestaurantAccess(user, this.prisma, await this.restaurantIdForOpening(id));
+        return this.prisma.restaurantOpening.delete({
             where: { id }
         });
     }

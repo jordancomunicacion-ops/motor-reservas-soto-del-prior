@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { computeDayStatus, shouldRequireStripe } from './widget-helpers';
-import type { Closure, Shift } from './widget-types';
+import type { Closure, Opening, Shift } from './widget-types';
 
 describe('computeDayStatus', () => {
     // Congelamos el "hoy" para que las fechas pasadas/futuras sean deterministas.
@@ -57,6 +57,36 @@ describe('computeDayStatus', () => {
     it('shifts con espacios en los días los acepta', () => {
         const shift: Shift = { daysOfWeek: '1, 2, 3, 4, 5' };
         expect(computeDayStatus(wednesday, [], [shift], [])).toBe('available');
+    });
+
+    it('opening puntual abre un día sin shifts → available', () => {
+        const onlyWeekend: Shift = { daysOfWeek: '6,0' };
+        const opening: Opening = { date: '2026-05-20', endDate: null, shiftIds: 'shift-1' };
+        expect(computeDayStatus(wednesday, [], [onlyWeekend], [], [opening])).toBe('available');
+    });
+
+    it('opening anula closure solapado → available', () => {
+        const closure: Closure = { date: '2026-05-18', endDate: '2026-05-25' };
+        const opening: Opening = { date: '2026-05-20', endDate: null, shiftIds: 'shift-1' };
+        expect(computeDayStatus(wednesday, [closure], [allDaysShift], [], [opening])).toBe('available');
+    });
+
+    it('opening en periodo abre todos los días del rango', () => {
+        const onlyWeekend: Shift = { daysOfWeek: '6,0' };
+        const opening: Opening = { date: '2026-05-18', endDate: '2026-05-22', shiftIds: 'shift-1' };
+        expect(computeDayStatus(wednesday, [], [onlyWeekend], [], [opening])).toBe('available');
+    });
+
+    it('evento gana sobre opening', () => {
+        const onlyWeekend: Shift = { daysOfWeek: '6,0' };
+        const opening: Opening = { date: '2026-05-20', endDate: null, shiftIds: 'shift-1' };
+        expect(computeDayStatus(wednesday, [], [onlyWeekend], ['2026-05-20'], [opening])).toBe('event');
+    });
+
+    it('opening fuera de rango no afecta', () => {
+        const onlyWeekend: Shift = { daysOfWeek: '6,0' };
+        const opening: Opening = { date: '2026-06-15', endDate: null, shiftIds: 'shift-1' };
+        expect(computeDayStatus(wednesday, [], [onlyWeekend], [], [opening])).toBe('closed');
     });
 });
 

@@ -10,7 +10,7 @@ import { fetchAPI } from '@/lib/api';
 import { loadStripe, type Stripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import { WidgetCardForm } from './WidgetCardForm';
-import { BASE_STEPS, type WidgetConfig, type RestaurantResponse, type SlotsResponse, type CreatedBooking, type RestaurantEvent, type Closure } from './widget-types';
+import { BASE_STEPS, type WidgetConfig, type RestaurantResponse, type SlotsResponse, type CreatedBooking, type RestaurantEvent, type Closure, type Opening } from './widget-types';
 import { computeDayStatus, shouldRequireStripe } from './widget-helpers';
 
 const logWidgetError = (context: string, err: unknown) => {
@@ -72,6 +72,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
     const [submitting, setSubmitting] = useState(false);
     const [loadingSlots, setLoadingSlots] = useState(false);
     const [closures, setClosures] = useState<{ date: string; endDate?: string | null }[]>([]);
+    const [openings, setOpenings] = useState<Opening[]>([]);
     const [restaurantName, setRestaurantName] = useState('');
     const [createdBooking, setCreatedBooking] = useState<CreatedBooking | null>(null);
     const [dayEvents, setDayEvents] = useState<RestaurantEvent[]>([]);
@@ -135,6 +136,11 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
                 if (Array.isArray(data)) setClosures(data);
             })
             .catch(err => logWidgetError('load closures', err));
+        fetchAPI<Opening[]>(`/restaurant/${restaurantId}/openings`)
+            .then(data => {
+                if (Array.isArray(data)) setOpenings(data);
+            })
+            .catch(err => logWidgetError('load openings', err));
         fetchAPI<RestaurantEvent[]>(`/event?restaurantId=${restaurantId}`)
             .then(data => {
                 if (Array.isArray(data)) {
@@ -149,7 +155,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pax]);
 
-    const getDayStatus = (date: Date) => computeDayStatus(date, closures, restaurantShifts, eventDates);
+    const getDayStatus = (date: Date) => computeDayStatus(date, closures, restaurantShifts, eventDates, openings);
 
     const handleDateSelect = async (date: Date) => {
         const status = getDayStatus(date);

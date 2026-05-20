@@ -126,6 +126,20 @@ model Hotel {
 
   events Event[]
   zones  Zone[]
+
+  openings HotelOpening[]
+}
+
+model HotelOpening {
+  id        String    @id @default(uuid())
+  hotelId   String
+  hotel     Hotel     @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  date      DateTime
+  endDate   DateTime?
+  reason    String?
+  createdAt DateTime  @default(now())
+
+  @@index([hotelId, date])
 }
 
 model WidgetConfig {
@@ -517,6 +531,7 @@ model Restaurant {
   hotel           Hotel?
   shifts          Shift[]
   closures        RestaurantClosure[]
+  openings        RestaurantOpening[]
 
   // Widget Config
   widgetConfig WidgetConfig?
@@ -578,6 +593,20 @@ model RestaurantClosure {
   endDate      DateTime?
   reason       String?
   createdAt    DateTime   @default(now())
+}
+
+model RestaurantOpening {
+  id           String     @id @default(uuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  date         DateTime
+  endDate      DateTime?
+  reason       String?
+  shiftIds     String
+  customShifts Json?
+  createdAt    DateTime   @default(now())
+
+  @@index([restaurantId, date])
 }
 
 model Zone {
