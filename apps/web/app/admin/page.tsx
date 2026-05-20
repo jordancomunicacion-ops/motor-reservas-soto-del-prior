@@ -37,6 +37,8 @@ interface DashboardStats {
     activeReservations?: { total: number; change: number };
     occupancy?: { percentage: number; change: number };
     covers?: { total: number; change: number };
+    reviews?: { overall: number | null; total: number; change: number };
+    visits?: { total: number; change: number };
     recentBookings?: RecentBooking[];
 }
 
@@ -49,6 +51,7 @@ interface ContextEntity {
 interface ReviewsSummary {
     total: number;
     overall: number | null;
+    change: number;
 }
 
 interface TrendsMonth {
@@ -99,13 +102,13 @@ export default function AdminDashboard() {
             setEntity(entityData);
             setTrendsData(trendsResp);
 
-            if (contextId) {
-                const endpoint = contextType === 'hotel'
-                    ? `/bookings/hotel/${contextId}/reviews`
-                    : `/restaurant/${contextId}/reviews`;
-                fetchAPI<{ total: number; averages: { overall: number | null } }>(endpoint)
-                    .then(d => setReviews({ total: d.total, overall: d.averages?.overall ?? null }))
-                    .catch(() => setReviews(null));
+            // reviews ya vienen agregadas en stats.reviews (con change vs mes anterior).
+            if (statsData?.reviews) {
+                setReviews({
+                    total: statsData.reviews.total,
+                    overall: statsData.reviews.overall,
+                    change: statsData.reviews.change,
+                });
             } else {
                 setReviews(null);
             }
@@ -203,7 +206,7 @@ export default function AdminDashboard() {
                             <MetricCard
                                 label={`Cubiertos${linkedRestaurant ? ' · vinculado' : ''}`}
                                 value={stats?.covers?.total ?? 0}
-                                hint="última hora"
+                                hint="vs semana pasada"
                                 change={stats?.covers?.change ?? 0}
                                 icon={Utensils}
                                 highlight={linkedRestaurant}
@@ -218,15 +221,16 @@ export default function AdminDashboard() {
                                         ? `${reviews.overall.toFixed(1)} / 5`
                                         : '—'
                                 }
-                                hint={`${reviews?.total ?? 0} ${(reviews?.total ?? 0) === 1 ? 'opinión' : 'opiniones'}`}
+                                hint={`vs mes pasado · ${reviews?.total ?? 0} ${(reviews?.total ?? 0) === 1 ? 'opinión' : 'opiniones'}`}
+                                change={reviews?.change ?? 0}
                                 icon={Star}
                             />
                         )}
                         <MetricCard
                             label="Visitas web"
-                            value="0"
-                            hint="vs ayer"
-                            change={0}
+                            value={stats?.visits?.total ?? 0}
+                            hint="vs semana pasada"
+                            change={stats?.visits?.change ?? 0}
                             icon={TrendingUp}
                             trend={trends.visits}
                         />

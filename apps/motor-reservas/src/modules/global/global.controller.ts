@@ -56,7 +56,17 @@ export class GlobalController {
         @Query('ctxId') ctxId?: string,
     ) {
         const now = new Date();
-        const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        // Rangos calendario: mes actual MTD vs mes anterior completo.
+        const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        // Semana ISO (lunes a domingo): semana actual MTD vs semana anterior completa.
+        const dow = now.getDay(); // 0=dom, 1=lun, ..., 6=sab
+        const diffToMonday = dow === 0 ? -6 : 1 - dow;
+        const thisMonday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday);
+        thisMonday.setHours(0, 0, 0, 0);
+        const lastMonday = new Date(thisMonday);
+        lastMonday.setDate(thisMonday.getDate() - 7);
 
         const scope = await getUserScope(req?.user, this.prisma);
 
@@ -105,15 +115,31 @@ export class GlobalController {
         const hasHotelScope = hotelIdsAllowed === null || hotelIdsAllowed.length > 0;
         const hasRestaurantScope = restaurantIdsAllowed === null || restaurantIdsAllowed.length > 0;
 
+        const eventRestaurantWhere = restaurantIdsAllowed === null
+            ? {}
+            : { restaurantId: { in: restaurantIdsAllowed } };
+
         // Queries en paralelo
         const [
             // Hotel
             hotelActiveCount,
             recentHotelBookings,
+            hotelRevenueCurrentMonth,
+            hotelRevenuePrevMonth,
             // Restaurante
             resActiveCount,
-            restaurantCovers,
             recentResBookings,
+            // Covers: semana ISO actual MTD vs semana ISO pasada completa
+            coversThisWeek,
+            coversLastWeek,
+            // Ingresos restaurante: eventos del mes actual vs mes anterior
+            resRevenueCurrentMonth,
+            resRevenuePrevMonth,
+            // Valoración: media del mes actual vs mes anterior
+            hotelReviewsCurrent,
+            hotelReviewsPrev,
+            resReviewsCurrent,
+            resReviewsPrev,
         ] = await Promise.all([
             hasHotelScope
                 ? this.prisma.booking.count({
@@ -128,23 +154,83 @@ export class GlobalController {
                     include: { hotel: { select: { name: true } } },
                 })
                 : Promise.resolve([]),
+            hasHotelScope
+                ? this.prisma.booking.aggregate({
+                    where: { checkInDate: { gte: currentMonthStart, lt: nextMonthStart }, status: { not: 'CANCELLED' }, ...hotelFilter },
+                    _sum: { totalPrice: true },
+                })
+                : Promise.resolve({ _sum: { totalPrice: null as null | number } }),
+            hasHotelScope
+                ? this.prisma.booking.aggregate({
+                    where: { checkInDate: { gte: prevMonthStart, lt: currentMonthStart }, status: { not: 'CANCELLED' }, ...hotelFilter },
+                    _sum: { totalPrice: true },
+                })
+                : Promise.resolve({ _sum: { totalPrice: null as null | number } }),
             hasRestaurantScope
                 ? this.prisma.resBooking.count({
                     where: { date: { gte: now }, status: { not: 'CANCELLED' }, ...restaurantFilter },
                 })
                 : Promise.resolve(0),
             hasRestaurantScope
-                ? this.prisma.resBooking.aggregate({
-                    where: { date: { gte: firstDayOfMonth }, status: { not: 'CANCELLED' }, ...restaurantFilter },
-                    _sum: { pax: true },
-                })
-                : Promise.resolve({ _sum: { pax: 0 } }),
-            hasRestaurantScope
                 ? this.prisma.resBooking.findMany({
                     take: 5,
                     where: restaurantFilter,
                     orderBy: { createdAt: 'desc' },
                     include: { restaurant: { select: { name: true } } },
+                })
+                : Promise.resolve([]),
+            hasRestaurantScope
+                ? this.prisma.resBooking.aggregate({
+                    where: { date: { gte: thisMonday }, status: { not: 'CANCELLED' }, ...restaurantFilter },
+                    _sum: { pax: true },
+                })
+                : Promise.resolve({ _sum: { pax: 0 } }),
+            hasRestaurantScope
+                ? this.prisma.resBooking.aggregate({
+                    where: { date: { gte: lastMonday, lt: thisMonday }, status: { not: 'CANCELLED' }, ...restaurantFilter },
+                    _sum: { pax: true },
+                })
+                : Promise.resolve({ _sum: { pax: 0 } }),
+            hasRestaurantScope
+                ? this.prisma.eventBooking.aggregate({
+                    where: {
+                        status: 'CONFIRMED',
+                        event: { date: { gte: currentMonthStart, lt: nextMonthStart }, ...eventRestaurantWhere },
+                    },
+                    _sum: { totalPrice: true },
+                })
+                : Promise.resolve({ _sum: { totalPrice: null as null | number } }),
+            hasRestaurantScope
+                ? this.prisma.eventBooking.aggregate({
+                    where: {
+                        status: 'CONFIRMED',
+                        event: { date: { gte: prevMonthStart, lt: currentMonthStart }, ...eventRestaurantWhere },
+                    },
+                    _sum: { totalPrice: true },
+                })
+                : Promise.resolve({ _sum: { totalPrice: null as null | number } }),
+            hasHotelScope
+                ? this.prisma.hotelReview.findMany({
+                    where: { createdAt: { gte: currentMonthStart, lt: nextMonthStart }, ...hotelFilter },
+                    select: { serviceScore: true, roomScore: true, cleanlinessScore: true },
+                })
+                : Promise.resolve([]),
+            hasHotelScope
+                ? this.prisma.hotelReview.findMany({
+                    where: { createdAt: { gte: prevMonthStart, lt: currentMonthStart }, ...hotelFilter },
+                    select: { serviceScore: true, roomScore: true, cleanlinessScore: true },
+                })
+                : Promise.resolve([]),
+            hasRestaurantScope
+                ? this.prisma.resReview.findMany({
+                    where: { createdAt: { gte: currentMonthStart, lt: nextMonthStart }, ...restaurantFilter },
+                    select: { serviceScore: true, ambianceScore: true, foodScore: true },
+                })
+                : Promise.resolve([]),
+            hasRestaurantScope
+                ? this.prisma.resReview.findMany({
+                    where: { createdAt: { gte: prevMonthStart, lt: currentMonthStart }, ...restaurantFilter },
+                    select: { serviceScore: true, ambianceScore: true, foodScore: true },
                 })
                 : Promise.resolve([]),
         ]);
@@ -173,19 +259,72 @@ export class GlobalController {
             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
             .slice(0, 5);
 
+        // Helpers de agregacion
+        const pctChange = (curr: number, prev: number): number => {
+            if (prev === 0) return curr > 0 ? 100 : 0;
+            return Math.round(((curr - prev) / prev) * 100);
+        };
+        const avgScore = <T extends Record<string, number>>(rows: T[]): number | null => {
+            if (rows.length === 0) return null;
+            let sum = 0;
+            let count = 0;
+            for (const r of rows) {
+                for (const k in r) {
+                    sum += r[k];
+                    count += 1;
+                }
+            }
+            return count > 0 ? sum / count : null;
+        };
+
+        const revenueCurrent = Number(hotelRevenueCurrentMonth._sum.totalPrice ?? 0) + Number(resRevenueCurrentMonth._sum.totalPrice ?? 0);
+        const revenuePrev = Number(hotelRevenuePrevMonth._sum.totalPrice ?? 0) + Number(resRevenuePrevMonth._sum.totalPrice ?? 0);
+        const coversCurr = coversThisWeek._sum.pax ?? 0;
+        const coversPrev = coversLastWeek._sum.pax ?? 0;
+
+        // Reviews: si contexto restaurante usa ResReview; si hotel usa HotelReview;
+        // si global suma todas las puntuaciones de ambas tablas.
+        const reviewSamplesCurrent = ctxType === 'restaurant'
+            ? avgScore(resReviewsCurrent)
+            : ctxType === 'hotel'
+                ? avgScore(hotelReviewsCurrent)
+                : avgScore([...hotelReviewsCurrent, ...resReviewsCurrent] as Array<Record<string, number>>);
+        const reviewSamplesPrev = ctxType === 'restaurant'
+            ? avgScore(resReviewsPrev)
+            : ctxType === 'hotel'
+                ? avgScore(hotelReviewsPrev)
+                : avgScore([...hotelReviewsPrev, ...resReviewsPrev] as Array<Record<string, number>>);
+        const reviewsTotal = ctxType === 'restaurant'
+            ? resReviewsCurrent.length
+            : ctxType === 'hotel'
+                ? hotelReviewsCurrent.length
+                : hotelReviewsCurrent.length + resReviewsCurrent.length;
+        const reviewsChange = reviewSamplesCurrent !== null && reviewSamplesPrev !== null
+            ? Math.round((reviewSamplesCurrent - reviewSamplesPrev) * 10) / 10
+            : 0;
+
         return {
-            revenue: { total: 0, change: 0 },
+            revenue: {
+                total: Math.round(revenueCurrent),
+                change: pctChange(revenueCurrent, revenuePrev),
+            },
             activeReservations: {
                 // Suma hotel + restaurante: si contexto=hotel y tiene restaurante vinculado, suma ambos.
-                // Si contexto=restaurant y tiene hotel vinculado, ídem.
                 total: hotelActiveCount + resActiveCount,
                 change: 0,
             },
             occupancy: { percentage: 0, change: 0 },
             covers: {
-                total: restaurantCovers._sum.pax || 0,
-                change: 0,
+                total: coversCurr,
+                change: pctChange(coversCurr, coversPrev),
             },
+            reviews: {
+                overall: reviewSamplesCurrent,
+                total: reviewsTotal,
+                // change en puntos de score (delta absoluto), no porcentaje
+                change: reviewsChange,
+            },
+            visits: { total: 0, change: 0 },
             recentBookings,
         };
     }
