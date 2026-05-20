@@ -11,7 +11,7 @@ export default async function AdminLayout({
     const userRole = session?.user?.role;
 
     return (
-        <div className="min-h-screen bg-background">
+        <div data-theme="admin-dark" className="min-h-screen bg-background text-foreground">
             <Sidebar userRole={userRole} />
             <div className="flex flex-col md:pl-60">
                 <header className="sticky top-0 z-20 flex h-[64px] items-center gap-3 border-b border-border bg-background/80 backdrop-blur-md px-5 sm:px-6">

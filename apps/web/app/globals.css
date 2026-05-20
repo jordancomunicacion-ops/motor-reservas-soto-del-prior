@@ -221,3 +221,120 @@
     letter-spacing: -0.02em;
   }
 }
+
+/* ============================================================
+   ADMIN — Dark + Teal (estilo Contabilidad)
+   Scope: solo el árbol que tenga data-theme="admin-dark".
+   No toca :root, así que widgets, login y vistas públicas siguen
+   con el sistema light/gold/Fraunces.
+   ============================================================ */
+[data-theme="admin-dark"] {
+  color-scheme: dark;
+
+  --radius: 0.75rem;
+
+  --background: #050505;
+  --foreground: #f8fafc;
+
+  --surface: #0f1115;
+  --surface-foreground: #f8fafc;
+
+  --card: #0f1115;
+  --card-foreground: #f8fafc;
+
+  --popover: #0f1115;
+  --popover-foreground: #f8fafc;
+
+  /* Primary — Teal Contabilidad */
+  --primary: #14b8a6;
+  --primary-foreground: #000000;
+
+  --secondary: #1e293b;
+  --secondary-foreground: #f8fafc;
+
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+
+  --accent: #14b8a6;
+  --accent-foreground: #f8fafc;
+
+  --destructive: #ef4444;
+  --destructive-foreground: #f8fafc;
+
+  --success: #22c55e;
+  --success-foreground: #052e16;
+
+  --warning: #f59e0b;
+  --warning-foreground: #1e1300;
+
+  --info: #38bdf8;
+  --info-foreground: #04293a;
+
+  --border: #1e293b;
+  --input: #1e293b;
+  --ring: #14b8a6;
+
+  --chart-1: #14b8a6;
+  --chart-2: #d97706;
+  --chart-3: #38bdf8;
+  --chart-4: #22c55e;
+  --chart-5: #94a3b8;
+
+  --sidebar: #0a0b0e;
+  --sidebar-foreground: #f8fafc;
+  --sidebar-primary: #14b8a6;
+  --sidebar-primary-foreground: #000000;
+  --sidebar-accent: #1e293b;
+  --sidebar-accent-foreground: #f8fafc;
+  --sidebar-border: #1e293b;
+  --sidebar-ring: #14b8a6;
+
+  --glass-bg: rgba(15, 17, 21, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.08);
+
+  background-color: var(--background);
+  color: var(--foreground);
+  background-image:
+    radial-gradient(at 0% 0%, rgba(20, 184, 166, 0.12) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(217, 119, 6, 0.08) 0px, transparent 50%);
+  background-attachment: fixed;
+}
+
+/* Glassmorphism helpers — opcionales, mismo patrón que Contabilidad */
+[data-theme="admin-dark"] .glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+}
+
+[data-theme="admin-dark"] .glass-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0) 100%);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius);
+}
+
+/* Inputs nativos sobre dark: contraste y caret correctos */
+[data-theme="admin-dark"] input,
+[data-theme="admin-dark"] select,
+[data-theme="admin-dark"] textarea {
+  color-scheme: dark;
+}
+
+[data-theme="admin-dark"] input::placeholder,
+[data-theme="admin-dark"] textarea::placeholder {
+  color: rgba(148, 163, 184, 0.6);
+}
+
+[data-theme="admin-dark"] option,
+[data-theme="admin-dark"] optgroup {
+  background-color: #0f1115;
+  color: #f8fafc;
+}
+
+[data-theme="admin-dark"] input[type="date"]::-webkit-calendar-picker-indicator,
+[data-theme="admin-dark"] input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.85);
+  cursor: pointer;
+}

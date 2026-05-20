@@ -11,7 +11,7 @@ export default function HotelReviewsPage() {
     return (
         <div className="space-y-8 max-w-5xl mx-auto pb-20">
             <div className="flex items-center gap-4">
-                <Link href={`/admin/hotels/${hotelId}`} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors">
+                <Link href={`/admin/hotels/${hotelId}`} className="p-2 hover:bg-muted rounded-full transition-colors">
                     <ArrowLeft className="w-5 h-5" />
                 </Link>
                 <div>
