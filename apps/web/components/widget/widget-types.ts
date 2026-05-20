@@ -68,8 +68,19 @@ export interface RestaurantResponse {
     shifts?: Shift[];
 }
 
+export interface ShiftSlots {
+    id?: string;
+    name: string;
+    type: 'BREAKFAST' | 'LUNCH' | 'DINNER' | string;
+    startTime: string;
+    endTime: string;
+    slots: string[];
+}
+
 export interface SlotsResponse {
     slots: string[];
+    /** Slots agrupados por turno; cada turno con su nombre real (ej. "Almuerzo" custom de una apertura). */
+    shiftSlots?: ShiftSlots[];
     closed?: boolean;
     message?: string;
     /** Lista de eventos del día (puede haber más de uno). */

@@ -10,7 +10,7 @@ import { fetchAPI } from '@/lib/api';
 import { loadStripe, type Stripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import { WidgetCardForm } from './WidgetCardForm';
-import { BASE_STEPS, type WidgetConfig, type RestaurantResponse, type SlotsResponse, type CreatedBooking, type RestaurantEvent, type Closure, type Opening } from './widget-types';
+import { BASE_STEPS, type WidgetConfig, type RestaurantResponse, type SlotsResponse, type CreatedBooking, type RestaurantEvent, type Closure, type Opening, type ShiftSlots } from './widget-types';
 import { computeDayStatus, shouldRequireStripe } from './widget-helpers';
 
 const logWidgetError = (context: string, err: unknown) => {
@@ -60,7 +60,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
 
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-    const [timeSlots, setTimeSlots] = useState<{ lunch: string[]; dinner: string[] } | null>(null);
+    const [timeSlots, setTimeSlots] = useState<{ lunch: string[]; dinner: string[]; groups: ShiftSlots[] } | null>(null);
     const [selectedTime, setSelectedTime] = useState<string | null>(null);
     const [formData, setFormData] = useState({ name: '', surname: '', email: '', phone: '', prefix: '+34' });
     const [pax, setPax] = useState(2);
@@ -167,23 +167,28 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
 
         try {
             const dateStr = format(date, 'yyyy-MM-dd');
-            const lunchData = await fetchAPI<SlotsResponse>(`/restaurant/${restaurantId}/slots?date=${dateStr}&pax=${pax}&type=LUNCH`);
-            const dinnerData = await fetchAPI<SlotsResponse>(`/restaurant/${restaurantId}/slots?date=${dateStr}&pax=${pax}&type=DINNER`);
+            const data = await fetchAPI<SlotsResponse>(`/restaurant/${restaurantId}/slots?date=${dateStr}&pax=${pax}`);
+
+            const groups = data?.shiftSlots || [];
+            // Fallback: si el backend antiguo no devuelve shiftSlots, los inferimos del array plano.
+            const fallbackLunch = groups.length === 0 ? (data?.slots || []) : [];
+            const lunch = groups.filter(g => g.type === 'LUNCH' || g.type === 'BREAKFAST').flatMap(g => g.slots);
+            const dinner = groups.filter(g => g.type === 'DINNER').flatMap(g => g.slots);
 
             setTimeSlots({
-                lunch: lunchData?.slots || [],
-                dinner: dinnerData?.slots || [],
+                lunch: lunch.length > 0 ? lunch : fallbackLunch,
+                dinner,
+                groups,
             });
             const eventsFromResponse =
-                lunchData?.events ??
-                dinnerData?.events ??
-                ((lunchData?.event || dinnerData?.event) ? [(lunchData?.event || dinnerData?.event) as RestaurantEvent] : []);
+                data?.events ??
+                (data?.event ? [data.event as RestaurantEvent] : []);
             const uniqueEvents = Array.from(new Map(eventsFromResponse.map(e => [e.id, e])).values());
             setDayEvents(uniqueEvents);
             setSelectedEvent(null);
         } catch (e) {
             console.error('Error fetching slots:', e);
-            setTimeSlots({ lunch: [], dinner: [] });
+            setTimeSlots({ lunch: [], dinner: [], groups: [] });
             setDayEvents([]);
         } finally {
             setLoadingSlots(false);
@@ -527,32 +532,47 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
                                             </div>
                                         )}
 
-                                        <div className="mb-6">
-                                            <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3 border-b pb-1">Comida</h4>
-                                            {timeSlots.lunch.length > 0 ? (
-                                                <div className="grid grid-cols-3 gap-2">
-                                                    {timeSlots.lunch.map(t => (
-                                                        <Button key={t} className="text-white text-sm py-2 h-auto font-bold tracking-wider hover:translate-y-[-2px] transition-transform shadow-sm rounded-none" style={{ backgroundColor: colors.accent }} onClick={() => handleTimeSelect(t)}>{t}</Button>
-                                                    ))}
+                                        {timeSlots.groups.length > 0 ? (
+                                            timeSlots.groups.map((group, idx) => (
+                                                <div key={group.id || `${group.name}-${idx}`} className={idx < timeSlots.groups.length - 1 ? 'mb-6' : ''}>
+                                                    <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3 border-b pb-1">{group.name}</h4>
+                                                    <div className="grid grid-cols-3 gap-2">
+                                                        {group.slots.map(t => (
+                                                            <Button key={t} className="text-white text-sm py-2 h-auto font-bold tracking-wider hover:translate-y-[-2px] transition-transform shadow-sm rounded-none" style={{ backgroundColor: colors.accent }} onClick={() => handleTimeSelect(t)}>{t}</Button>
+                                                        ))}
+                                                    </div>
                                                 </div>
-                                            ) : (
-                                                <p className="text-[10px] text-gray-400 italic">No hay disponibilidad para comer.</p>
-                                            )}
-                                        </div>
-                                        <div>
-                                            <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3 border-b pb-1">Cena</h4>
-                                            {timeSlots.dinner.length > 0 ? (
-                                                <div className="grid grid-cols-3 gap-2">
-                                                    {timeSlots.dinner.map(t => (
-                                                        <Button key={t} className="text-white text-sm py-2 h-auto font-bold tracking-wider hover:translate-y-[-2px] transition-transform shadow-sm rounded-none" style={{ backgroundColor: colors.accent }} onClick={() => handleTimeSelect(t)}>{t}</Button>
-                                                    ))}
+                                            ))
+                                        ) : (
+                                            <>
+                                                <div className="mb-6">
+                                                    <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3 border-b pb-1">Comida</h4>
+                                                    {timeSlots.lunch.length > 0 ? (
+                                                        <div className="grid grid-cols-3 gap-2">
+                                                            {timeSlots.lunch.map(t => (
+                                                                <Button key={t} className="text-white text-sm py-2 h-auto font-bold tracking-wider hover:translate-y-[-2px] transition-transform shadow-sm rounded-none" style={{ backgroundColor: colors.accent }} onClick={() => handleTimeSelect(t)}>{t}</Button>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <p className="text-[10px] text-gray-400 italic">No hay disponibilidad para comer.</p>
+                                                    )}
                                                 </div>
-                                            ) : (
-                                                <p className="text-[10px] text-gray-400 italic">No hay disponibilidad para cenar.</p>
-                                            )}
-                                        </div>
+                                                <div>
+                                                    <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3 border-b pb-1">Cena</h4>
+                                                    {timeSlots.dinner.length > 0 ? (
+                                                        <div className="grid grid-cols-3 gap-2">
+                                                            {timeSlots.dinner.map(t => (
+                                                                <Button key={t} className="text-white text-sm py-2 h-auto font-bold tracking-wider hover:translate-y-[-2px] transition-transform shadow-sm rounded-none" style={{ backgroundColor: colors.accent }} onClick={() => handleTimeSelect(t)}>{t}</Button>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <p className="text-[10px] text-gray-400 italic">No hay disponibilidad para cenar.</p>
+                                                    )}
+                                                </div>
+                                            </>
+                                        )}
 
-                                        {timeSlots.lunch.length === 0 && timeSlots.dinner.length === 0 && dayEvents.length === 0 && (
+                                        {timeSlots.groups.length === 0 && timeSlots.lunch.length === 0 && timeSlots.dinner.length === 0 && dayEvents.length === 0 && (
                                             <div className="mt-8 p-6 bg-amber-50 border-2 border-amber-100 rounded-2xl text-center">
                                                 <Info className="w-8 h-8 text-amber-500 mx-auto mb-3" />
                                                 <h4 className="font-bold text-gray-800 mb-1">¡Vaya! No queda sitio</h4>

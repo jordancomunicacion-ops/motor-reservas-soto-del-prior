@@ -87,12 +87,14 @@ export class RestaurantAvailabilityService {
             }
         });
 
-        type SlotShift = { startTime: string; endTime: string; slotInterval: number; type?: string };
+        type SlotShift = { id?: string; name?: string; startTime: string; endTime: string; slotInterval: number; type?: string };
         let activeShifts: SlotShift[];
 
         if (opening) {
             const allowed = new Set(opening.shiftIds.split(',').map(x => x.trim()).filter(Boolean));
-            const reused: SlotShift[] = shifts.filter(s => allowed.has(s.id));
+            const reused: SlotShift[] = shifts
+                .filter(s => allowed.has(s.id))
+                .map(s => ({ id: s.id, name: s.name, type: s.type, startTime: s.startTime, endTime: s.endTime, slotInterval: s.slotInterval }));
             const rawCustom = (opening.customShifts as Array<{
                 name?: string;
                 type?: string;
@@ -103,6 +105,7 @@ export class RestaurantAvailabilityService {
             const custom: SlotShift[] = rawCustom
                 .filter(cs => cs?.startTime && cs?.endTime && cs?.slotInterval)
                 .map(cs => ({
+                    name: cs.name,
                     startTime: cs.startTime as string,
                     endTime: cs.endTime as string,
                     slotInterval: cs.slotInterval as number,
@@ -111,10 +114,12 @@ export class RestaurantAvailabilityService {
                 .filter(cs => !type || cs.type === type);
             activeShifts = [...reused, ...custom];
         } else {
-            activeShifts = shifts.filter(s => {
-                const days = s.daysOfWeek.split(',').map(d => d.trim());
-                return days.includes(dayOfWeek.toString());
-            });
+            activeShifts = shifts
+                .filter(s => {
+                    const days = s.daysOfWeek.split(',').map(d => d.trim());
+                    return days.includes(dayOfWeek.toString());
+                })
+                .map(s => ({ id: s.id, name: s.name, type: s.type, startTime: s.startTime, endTime: s.endTime, slotInterval: s.slotInterval }));
         }
 
         if (activeShifts.length === 0) {
@@ -159,10 +164,12 @@ export class RestaurantAvailabilityService {
         const bookings = bookingsRaw.map(toSlotBooking);
 
         const availableSlots: string[] = [];
+        const shiftSlots: Array<{ id?: string; name: string; type: string; startTime: string; endTime: string; slots: string[] }> = [];
         const now = new Date();
 
         for (const shift of activeShifts) {
             const slots = generateSlots(shift.startTime, shift.endTime, shift.slotInterval);
+            const slotsForShift: string[] = [];
 
             for (const slot of slots) {
                 const slotTime = zonedDateToUtc(dayStr, slot, timezone);
@@ -184,15 +191,28 @@ export class RestaurantAvailabilityService {
                     : allTables;
 
                 if (isSlotAvailable(slotTime, pax, candidateTables as SlotTable[], bookings, defaultDuration, bufferMinutes)) {
+                    if (!slotsForShift.includes(slot)) slotsForShift.push(slot);
                     if (!availableSlots.includes(slot)) {
                         availableSlots.push(slot);
                     }
                 }
             }
+
+            if (slotsForShift.length > 0) {
+                shiftSlots.push({
+                    id: shift.id,
+                    name: shift.name || (shift.type === 'BREAKFAST' ? 'Desayuno' : shift.type === 'DINNER' ? 'Cena' : 'Comida'),
+                    type: shift.type || 'LUNCH',
+                    startTime: shift.startTime,
+                    endTime: shift.endTime,
+                    slots: slotsForShift,
+                });
+            }
         }
 
         return {
             slots: availableSlots,
+            shiftSlots,
             closed: activeShifts.length === 0,
             events: dayEvents,
         };
