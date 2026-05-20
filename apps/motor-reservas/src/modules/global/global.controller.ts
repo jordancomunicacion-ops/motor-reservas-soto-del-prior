@@ -386,13 +386,21 @@ export class GlobalController {
         const hasHotelScope = hotelIdsAllowed === null || hotelIdsAllowed.length > 0;
         const hasRestaurantScope = restaurantIdsAllowed === null || restaurantIdsAllowed.length > 0;
 
-        // Una query por entidad: trae solo los campos necesarios para agrupar en memoria.
-        // Para 12 meses esto son a lo sumo unos miles de filas — muy barato vs N+1 por mes.
-        const [hotelBookings, resBookings] = await Promise.all([
+        // Para occupancy: trae bookings que SOLAPEN con la ventana (no solo las que
+        // empiezan en ella). Una reserva que checkIn=2026-04-20 / checkOut=2026-05-05
+        // aporta noches tanto en abril como en mayo.
+        const windowEnd = new Date(startMonth.getFullYear(), startMonth.getMonth() + months, 1);
+
+        const [hotelBookings, resBookings, totalRooms] = await Promise.all([
             hasHotelScope
                 ? this.prisma.booking.findMany({
-                    where: { checkInDate: { gte: startMonth }, status: { not: 'CANCELLED' }, ...hotelFilter },
-                    select: { checkInDate: true, totalPrice: true },
+                    where: {
+                        checkInDate: { lt: windowEnd },
+                        checkOutDate: { gt: startMonth },
+                        status: { not: 'CANCELLED' },
+                        ...hotelFilter,
+                    },
+                    select: { checkInDate: true, checkOutDate: true, totalPrice: true },
                 })
                 : Promise.resolve([]),
             hasRestaurantScope
@@ -401,24 +409,75 @@ export class GlobalController {
                     select: { date: true, pax: true },
                 })
                 : Promise.resolve([]),
+            // Capacidad = nº de habitaciones activas en los hoteles del scope.
+            hasHotelScope
+                ? this.prisma.room.count({
+                    where: { isActive: true, roomType: { ...hotelFilter } },
+                })
+                : Promise.resolve(0),
         ]);
 
-        type Bucket = { month: string; bookings: number; covers: number; revenue: number; hotelBookings: number; restaurantBookings: number };
+        type Bucket = {
+            month: string;
+            bookings: number;
+            covers: number;
+            revenue: number;
+            hotelBookings: number;
+            restaurantBookings: number;
+            nights: number;
+            capacity: number;
+            occupancy: number;
+        };
+        const MS_PER_DAY = 24 * 60 * 60 * 1000;
         const buckets: Bucket[] = [];
         for (let i = 0; i < months; i++) {
-            const d = new Date(startMonth.getFullYear(), startMonth.getMonth() + i, 1);
-            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-            buckets.push({ month: key, bookings: 0, covers: 0, revenue: 0, hotelBookings: 0, restaurantBookings: 0 });
+            const monthStart = new Date(startMonth.getFullYear(), startMonth.getMonth() + i, 1);
+            const monthEnd = new Date(startMonth.getFullYear(), startMonth.getMonth() + i + 1, 1);
+            const daysInMonth = Math.round((monthEnd.getTime() - monthStart.getTime()) / MS_PER_DAY);
+            const key = `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, '0')}`;
+            buckets.push({
+                month: key,
+                bookings: 0,
+                covers: 0,
+                revenue: 0,
+                hotelBookings: 0,
+                restaurantBookings: 0,
+                nights: 0,
+                capacity: totalRooms * daysInMonth,
+                occupancy: 0,
+            });
         }
 
         const indexFor = (d: Date) => (d.getFullYear() - startMonth.getFullYear()) * 12 + (d.getMonth() - startMonth.getMonth());
 
         for (const b of hotelBookings) {
-            const idx = indexFor(b.checkInDate);
+            const checkIn = b.checkInDate;
+            const checkOut = b.checkOutDate;
+
+            // Cuenta de reservas y revenue: las atribuimos al mes del checkIn
+            // (criterio: "reservas que entran en X mes" + "ingresos devengados al entrar").
+            const idx = indexFor(checkIn);
             if (idx >= 0 && idx < buckets.length) {
                 buckets[idx].bookings += 1;
                 buckets[idx].hotelBookings += 1;
                 buckets[idx].revenue += Number(b.totalPrice ?? 0);
+            }
+
+            // Noches: se reparten entre todos los meses que solapan [checkIn, checkOut).
+            if (!checkOut || checkOut <= checkIn) continue;
+            const startIdx = Math.max(0, indexFor(checkIn));
+            // Para encontrar el último mes que toca el booking usamos checkOut - 1ms.
+            const lastNightDay = new Date(checkOut.getTime() - 1);
+            const endIdx = Math.min(buckets.length - 1, indexFor(lastNightDay));
+            for (let i = startIdx; i <= endIdx; i++) {
+                const monthStart = new Date(startMonth.getFullYear(), startMonth.getMonth() + i, 1);
+                const monthEnd = new Date(startMonth.getFullYear(), startMonth.getMonth() + i + 1, 1);
+                const overlapStart = checkIn > monthStart ? checkIn : monthStart;
+                const overlapEnd = checkOut < monthEnd ? checkOut : monthEnd;
+                if (overlapEnd > overlapStart) {
+                    const nights = Math.round((overlapEnd.getTime() - overlapStart.getTime()) / MS_PER_DAY);
+                    buckets[i].nights += nights;
+                }
             }
         }
         for (const b of resBookings) {
@@ -428,6 +487,14 @@ export class GlobalController {
                 buckets[idx].restaurantBookings += 1;
                 buckets[idx].covers += b.pax;
             }
+        }
+
+        // Calculo final de % ocupacion por mes. Si no hay capacidad (0 habitaciones
+        // o contexto sin hotel) lo dejamos en 0 — el frontend ya sabe gestionar 0.
+        for (const bucket of buckets) {
+            bucket.occupancy = bucket.capacity > 0
+                ? Math.round((bucket.nights / bucket.capacity) * 100)
+                : 0;
         }
 
         return { months: buckets };

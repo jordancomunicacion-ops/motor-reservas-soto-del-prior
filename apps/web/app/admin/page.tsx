@@ -61,6 +61,9 @@ interface TrendsMonth {
     revenue: number;
     hotelBookings: number;
     restaurantBookings: number;
+    nights: number;
+    capacity: number;
+    occupancy: number;
 }
 
 interface TrendsResponse {
@@ -144,8 +147,8 @@ export default function AdminDashboard() {
             revenue: months.map(m => m.revenue),
             active: months.map(m => m.bookings),
             covers: months.map(m => m.covers),
-            occupancy: [] as number[], // pendiente — requiere agregar capacidad/inventario
-            visits: [] as number[],    // pendiente — requiere integración analytics
+            occupancy: months.map(m => m.occupancy),
+            visits: [] as number[], // pendiente — requiere integración analytics
         };
     }, [trendsData]);
 
