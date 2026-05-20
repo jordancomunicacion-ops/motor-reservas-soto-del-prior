@@ -90,7 +90,7 @@ export function Sidebar({ userRole }: { userRole?: string }) {
                         width={180}
                         height={50}
                         priority
-                        className="h-8 w-auto"
+                        className="h-8 w-auto invert"
                     />
                 </Link>
             </div>

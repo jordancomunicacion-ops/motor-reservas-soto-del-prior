@@ -51,15 +51,17 @@ interface ReviewsSummary {
     overall: number | null;
 }
 
-/** Mock sparkline data hasta que el backend devuelva series temporales reales. */
-function mockTrend(seed: number, len = 14): number[] {
-    const out: number[] = [];
-    let v = seed;
-    for (let i = 0; i < len; i++) {
-        v = Math.max(0, v + (Math.sin(i * 0.7 + seed) * seed * 0.15) + (Math.random() - 0.4) * seed * 0.1);
-        out.push(Math.round(v));
-    }
-    return out;
+interface TrendsMonth {
+    month: string;
+    bookings: number;
+    covers: number;
+    revenue: number;
+    hotelBookings: number;
+    restaurantBookings: number;
+}
+
+interface TrendsResponse {
+    months: TrendsMonth[];
 }
 
 export default function AdminDashboard() {
@@ -71,6 +73,7 @@ export default function AdminDashboard() {
     const [entity, setEntity] = useState<ContextEntity | null>(null);
     const [stats, setStats] = useState<DashboardStats | null>(null);
     const [reviews, setReviews] = useState<ReviewsSummary | null>(null);
+    const [trendsData, setTrendsData] = useState<TrendsResponse | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -81,18 +84,20 @@ export default function AdminDashboard() {
     async function loadData() {
         setLoading(true);
         try {
-            const statsUrl = contextId
-                ? `/global/stats?ctxType=${contextType}&ctxId=${encodeURIComponent(contextId)}`
-                : '/global/stats';
+            const ctxQs = contextId ? `?ctxType=${contextType}&ctxId=${encodeURIComponent(contextId)}` : '';
+            const statsUrl = `/global/stats${ctxQs}`;
+            const trendsUrl = `/global/trends${ctxQs}${ctxQs ? '&' : '?'}months=12`;
 
-            const [statsData, entityData] = await Promise.all([
+            const [statsData, entityData, trendsResp] = await Promise.all([
                 fetchAPI<DashboardStats>(statsUrl),
                 contextId
                     ? fetchAPI<ContextEntity>(contextType === 'hotel' ? `/property/hotels/${contextId}` : `/restaurant/${contextId}`)
                     : Promise.resolve(null),
+                fetchAPI<TrendsResponse>(trendsUrl).catch(() => null),
             ]);
             setStats(statsData);
             setEntity(entityData);
+            setTrendsData(trendsResp);
 
             if (contextId) {
                 const endpoint = contextType === 'hotel'
@@ -128,14 +133,18 @@ export default function AdminDashboard() {
     const showReviews = !isGlobal;
     const linkedRestaurant = !!entity?.restaurantId && contextType === 'hotel';
 
-    // Trends mock — reemplazar cuando backend devuelva series
-    const trends = useMemo(() => ({
-        revenue: mockTrend((stats?.revenue?.total ?? 1000) || 1000),
-        active: mockTrend(Math.max(stats?.activeReservations?.total ?? 5, 5)),
-        occupancy: mockTrend(Math.max(stats?.occupancy?.percentage ?? 30, 30)),
-        covers: mockTrend(Math.max(stats?.covers?.total ?? 30, 30)),
-        visits: mockTrend(8),
-    }), [stats]);
+    // Series mensuales reales del backend (últimos 12 meses).
+    // Si aún no llegan los datos devolvemos arrays vacíos → MetricCard no pinta sparkline.
+    const trends = useMemo(() => {
+        const months = trendsData?.months ?? [];
+        return {
+            revenue: months.map(m => m.revenue),
+            active: months.map(m => m.bookings),
+            covers: months.map(m => m.covers),
+            occupancy: [] as number[], // pendiente — requiere agregar capacidad/inventario
+            visits: [] as number[],    // pendiente — requiere integración analytics
+        };
+    }, [trendsData]);
 
     return (
         <div className="space-y-6">

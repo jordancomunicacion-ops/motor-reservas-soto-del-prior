@@ -189,4 +189,108 @@ export class GlobalController {
             recentBookings,
         };
     }
+
+    /**
+     * Series temporales (mensuales) de los últimos N meses, agregadas según el scope
+     * del usuario + contexto seleccionado. Devuelve un array de 12 (por defecto) puntos
+     * con bookings totales, covers (pax restaurante) y revenue (€ hotel).
+     *
+     * Frontend lo usa para pintar sparklines reales en las MetricCard del dashboard.
+     */
+    @Roles('ADMIN')
+    @Get('trends')
+    async getTrends(
+        @Req() req: AuthenticatedRequest,
+        @Query('ctxType') ctxType?: string,
+        @Query('ctxId') ctxId?: string,
+        @Query('months') monthsParam?: string,
+    ) {
+        const months = Math.min(Math.max(parseInt(monthsParam || '12') || 12, 1), 24);
+        const now = new Date();
+        const startMonth = new Date(now.getFullYear(), now.getMonth() - (months - 1), 1);
+
+        const scope = await getUserScope(req?.user, this.prisma);
+        let hotelIdsAllowed: string[] | null = scope.hotelIds;
+        let restaurantIdsAllowed: string[] | null = scope.restaurantIds;
+
+        if (ctxType === 'hotel' && ctxId) {
+            const hotel = await this.prisma.hotel.findUnique({
+                where: { id: ctxId },
+                select: { id: true, restaurantId: true },
+            });
+            const inScope = hotelIdsAllowed === null || hotelIdsAllowed.includes(ctxId);
+            if (!hotel || !inScope) {
+                hotelIdsAllowed = [];
+                restaurantIdsAllowed = [];
+            } else {
+                hotelIdsAllowed = [hotel.id];
+                restaurantIdsAllowed = hotel.restaurantId ? [hotel.restaurantId] : [];
+            }
+        } else if (ctxType === 'restaurant' && ctxId) {
+            const inScope = restaurantIdsAllowed === null || restaurantIdsAllowed.includes(ctxId);
+            if (!inScope) {
+                hotelIdsAllowed = [];
+                restaurantIdsAllowed = [];
+            } else {
+                restaurantIdsAllowed = [ctxId];
+                const linkedHotel = await this.prisma.hotel.findFirst({
+                    where: { restaurantId: ctxId },
+                    select: { id: true },
+                });
+                hotelIdsAllowed = linkedHotel ? [linkedHotel.id] : [];
+            }
+        }
+
+        const hotelFilter = hotelIdsAllowed === null ? {} : { hotelId: { in: hotelIdsAllowed } };
+        const restaurantFilter = restaurantIdsAllowed === null ? {} : { restaurantId: { in: restaurantIdsAllowed } };
+
+        const hasHotelScope = hotelIdsAllowed === null || hotelIdsAllowed.length > 0;
+        const hasRestaurantScope = restaurantIdsAllowed === null || restaurantIdsAllowed.length > 0;
+
+        // Una query por entidad: trae solo los campos necesarios para agrupar en memoria.
+        // Para 12 meses esto son a lo sumo unos miles de filas — muy barato vs N+1 por mes.
+        const [hotelBookings, resBookings] = await Promise.all([
+            hasHotelScope
+                ? this.prisma.booking.findMany({
+                    where: { checkInDate: { gte: startMonth }, status: { not: 'CANCELLED' }, ...hotelFilter },
+                    select: { checkInDate: true, totalPrice: true },
+                })
+                : Promise.resolve([]),
+            hasRestaurantScope
+                ? this.prisma.resBooking.findMany({
+                    where: { date: { gte: startMonth }, status: { not: 'CANCELLED' }, ...restaurantFilter },
+                    select: { date: true, pax: true },
+                })
+                : Promise.resolve([]),
+        ]);
+
+        type Bucket = { month: string; bookings: number; covers: number; revenue: number; hotelBookings: number; restaurantBookings: number };
+        const buckets: Bucket[] = [];
+        for (let i = 0; i < months; i++) {
+            const d = new Date(startMonth.getFullYear(), startMonth.getMonth() + i, 1);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            buckets.push({ month: key, bookings: 0, covers: 0, revenue: 0, hotelBookings: 0, restaurantBookings: 0 });
+        }
+
+        const indexFor = (d: Date) => (d.getFullYear() - startMonth.getFullYear()) * 12 + (d.getMonth() - startMonth.getMonth());
+
+        for (const b of hotelBookings) {
+            const idx = indexFor(b.checkInDate);
+            if (idx >= 0 && idx < buckets.length) {
+                buckets[idx].bookings += 1;
+                buckets[idx].hotelBookings += 1;
+                buckets[idx].revenue += Number(b.totalPrice ?? 0);
+            }
+        }
+        for (const b of resBookings) {
+            const idx = indexFor(b.date);
+            if (idx >= 0 && idx < buckets.length) {
+                buckets[idx].bookings += 1;
+                buckets[idx].restaurantBookings += 1;
+                buckets[idx].covers += b.pax;
+            }
+        }
+
+        return { months: buckets };
+    }
 }
