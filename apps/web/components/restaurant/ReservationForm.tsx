@@ -9,6 +9,7 @@ import { format } from "date-fns";
 import { User, X, ChevronDown, ChevronRight, Utensils, MessageCircle, Instagram, Facebook, Globe, Linkedin } from "lucide-react";
 
 import type { GuestBookingProfile } from './GuestProfileSheet';
+import { formatTimeInTz, formatDateOnlyInTz, zonedDateToUtc } from '@/lib/timezone';
 
 export interface ReservationFormPayload {
     guestName: string;
@@ -41,19 +42,20 @@ interface ReservationFormProps {
     initialDate?: Date;
     initialBooking?: GuestBookingProfile | null;
     initialTableId?: string | null;
+    timezone?: string;
 }
 
-export default function ReservationForm({ isOpen, onClose, onSubmit, initialDate, initialBooking, initialTableId }: ReservationFormProps) {
+export default function ReservationForm({ isOpen, onClose, onSubmit, initialDate, initialBooking, initialTableId, timezone }: ReservationFormProps) {
     const isEditing = !!initialBooking;
 
     const initialDateStr = initialBooking?.date
-        ? format(new Date(initialBooking.date), "yyyy-MM-dd")
+        ? formatDateOnlyInTz(initialBooking.date, timezone)
         : initialDate
             ? format(initialDate, "yyyy-MM-dd")
             : format(new Date(), "yyyy-MM-dd");
 
     const initialTime = initialBooking?.date
-        ? `${String(new Date(initialBooking.date).getUTCHours()).padStart(2, '0')}:${String(new Date(initialBooking.date).getUTCMinutes()).padStart(2, '0')}`
+        ? formatTimeInTz(initialBooking.date, timezone, '20:00')
         : "20:00";
 
     const [dateStr, setDateStr] = useState(initialDateStr);
@@ -96,9 +98,7 @@ export default function ReservationForm({ isOpen, onClose, onSubmit, initialDate
 
     const handleSubmit = () => {
         if (!dateStr) return;
-        const [hours, minutes] = time.split(':').map(Number);
-        const bookingDate = new Date(dateStr);
-        bookingDate.setUTCHours(hours, minutes, 0, 0);
+        const bookingDate = zonedDateToUtc(dateStr, time, timezone);
 
         const tagsArr = tagsInput.split(',').map((t: string) => t.trim()).filter(Boolean);
 

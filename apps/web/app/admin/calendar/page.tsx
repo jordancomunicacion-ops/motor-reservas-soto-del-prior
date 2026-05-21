@@ -41,6 +41,7 @@ import { PageHeader } from '@/components/ui/page-header';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import GuestProfileSheet from '@/components/restaurant/GuestProfileSheet';
+import { formatTimeInTz, formatDayMonthInTz } from '@/lib/timezone';
 
 interface Booking {
     id: string;
@@ -500,24 +501,12 @@ function BookingRow({
     const time = (() => {
         if (booking.time) return booking.time.substring(0, 5);
         const dateVal = booking.checkInDate || booking.date;
-        if (dateVal) {
-            const d = new Date(dateVal);
-            if (!isNaN(d.getTime())) {
-                return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
-            }
-        }
-        return '--:--';
+        return dateVal ? formatTimeInTz(dateVal) : '--:--';
     })();
 
     const dayMonth = (() => {
         const dateVal = booking.checkInDate || booking.date;
-        if (dateVal) {
-            const d = new Date(dateVal);
-            if (!isNaN(d.getTime())) {
-                return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-            }
-        }
-        return '--/--';
+        return dateVal ? formatDayMonthInTz(dateVal) : '--/--';
     })();
 
     const reviewAvg = booking.review

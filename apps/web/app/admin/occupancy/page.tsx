@@ -39,6 +39,7 @@ import GuestProfileSheet from '@/components/restaurant/GuestProfileSheet';
 import { DateSelector } from '@/components/admin/DateSelector';
 import ReviewsPanel from '@/components/admin/ReviewsPanel';
 import HotelReviewsPanel from '@/components/admin/HotelReviewsPanel';
+import { formatTimeInTz } from '@/lib/timezone';
 
 interface RoomType { id: string; name: string; rooms: Room[] }
 interface Room { id: string; name: string; }
@@ -95,15 +96,17 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
     const [selectedBookingForProfile, setSelectedBookingForProfile] = useState<GuestBookingProfile | null>(null);
+    const [restaurantTz, setRestaurantTz] = useState<string | undefined>(undefined);
 
     const loadData = async () => {
         if (!contextId) return;
         setLoading(true);
         try {
-            const [tablesRes, bookingsRes, waitlistRes] = await Promise.all([
+            const [tablesRes, bookingsRes, waitlistRes, restRes] = await Promise.all([
                 fetchAPI<ZoneWithTables[]>(`/restaurant/${contextId}/tables?date=${format(date, 'yyyy-MM-dd')}`),
                 fetchAPI<RestaurantBooking[]>(`/restaurant/${contextId}/bookings?date=${format(date, 'yyyy-MM-dd')}`),
                 fetchAPI<WaitlistEntry[]>(`/restaurant/${contextId}/waitlist`),
+                fetchAPI<{ timezone?: string }>(`/restaurant/${contextId}`).catch(() => ({} as { timezone?: string })),
             ]);
 
             if (Array.isArray(tablesRes)) {
@@ -113,6 +116,7 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
             }
             if (Array.isArray(bookingsRes)) setBookings(bookingsRes);
             if (Array.isArray(waitlistRes)) setWaitlist(waitlistRes);
+            setRestaurantTz(restRes?.timezone);
         } catch (e) { console.error("Error loading data", e); }
         setLoading(false);
     };
@@ -210,11 +214,7 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
                                     >
                                         <div className="flex justify-between items-center">
                                             <span className="font-medium tabular-nums">
-                                                {(() => {
-                                                    const when = b.date ? new Date(b.date) : null;
-                                                    if (!when || isNaN(when.getTime())) return '--:--';
-                                                    return `${String(when.getUTCHours()).padStart(2, '0')}:${String(when.getUTCMinutes()).padStart(2, '0')}`;
-                                                })()}
+                                                {formatTimeInTz(b.date, restaurantTz)}
                                             </span>
                                             <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                                                 {b.pax ?? 0} pax
@@ -260,6 +260,7 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
                                 onSelectProfile={(b) => setSelectedBookingForProfile(b)}
                                 hideArchitectButton
                                 className="h-full w-full"
+                                timezone={restaurantTz}
                             />
                         )}
 
@@ -272,6 +273,7 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
                                     onAssignTable={handleAssignTable}
                                     onEdit={() => { }}
                                     onSelectProfile={(b) => setSelectedBookingForProfile(b)}
+                                    timezone={restaurantTz}
                                 />
                             </div>
                         )}
@@ -299,6 +301,7 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
                 }}
                 initialDate={date}
                 initialTableId={selectedTableId}
+                timezone={restaurantTz}
             />
 
             <GuestProfileSheet

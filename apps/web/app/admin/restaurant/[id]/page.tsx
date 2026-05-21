@@ -14,6 +14,7 @@ import ReservationForm from '@/components/restaurant/ReservationForm';
 import GuestProfileSheet from '@/components/restaurant/GuestProfileSheet';
 import { fetchAPI } from '@/lib/api';
 import { DateSelector } from '@/components/admin/DateSelector';
+import { formatTimeInTz } from '@/lib/timezone';
 
 import AccessManager from '@/components/admin/AccessManager';
 import type {
@@ -39,7 +40,7 @@ function RestaurantDashboardContent() {
     const [bookings, setBookings] = useState<RestaurantBooking[]>([]);
     const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
     const [rawTables, setRawTables] = useState<TableWithZone[]>([]);
-    const [restaurant, setRestaurant] = useState<{ name?: string } | null>(null);
+    const [restaurant, setRestaurant] = useState<{ name?: string; timezone?: string } | null>(null);
 
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingBooking, setEditingBooking] = useState<GuestBookingProfile | null>(null);
@@ -53,7 +54,7 @@ function RestaurantDashboardContent() {
                 fetchAPI<ZoneWithTables[]>(`/restaurant/${restaurantId}/tables?date=${format(date, 'yyyy-MM-dd')}`),
                 fetchAPI<RestaurantBooking[]>(`/restaurant/${restaurantId}/bookings?date=${format(date, 'yyyy-MM-dd')}`),
                 fetchAPI<WaitlistEntry[]>(`/restaurant/${restaurantId}/waitlist`),
-                fetchAPI<{ name?: string }>(`/restaurant/${restaurantId}`).catch(() => ({ name: 'Restaurante' })),
+                fetchAPI<{ name?: string; timezone?: string }>(`/restaurant/${restaurantId}`).catch(() => ({ name: 'Restaurante' })),
             ]);
 
             if (Array.isArray(tablesRes)) {
@@ -188,7 +189,6 @@ function RestaurantDashboardContent() {
                         <CardContent className="p-0 flex-1 overflow-auto">
                             <div className="divide-y divide-border/60">
                                 {pendingTables.map(b => {
-                                    const when = b.date ? new Date(b.date) : null;
                                     return (
                                         <div
                                             key={b.id}
@@ -198,7 +198,7 @@ function RestaurantDashboardContent() {
                                         >
                                             <div className="flex justify-between items-center">
                                                 <span className="font-medium tabular-nums">
-                                                    {when ? `${String(when.getUTCHours()).padStart(2, '0')}:${String(when.getUTCMinutes()).padStart(2, '0')}` : '—'}
+                                                    {b.date ? formatTimeInTz(b.date, restaurant?.timezone, '—') : '—'}
                                                 </span>
                                                 <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                                                     {b.pax} pax
@@ -235,6 +235,7 @@ function RestaurantDashboardContent() {
                                 onSelectProfile={(b) => setSelectedBookingForProfile(b)}
                                 onTableSelect={() => { }}
                                 className="h-full w-full"
+                                timezone={restaurant?.timezone}
                             />
                         )}
                     </div>
@@ -247,6 +248,7 @@ function RestaurantDashboardContent() {
                 onSubmit={handleCreateBooking}
                 initialDate={date}
                 initialBooking={editingBooking}
+                timezone={restaurant?.timezone}
             />
 
             <GuestProfileSheet

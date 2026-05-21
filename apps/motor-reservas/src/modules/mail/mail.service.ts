@@ -6,6 +6,26 @@ import 'isomorphic-fetch';
 import { Client as GraphClient } from '@microsoft/microsoft-graph-client';
 import { resolveMailConfig } from './mail-config-resolver';
 
+const DEFAULT_TZ = 'Europe/Madrid';
+
+function formatDateInTz(date: Date, timezone: string): string {
+    return new Intl.DateTimeFormat('es-ES', {
+        timeZone: timezone,
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+    }).format(date);
+}
+
+function formatTimeInTz(date: Date, timezone: string): string {
+    return new Intl.DateTimeFormat('es-ES', {
+        timeZone: timezone,
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23',
+    }).format(date);
+}
+
 type GraphConfig = {
     tenantId: string;
     clientId: string;
@@ -315,10 +335,12 @@ export class MailService {
             ? `${publicUrl}/restaurant/review?id=${booking.id}&token=${booking.reviewToken}`
             : `${publicUrl}/restaurant/review?id=${booking.id}`;
 
+        const tz = restaurant.timezone || DEFAULT_TZ;
+        const bookingDate = new Date(booking.date);
         const data = {
             name: booking.guestName,
-            date: new Date(booking.date).toLocaleDateString(),
-            time: new Date(booking.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            date: formatDateInTz(bookingDate, tz),
+            time: formatTimeInTz(bookingDate, tz),
             pax: booking.pax,
             restaurant_name: restaurant.name,
             modify_link: manageLink,
@@ -387,11 +409,12 @@ export class MailService {
             ? `${publicUrl}/hotel/review?id=${booking.id}&token=${booking.reviewToken}`
             : `${publicUrl}/hotel/review?id=${booking.id}`;
 
+        const tz = hotel.timezone && hotel.timezone !== 'UTC' ? hotel.timezone : DEFAULT_TZ;
         const data = {
             name: booking.guestName,
             hotel_name: hotel.name,
-            check_in: new Date(booking.checkInDate).toLocaleDateString(),
-            check_out: new Date(booking.checkOutDate).toLocaleDateString(),
+            check_in: formatDateInTz(new Date(booking.checkInDate), tz),
+            check_out: formatDateInTz(new Date(booking.checkOutDate), tz),
             reference: booking.referenceCode,
             nights: booking.nights,
             total_price: `${booking.totalPrice} ${booking.currency}`,

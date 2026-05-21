@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Users, RotateCw, Armchair, LayoutGrid, Link as LinkIcon, MessageSquare, GlassWater, UserCheck, FileText, LogOut, UserCircle, Cake } from "lucide-react";
 import type { BookingOnTable, TableNodeData, ZoneWithTables } from '@/types/restaurant';
 import type { GuestBookingProfile } from './GuestProfileSheet';
+import { formatTimeInTz } from '@/lib/timezone';
 
 export type TableUpdates = Partial<TableNodeData> & { bookingStatus?: string };
 
@@ -18,9 +19,10 @@ interface TableProps {
     mode: 'VIEW' | 'EDIT' | 'SERVICE';
     isSelected?: boolean;
     onSelectProfile?: (booking: GuestBookingProfile) => void;
+    timezone?: string;
 }
 
-function TableNode({ data, onUpdate, onDropReservation, onSelect, onSelectProfile, mode, isSelected }: TableProps) {
+function TableNode({ data, onUpdate, onDropReservation, onSelect, onSelectProfile, mode, isSelected, timezone }: TableProps) {
     const [isDragging, setIsDragging] = useState(false);
     const [dropdownPos, setDropdownPos] = useState<'bottom' | 'top'>('bottom');
     const tableRef = useRef<HTMLDivElement>(null);
@@ -165,12 +167,7 @@ function TableNode({ data, onUpdate, onDropReservation, onSelect, onSelectProfil
                         {activeBooking.guestName.split(' ')[0]}
                     </span>
                     <span className="text-[8px] font-semibold opacity-90 mt-0.5 tabular-nums">
-                        {isNaN(new Date(activeBooking.date).getTime()) ? '--:--' : (
-                            <>
-                                {String(new Date(activeBooking.date).getUTCHours()).padStart(2, '0')}:
-                                {String(new Date(activeBooking.date).getUTCMinutes()).padStart(2, '0')}
-                            </>
-                        )}
+                        {formatTimeInTz(activeBooking.date, timezone)}
                     </span>
                 </div>
             )}
@@ -295,7 +292,8 @@ export default function TablePlan({
     onSelectProfile,
     activeZoneId,
     onActiveZoneChange,
-    className
+    className,
+    timezone
 }: {
     zones: ZoneWithTables[],
     tables: TableNodeData[],
@@ -310,7 +308,8 @@ export default function TablePlan({
     mode?: 'VIEW' | 'EDIT' | 'SERVICE',
     activeZoneId?: string,
     onActiveZoneChange?: (id: string) => void,
-    className?: string
+    className?: string,
+    timezone?: string
 }) {
     const router = useRouter();
     const [activeZone, setActiveZone] = useState(activeZoneId || zones[0]?.id || "");
@@ -445,6 +444,7 @@ export default function TablePlan({
                             onSelect={onTableSelect}
                             onSelectProfile={onSelectProfile}
                             isSelected={selectedTableId === table.id}
+                            timezone={timezone}
                         />
                     ))}
 

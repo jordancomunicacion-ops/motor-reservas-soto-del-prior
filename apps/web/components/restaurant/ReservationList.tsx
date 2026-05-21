@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { MoreHorizontal, XCircle, UserCircle, Edit2, Mail, MessageSquare, Utensils, Star, AlertTriangle, Clock, MapPin } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { formatTimeInTz } from "@/lib/timezone";
 
 function formatRelativeTime(dateInput: string | Date): string {
     const date = new Date(dateInput);
@@ -48,6 +49,7 @@ interface ReservationListProps {
     onAssignTable?: (bookingId: string, tableId: string) => void;
     onEdit: (booking: ListBooking) => void;
     onSelectProfile?: (booking: ListBooking) => void;
+    timezone?: string;
 }
 
 type StatusTone = 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'accent';
@@ -80,7 +82,7 @@ const STATUS_LABELS: Record<string, string> = {
     TO_REVIEW: "A Revisar",
 };
 
-export default function ReservationList({ bookings, zones = [], onStatusChange, onAssignTable, onEdit, onSelectProfile }: ReservationListProps) {
+export default function ReservationList({ bookings, zones = [], onStatusChange, onAssignTable, onEdit, onSelectProfile, timezone }: ReservationListProps) {
     return (
         <div className="bg-card rounded-md border border-border overflow-hidden">
             <Table>
@@ -110,11 +112,10 @@ export default function ReservationList({ bookings, zones = [], onStatusChange, 
                             const bookingTags = parseTags(booking.tags);
                             const hasAllergies = bookingTags.some(t => /alerg/i.test(t)) || /alerg|intoler/i.test(booking.notes || '');
                             const isVip = bookingTags.some(t => /vip/i.test(t));
-                            const bookingDate = booking.date ? new Date(booking.date) : null;
                             return (
                             <TableRow key={booking.id} className="hover:bg-muted/30">
                                 <TableCell className="font-medium tabular-nums">
-                                    {bookingDate ? `${String(bookingDate.getUTCHours()).padStart(2, '0')}:${String(bookingDate.getUTCMinutes()).padStart(2, '0')}` : '—'}
+                                    {booking.date ? formatTimeInTz(booking.date, timezone, '—') : '—'}
                                 </TableCell>
                                 <TableCell>
                                     {(() => {
