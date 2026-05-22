@@ -44,7 +44,11 @@ if errorlevel 1 goto :error
 
 echo.
 echo [2/5] Limpiando Docker y verificando espacio en el servidor...
-ssh %SSH_OPTS% %REMOTE_USER%@%REMOTE_HOST% "df -h / && docker compose -f %REMOTE_PATH%/docker-compose.yml down --remove-orphans 2>/dev/null || true && docker system prune -af --volumes && journalctl --vacuum-size=100M 2>/dev/null || true && df -h /"
+REM Importante: `prune -af` sin --volumes. El volumen `reservas_db_data` contiene
+REM la BD de producción y `prune --volumes` lo borraría si los contenedores ya
+REM están parados (volumen "no usado"). setup_remote.sh hace cleanup adicional
+REM por nombre antes del `up` para evitar conflictos de container_name.
+ssh %SSH_OPTS% %REMOTE_USER%@%REMOTE_HOST% "df -h / && docker compose -f %REMOTE_PATH%/docker-compose.yml down --remove-orphans 2>/dev/null || true && docker system prune -af && journalctl --vacuum-size=100M 2>/dev/null || true && df -h /"
 if errorlevel 1 goto :error
 
 echo.

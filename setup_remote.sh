@@ -30,6 +30,17 @@ if [ -f .env ]; then
   export $(cat .env | sed 's/#.*//g' | xargs)
 fi
 
+# Cleanup defensivo: si quedan contenedores con los mismos nombres de un deploy
+# anterior que DESPLEGAR.bat no logró tumbar (down silencioso por compose file
+# obsoleto, race con system prune, etc.), `docker compose up` falla con conflict
+# en el container_name. Tumbamos por nombre antes de levantar — el volumen
+# nombrado `reservas_db_data` se preserva (docker rm no toca named volumes).
+echo "Limpiando contenedores previos para evitar conflictos de nombre..."
+docker compose down --remove-orphans 2>/dev/null || true
+for c in sotoreservas-db sotoreservas-engine sotoreservas-api sotoreservas-web; do
+  docker rm -f "$c" 2>/dev/null || true
+done
+
 # Construir e iniciar contenedores
 echo "Levantando contenedores..."
 if ! docker compose up -d --build; then
