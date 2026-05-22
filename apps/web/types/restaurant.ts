@@ -13,6 +13,10 @@ export interface BookingOnTable {
     visitCount?: number;
     notes?: string | null;
     tags?: string | null;
+    /** Mesa "cabecera" de la reserva (cuando el cluster ocupa varias mesas). */
+    tableId?: string | null;
+    /** Otras mesas del cluster cuando la reserva ocupa varias mesas contiguas. */
+    metadata?: { linkedTableIds?: string[] } | null;
 }
 
 export interface TableSummary {

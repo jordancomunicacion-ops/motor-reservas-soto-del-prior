@@ -1,16 +1,17 @@
 @echo off
+chcp 65001 >nul
 setlocal
+title SOTOdelPRIOR - Despliegue Reservas
+cd /d "%~dp0"
+
+set APP_NAME=Reservas
 
 REM ===================================================
-REM   Configuracion del servidor (sobreescribible)
-REM   Crea deploy.env junto a este .bat con lineas:
+REM   Config sobreescribible via deploy.env (gitignored)
 REM     REMOTE_USER=root
 REM     REMOTE_HOST=mi.servidor.com
 REM     REMOTE_PATH=/root/SOTOdelPRIOR/apps/reservas
-REM   (deploy.env esta ignorado por git)
 REM ===================================================
-cd /d "%~dp0"
-
 if exist deploy.env (
     for /f "usebackq tokens=1,* delims==" %%A in ("deploy.env") do (
         if not "%%A"=="" set "%%A=%%B"
@@ -19,53 +20,67 @@ if exist deploy.env (
 
 if "%REMOTE_USER%"=="" set REMOTE_USER=root
 if "%REMOTE_HOST%"=="" (
-    echo ERROR: REMOTE_HOST no definido. Crea deploy.env con REMOTE_HOST=tu.servidor.com
+    echo [ERROR] REMOTE_HOST no definido. Crea deploy.env con REMOTE_HOST=tu.servidor.com
+    pause
     exit /b 1
 )
 if "%REMOTE_PATH%"=="" set REMOTE_PATH=/root/SOTOdelPRIOR/apps/reservas
 
-REM Opciones SSH para evitar que el cliente se cuelgue si la conexion queda silenciosa
-REM (tipico en fases largas como `docker system prune` o builds de imagen):
-REM   - ServerAliveInterval=30  pinga cada 30s
-REM   - ServerAliveCountMax=20  tolera 10 min sin respuesta antes de cortar
-REM   - ConnectTimeout=30       falla rapido si el host no responde al inicio
+set ARCHIVE=deploy.tar.gz
+REM SSH robusto frente a fases largas (prune, build)
 set SSH_OPTS=-o ServerAliveInterval=30 -o ServerAliveCountMax=20 -o ConnectTimeout=30
 
-echo ==========================================
-echo   DESPLIEGUE RESERVAS (APP AUTONOMA)
+echo ============================================================
+echo   DESPLIEGUE %APP_NAME% (SOTO DEL PRIOR)
 echo   Servidor: %REMOTE_USER%@%REMOTE_HOST%
 echo   Ruta:     %REMOTE_PATH%
-echo ==========================================
+echo ============================================================
 echo.
 
-echo [1/5] Empaquetando App Reservas...
-REM Excluimos .env porque vive solo en el servidor (DB_PASS, JWT_SECRET, AUTH_SECRET, SMTP, etc.)
-REM Subir el .env local lo machacaria; el paso 3 ya lo preserva con un find !.env.
-tar --exclude="node_modules" --exclude=".next" --exclude=".git" --exclude=".idea" --exclude=".vscode" --exclude=".claude" --exclude="dist" --exclude="build" --exclude="db_data" --exclude="pg_data" --exclude="*.log" --exclude="*.db" --exclude="*.db-journal" --exclude="deploy.tar.gz" --exclude="deploy.env" --exclude="./.env" -czvf deploy.tar.gz .
+echo [1/5] Empaquetando %APP_NAME%...
+REM .env vive solo en el servidor (DB_PASS, JWT, SMTP, ...). Lo preserva el paso 3.
+tar --exclude="node_modules" --exclude=".next" --exclude=".git" --exclude=".idea" --exclude=".vscode" --exclude=".claude" --exclude="dist" --exclude="build" --exclude="db_data" --exclude="pg_data" --exclude="*.log" --exclude="*.db" --exclude="*.db-journal" --exclude="%ARCHIVE%" --exclude="deploy.env" --exclude="./.env" -czf %ARCHIVE% .
+if errorlevel 1 goto :error
 
 echo.
-echo [2/5] Verificando espacio en disco del servidor...
-ssh %SSH_OPTS% %REMOTE_USER%@%REMOTE_HOST% "echo '--- Espacio disponible ---' && df -h / && echo '--- Limpiando Docker (imagenes, contenedores, cache) ---' && docker compose -f %REMOTE_PATH%/docker-compose.yml down --remove-orphans 2>/dev/null || true && docker system prune -af --volumes && echo '--- Limpiando logs de sistema ---' && journalctl --vacuum-size=100M 2>/dev/null || true && echo '--- Espacio tras limpieza ---' && df -h /"
+echo [2/5] Limpiando Docker y verificando espacio en el servidor...
+ssh %SSH_OPTS% %REMOTE_USER%@%REMOTE_HOST% "df -h / && docker compose -f %REMOTE_PATH%/docker-compose.yml down --remove-orphans 2>/dev/null || true && docker system prune -af --volumes && journalctl --vacuum-size=100M 2>/dev/null || true && df -h /"
+if errorlevel 1 goto :error
 
 echo.
-echo [3/5] Limpiando archivos del despliegue anterior...
+echo [3/5] Limpiando archivos del despliegue anterior (preserva DB y .env)...
 ssh %SSH_OPTS% %REMOTE_USER%@%REMOTE_HOST% "mkdir -p %REMOTE_PATH% && cd %REMOTE_PATH% && find . -maxdepth 1 ! -name 'pg_data' ! -name 'db_data' ! -name '.env' ! -name '.' -exec rm -rf {} +"
+if errorlevel 1 goto :error
 
 echo.
-echo [4/5] Subiendo al servidor (%REMOTE_PATH%)...
-scp %SSH_OPTS% deploy.tar.gz %REMOTE_USER%@%REMOTE_HOST%:%REMOTE_PATH%/deploy.tar.gz
+echo [4/5] Subiendo paquete al servidor...
+scp %SSH_OPTS% %ARCHIVE% %REMOTE_USER%@%REMOTE_HOST%:%REMOTE_PATH%/%ARCHIVE%
+if errorlevel 1 goto :error
 
 echo.
-echo [5/5] Instalando Reservas en el servidor...
-ssh %SSH_OPTS% %REMOTE_USER%@%REMOTE_HOST% "cd %REMOTE_PATH% && tar -xzvf deploy.tar.gz > /dev/null && sed -i 's/\r$//' setup_remote.sh && bash setup_remote.sh"
+echo [5/5] Instalando %APP_NAME% en el servidor...
+ssh %SSH_OPTS% %REMOTE_USER%@%REMOTE_HOST% "cd %REMOTE_PATH% && tar -xzf %ARCHIVE% > /dev/null && sed -i 's/\r$//' setup_remote.sh && bash setup_remote.sh"
+if errorlevel 1 goto :error
 
 echo.
 echo Limpiando local...
-del deploy.tar.gz
+del %ARCHIVE%
 
 echo.
-echo ==========================================
-echo    DESPLIEGUE RESERVAS COMPLETADO
-echo ==========================================
+echo ============================================================
+echo   [OK] DESPLIEGUE %APP_NAME% COMPLETADO
+echo ============================================================
 pause
 endlocal
+exit /b 0
+
+:error
+echo.
+echo ============================================================
+echo   [ERROR] El despliegue de %APP_NAME% ha fallado.
+echo   Revisa el mensaje anterior.
+echo ============================================================
+if exist %ARCHIVE% del %ARCHIVE%
+pause
+endlocal
+exit /b 1

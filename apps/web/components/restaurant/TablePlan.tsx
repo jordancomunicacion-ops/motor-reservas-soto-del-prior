@@ -18,11 +18,14 @@ interface TableProps {
     onSelect?: (id: string) => void;
     mode: 'VIEW' | 'EDIT' | 'SERVICE';
     isSelected?: boolean;
+    /** En clusters de mesas unidas: la mesa se resalta como parte del grupo, pero
+     *  solo la mesa pulsada (isSelected) muestra el menú de acciones/edición. */
+    isInSelectedCluster?: boolean;
     onSelectProfile?: (booking: GuestBookingProfile) => void;
     timezone?: string;
 }
 
-function TableNode({ data, onUpdate, onDropReservation, onSelect, onSelectProfile, mode, isSelected, timezone }: TableProps) {
+function TableNode({ data, onUpdate, onDropReservation, onSelect, onSelectProfile, mode, isSelected, isInSelectedCluster, timezone }: TableProps) {
     const [isDragging, setIsDragging] = useState(false);
     const [dropdownPos, setDropdownPos] = useState<'bottom' | 'top'>('bottom');
     const tableRef = useRef<HTMLDivElement>(null);
@@ -134,6 +137,7 @@ function TableNode({ data, onUpdate, onDropReservation, onSelect, onSelectProfil
                 isDragging && "opacity-50",
                 data.shape === 'ROUND' ? 'rounded-full' : 'rounded-md',
                 isSelected && "ring-4 ring-primary ring-offset-4 z-[100] shadow-2xl",
+                !isSelected && isInSelectedCluster && "ring-2 ring-primary/70 ring-offset-2 z-[90]",
                 mode === 'EDIT' ? "border-double border-4 cursor-move" : "cursor-pointer hover:brightness-95 hover:shadow-md active:scale-95"
             )}
             style={{
@@ -151,7 +155,7 @@ function TableNode({ data, onUpdate, onDropReservation, onSelect, onSelectProfil
             {mode === 'EDIT' && (
                 <div className="absolute inset-0 border border-border/40 pointer-events-none" />
             )}
-            <span className="font-semibold text-[8px] uppercase tracking-tighter opacity-70 absolute top-1 pointer-events-none">{data.name} · {data.capacity}p</span>
+            <span className="font-semibold text-[8px] uppercase tracking-tighter opacity-70 absolute top-1 pointer-events-none">{data.name} · {data.maxPax ?? data.capacity}p</span>
 
             {activeBooking && (
                 <div
@@ -175,7 +179,7 @@ function TableNode({ data, onUpdate, onDropReservation, onSelect, onSelectProfil
             {!activeBooking && (
                 <div className="flex items-center text-[8px] mt-0.5 space-x-0.5 opacity-90 font-semibold">
                     <Users className="size-2" />
-                    <span>{data.capacity}</span>
+                    <span>{data.maxPax ?? data.capacity}</span>
                 </div>
             )}
 
@@ -267,7 +271,8 @@ function TableNode({ data, onUpdate, onDropReservation, onSelect, onSelectProfil
                         className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-primary transition-colors"
                         onClick={(e) => {
                             e.stopPropagation();
-                            onUpdate(data.id, { capacity: ((data.capacity ?? 0) % 8) + 1 });
+                            const next = (((data.maxPax ?? data.capacity ?? 0)) % 8) + 1;
+                            onUpdate(data.id, { capacity: next, maxPax: next });
                         }}
                     >
                         <Armchair className="size-3.5" />
@@ -334,6 +339,18 @@ export default function TablePlan({
 
     // Filter tables by active zone
     const activeTables = tables.filter(t => t.zoneId === activeZone);
+
+    // Cluster de la selección: si la mesa seleccionada está ocupada por una reserva
+    // que también ocupa otras mesas (linkedTableIds), todas se resaltan juntas.
+    const selectedClusterIds = (() => {
+        if (!selectedTableId) return new Set<string>();
+        const sel = tables.find(t => t.id === selectedTableId);
+        const booking = sel?.resBookings?.[0];
+        if (!booking) return new Set<string>([selectedTableId]);
+        const head = booking.tableId ?? selectedTableId;
+        const linked = booking.metadata?.linkedTableIds ?? [];
+        return new Set<string>([head, ...linked, selectedTableId]);
+    })();
 
     // Canvas drop (for moving tables)
     const handleCanvasDrop = (e: React.DragEvent) => {
@@ -444,6 +461,7 @@ export default function TablePlan({
                             onSelect={onTableSelect}
                             onSelectProfile={onSelectProfile}
                             isSelected={selectedTableId === table.id}
+                            isInSelectedCluster={selectedClusterIds.has(table.id)}
                             timezone={timezone}
                         />
                     ))}

@@ -1,46 +1,49 @@
 @echo off
+chcp 65001 >nul
 setlocal
-title Reservas SOTO DEL PRIOR - Entorno Local
-
-echo ===================================================
-echo   LANZADOR ENTORNO LOCAL - RESERVAS SOTO DEL PRIOR
-echo ===================================================
-echo.
-
-:: Asegurarse de que el directorio de trabajo es el del script
+title SOTOdelPRIOR - Test local Reservas
 cd /d "%~dp0"
 
+set APP_NAME=Reservas
+set LOCAL_URL=http://localhost:3001/admin
+
+echo ============================================================
+echo   ENTORNO LOCAL %APP_NAME% (SOTO DEL PRIOR)
+echo   Dashboard: %LOCAL_URL%
+echo ============================================================
+echo.
+
 echo [1/3] Verificando Base de Datos...
-:: Bajamos todo primero para asegurar que los cambios de red se aplican sin conflictos
 docker compose stop sotoreservas-db >nul 2>&1
 docker compose up -d --force-recreate sotoreservas-db
-if %ERRORLEVEL% NEQ 0 (
-    echo Error: Docker no esta en ejecucion o hay un problema con la DB.
-    pause
-    exit /b %ERRORLEVEL%
+if errorlevel 1 (
+    echo [ERROR] Docker no esta en ejecucion o problema con la DB.
+    goto :error
 )
 
+echo.
 echo [2/3] Abriendo el Panel de Control...
-:: Esperamos un segundo y abrimos el navegador
-timeout /t 2 /nobreak > nul
-start "" "http://localhost:3001/admin"
+timeout /t 2 /nobreak >nul
+start "" "%LOCAL_URL%"
 
-echo [3/3] Iniciando Servidores (Web y API)...
 echo.
-echo ---------------------------------------------------
-echo   IMPORTANTE: El Dashboard estara en:
-echo   http://localhost:3001/admin
-echo ---------------------------------------------------
+echo ============================================================
+echo   [OK] DB lista. Iniciando servidores (Web + API)
+echo   Dashboard: %LOCAL_URL%
+echo ============================================================
 echo.
 
-:: Ejecutamos el comando dev del root que lanza todos los workspaces
+echo [3/3] Arrancando workspaces (npm run dev)...
 npm run dev
-
-if %ERRORLEVEL% NEQ 0 (
+if errorlevel 1 (
     echo.
-    echo Hubo un error al iniciar los servidores. 
-    echo Asegurate de haber ejecutado "npm install" previamente.
-    pause
+    echo [ERROR] Fallo al iniciar. Asegurate de haber ejecutado "npm install".
+    goto :error
 )
-
 pause
+goto :eof
+
+:error
+pause
+endlocal
+exit /b 1

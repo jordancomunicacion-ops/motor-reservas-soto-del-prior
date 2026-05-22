@@ -39,13 +39,14 @@ interface ReservationFormProps {
     isOpen: boolean;
     onClose: () => void;
     onSubmit: (data: ReservationFormPayload) => void;
+    onCancel?: (bookingId: string) => void | Promise<void>;
     initialDate?: Date;
     initialBooking?: GuestBookingProfile | null;
     initialTableId?: string | null;
     timezone?: string;
 }
 
-export default function ReservationForm({ isOpen, onClose, onSubmit, initialDate, initialBooking, initialTableId, timezone }: ReservationFormProps) {
+export default function ReservationForm({ isOpen, onClose, onSubmit, onCancel, initialDate, initialBooking, initialTableId, timezone }: ReservationFormProps) {
     const isEditing = !!initialBooking;
 
     const initialDateStr = initialBooking?.date
@@ -298,9 +299,25 @@ export default function ReservationForm({ isOpen, onClose, onSubmit, initialDate
                     )}
                 </div>
 
-                <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-border">
-                    <Button variant="outline" onClick={onClose}>Cancelar</Button>
-                    <Button onClick={handleSubmit} disabled={!name}>{isEditing ? 'Guardar' : 'Crear Reserva'}</Button>
+                <div className="flex justify-between items-center gap-2 mt-6 pt-4 border-t border-border">
+                    <div>
+                        {isEditing && onCancel && initialBooking?.id && (
+                            <Button
+                                variant="destructive"
+                                onClick={async () => {
+                                    if (!confirm('¿Cancelar esta reserva? Se liberará la mesa asignada.')) return;
+                                    await onCancel(initialBooking.id);
+                                    onClose();
+                                }}
+                            >
+                                Cancelar reserva
+                            </Button>
+                        )}
+                    </div>
+                    <div className="flex gap-2">
+                        <Button variant="outline" onClick={onClose}>Cerrar</Button>
+                        <Button onClick={handleSubmit} disabled={!name}>{isEditing ? 'Guardar' : 'Crear Reserva'}</Button>
+                    </div>
                 </div>
             </div>
         </div>

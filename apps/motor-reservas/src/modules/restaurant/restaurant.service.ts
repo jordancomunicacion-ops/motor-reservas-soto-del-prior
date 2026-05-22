@@ -12,6 +12,7 @@ import { RestaurantAvailabilityService } from './restaurant-availability.service
 import { RestaurantAccessService } from './restaurant-access.service';
 import { sanitizeMailConfig } from './mail-config-sanitizer';
 import { toDateOnlyString, zonedDateToUtc, zonedDayRangeUtc } from '../../common/timezone';
+import { findClusterForPax, isTableBooked, type SlotBooking, type SlotTable } from './availability-helpers';
 
 // Margen mínimo (en minutos) antes de la reserva para permitir modificar/cancelar desde la web pública.
 const PUBLIC_EDIT_CUTOFF_MINUTES = 120;
@@ -554,11 +555,81 @@ export class RestaurantService {
         return booking;
     }
 
+    /**
+     * Calcula linkedTableIds para una asignación manual de mesa: si el pax cabe en la
+     * mesa, no hay cluster (devuelve []); si no, intenta crecer hacia mesas contiguas
+     * libres usando BFS y devuelve los IDs adicionales (sin la cabecera).
+     */
+    private async computeManualCluster(
+        restaurantId: string,
+        startTableId: string,
+        pax: number,
+        date: Date,
+        duration: number,
+        excludeBookingId: string,
+    ): Promise<string[]> {
+        const tables = await this.prisma.table.findMany({
+            where: { zone: { restaurantId }, isActive: true },
+        }) as unknown as SlotTable[];
+        const startTable = tables.find(t => t.id === startTableId);
+        if (!startTable) return [];
+        if (pax <= startTable.maxPax) return [];
+
+        const bookingsRaw = await this.prisma.resBooking.findMany({
+            where: {
+                restaurantId,
+                date: { gte: new Date(date.getTime() - 24 * 60 * 60 * 1000), lte: new Date(date.getTime() + 24 * 60 * 60 * 1000) },
+                status: { notIn: [ResBookingStatus.CANCELLED, ResBookingStatus.RELEASED, ResBookingStatus.NO_SHOW] },
+                id: { not: excludeBookingId },
+            },
+            select: { id: true, date: true, duration: true, tableId: true, metadata: true },
+        });
+        const bookings: SlotBooking[] = bookingsRaw.map(b => {
+            const meta = (b.metadata as { linkedTableIds?: unknown } | null) || {};
+            const linked = Array.isArray(meta.linkedTableIds) ? (meta.linkedTableIds as string[]) : undefined;
+            return {
+                id: b.id,
+                date: b.date,
+                duration: b.duration,
+                tableId: b.tableId,
+                ...(linked ? { linkedTableIds: linked } : {}),
+            };
+        });
+        const freeTables = tables.filter(t =>
+            t.id === startTableId || !isTableBooked(t, date, duration, bookings),
+        );
+        const cluster = findClusterForPax(startTable, freeTables, pax);
+        if (!cluster) return [];
+        return cluster.filter(id => id !== startTableId);
+    }
+
     async updateBookingStatus(bookingId: string, status: string, tableId?: string, user?: AuthenticatedUser) {
         if (user) await ensureRestaurantAccess(user, this.prisma, await this.restaurantIdForBooking(bookingId));
         const updateData: any = { status };
         if (tableId) updateData.tableId = tableId;
-        
+
+        // Al cancelar (o no-show) liberamos la mesa para que el cluster quede disponible
+        // y la mesa no aparezca pintada como ocupada en el plano.
+        if (status === 'CANCELLED' || status === 'NO_SHOW') {
+            const prev = await this.prisma.resBooking.findUnique({
+                where: { id: bookingId },
+                select: { metadata: true }
+            });
+            updateData.tableId = null;
+            updateData.metadata = { ...((prev?.metadata as any) || {}), linkedTableIds: [] };
+        } else if (tableId) {
+            // Asignación manual: si el pax no cabe en la mesa elegida, intentamos
+            // formar un cluster con mesas contiguas libres para que ambas se vean ocupadas.
+            const prev = await this.prisma.resBooking.findUnique({
+                where: { id: bookingId },
+                select: { pax: true, date: true, duration: true, restaurantId: true, metadata: true }
+            });
+            if (prev) {
+                const linked = await this.computeManualCluster(prev.restaurantId, tableId, prev.pax, prev.date, prev.duration, bookingId);
+                updateData.metadata = { ...((prev.metadata as any) || {}), linkedTableIds: linked };
+            }
+        }
+
         const booking = await this.prisma.resBooking.update({
             where: { id: bookingId },
             data: updateData
