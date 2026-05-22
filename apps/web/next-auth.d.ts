@@ -9,6 +9,7 @@ declare module 'next-auth' {
             restaurantId: string | null;
             hotelId: string | null;
         } & DefaultSession['user'];
+        accessToken?: string;
     }
 
     interface User extends DefaultUser {

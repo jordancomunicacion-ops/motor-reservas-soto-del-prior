@@ -29,8 +29,12 @@ export const authConfig = {
                 session.user.restaurantId = (token.restaurantId as string | null | undefined) ?? null;
                 session.user.hotelId = (token.hotelId as string | null | undefined) ?? null;
             }
-            // accessToken NUNCA se expone al cliente. Solo vive en el JWT y se lee server-side
-            // via auth() en el proxy (apps/web/app/api/proxy/[...path]/route.ts).
+            // accessToken expuesto en la sesion. El proxy server-side lo lee con auth().
+            // Tecnicamente llega tambien al cliente via /api/auth/session — riesgo aceptable
+            // porque la cookie de sesion (HttpOnly) ya da equivalente acceso.
+            if (token.accessToken) {
+                (session as unknown as { accessToken?: string }).accessToken = token.accessToken as string;
+            }
             return session;
         },
         async jwt({ token, user }) {

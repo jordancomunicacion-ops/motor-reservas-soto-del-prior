@@ -1,10 +1,8 @@
 import type { NextRequest } from 'next/server';
-import { getToken } from 'next-auth/jwt';
+import { auth } from '@/auth';
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
-// Headers que NO reenviamos al motor: los que controlamos (Authorization, Host, Cookie)
-// y los hop-by-hop.
 const STRIP_REQUEST_HEADERS = new Set([
     'host',
     'connection',
@@ -54,14 +52,11 @@ function buildResponseHeaders(res: Response): Headers {
 }
 
 async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }> }) {
-    const token = await getToken({
-        req,
-        secret: process.env.AUTH_SECRET,
-    });
+    const session = await auth();
+    const accessToken = (session as unknown as { accessToken?: string } | null)?.accessToken;
 
-    const accessToken = token?.accessToken as string | undefined;
-    if (!accessToken) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    if (!session?.user || !accessToken) {
+        return new Response(JSON.stringify({ error: 'Unauthorized', reason: !session?.user ? 'no-session' : 'no-token' }), {
             status: 401,
             headers: { 'Content-Type': 'application/json' }
         });
