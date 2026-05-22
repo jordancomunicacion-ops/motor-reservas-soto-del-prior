@@ -24,24 +24,25 @@ export default function Page() {
     }, [errorMessage]);
 
     return (
-        <div className="min-h-screen grid lg:grid-cols-2 bg-background">
+        <div data-theme="admin-dark" className="min-h-screen grid lg:grid-cols-2 bg-background text-foreground">
             {/* Side visual: brand wash */}
-            <div className="hidden lg:flex relative bg-foreground text-background overflow-hidden">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,oklch(0.715_0.085_75/0.18),transparent_55%)]" />
+            <div className="hidden lg:flex relative bg-card border-r border-border/40 overflow-hidden">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,oklch(0.74_0.13_180/0.18),transparent_55%)]" />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,oklch(0.74_0.13_180/0.10),transparent_50%)]" />
                 <div className="relative flex flex-col justify-between p-12 w-full">
                     <div className="flex items-center gap-3">
                         <Image src="/logo-icon.png" alt="" width={36} height={36} className="invert" />
-                        <span className="text-eyebrow text-background/70">Soto del Prior</span>
+                        <span className="text-eyebrow text-foreground/70">Soto del Prior</span>
                     </div>
                     <div className="space-y-4 max-w-md">
-                        <h2 className="font-display text-4xl font-medium leading-tight tracking-tight">
+                        <h2 className="font-display text-4xl font-medium leading-tight tracking-tight text-foreground">
                             La gestión, tan cuidada como tu hospitalidad.
                         </h2>
-                        <p className="text-sm text-background/70 leading-relaxed">
+                        <p className="text-sm text-muted-foreground leading-relaxed">
                             Motor de reservas, planning y valoraciones — todo en un mismo lugar.
                         </p>
                     </div>
-                    <p className="text-[11px] text-background/40">© {new Date().getFullYear()} Soto del Prior</p>
+                    <p className="text-[11px] text-muted-foreground/60">© {new Date().getFullYear()} Soto del Prior</p>
                 </div>
             </div>
 
@@ -50,7 +51,7 @@ export default function Page() {
                 <div className="w-full max-w-sm space-y-8">
                     <div className="text-center space-y-3">
                         <div className="lg:hidden flex justify-center">
-                            <Image src="/logo-icon.png" alt="Soto del Prior" width={56} height={56} />
+                            <Image src="/logo-icon.png" alt="Soto del Prior" width={56} height={56} className="invert" />
                         </div>
                         <div className="space-y-1.5">
                             <p className="text-eyebrow">Motor de reservas</p>
@@ -63,7 +64,7 @@ export default function Page() {
                         </div>
                     </div>
 
-                    <Card className="border-border/60 shadow-sm">
+                    <Card className="border-border/60 shadow-sm bg-card">
                         <CardContent>
                             <form action={formAction} className="space-y-5">
                                 <div className="space-y-2">
@@ -109,7 +110,7 @@ export default function Page() {
 
                                 {errorMessage && (
                                     <div
-                                        className="flex items-start gap-2 rounded-md border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive"
+                                        className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
                                         aria-live="polite"
                                     >
                                         <AlertCircle className="size-4 mt-0.5 shrink-0" />
