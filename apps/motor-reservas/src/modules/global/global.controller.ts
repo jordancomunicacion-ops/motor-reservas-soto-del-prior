@@ -19,7 +19,6 @@ export class GlobalController {
 
     constructor(private prisma: PrismaService) { }
 
-    @Roles('ADMIN')
     @Get('contexts')
     async getContexts(@Req() req: AuthenticatedRequest) {
         const scope = await getUserScope(req?.user, this.prisma);
@@ -48,7 +47,6 @@ export class GlobalController {
      *   - ?ctxType=hotel&ctxId=ID: solo ese hotel + el restaurante vinculado si existe (sinergia).
      *   - ?ctxType=restaurant&ctxId=ID: solo ese restaurante + el hotel vinculado si existe.
      */
-    @Roles('ADMIN')
     @Get('stats')
     async getStats(
         @Req() req: AuthenticatedRequest,
@@ -336,7 +334,6 @@ export class GlobalController {
      *
      * Frontend lo usa para pintar sparklines reales en las MetricCard del dashboard.
      */
-    @Roles('ADMIN')
     @Get('trends')
     async getTrends(
         @Req() req: AuthenticatedRequest,

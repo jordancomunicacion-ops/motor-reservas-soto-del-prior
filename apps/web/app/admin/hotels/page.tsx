@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { fetchAPI } from '@/lib/api';
+import { fetchAPIAdmin } from '@/lib/api-admin';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -40,7 +40,7 @@ export default function HotelsPage() {
     async function loadHotels() {
         setLoading(true);
         try {
-            const data = await fetchAPI<HotelRow[]>('/property/hotels');
+            const data = await fetchAPIAdmin<HotelRow[]>('/property/hotels');
             if (Array.isArray(data)) setHotels(data);
         } catch (e) {
             console.error(e);
@@ -57,7 +57,7 @@ export default function HotelsPage() {
         }
         setCreating(true);
         try {
-            await fetchAPI('/property/hotels', {
+            await fetchAPIAdmin('/property/hotels', {
                 method: 'POST',
                 body: JSON.stringify({ name: newName.trim(), currency: 'EUR', timezone: 'Europe/Madrid' }),
             });

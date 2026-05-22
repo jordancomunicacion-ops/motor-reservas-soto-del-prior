@@ -13,7 +13,6 @@ export class WidgetConfigController {
         return this.service.getConfig(hotelId);
     }
 
-    @Roles('ADMIN')
     @Post(':hotelId')
     updateConfig(@Param('hotelId') hotelId: string, @Body() body: any) {
         return this.service.updateConfig(hotelId, body);

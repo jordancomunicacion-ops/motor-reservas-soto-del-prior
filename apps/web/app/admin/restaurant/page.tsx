@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { fetchAPI } from '@/lib/api';
+import { fetchAPIAdmin } from '@/lib/api-admin';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,7 +31,7 @@ export default function RestaurantListPage() {
     async function loadRestaurants() {
         setLoading(true);
         try {
-            const data = await fetchAPI<RestaurantRow[]>('/restaurant');
+            const data = await fetchAPIAdmin<RestaurantRow[]>('/restaurant');
             if (Array.isArray(data)) setRestaurants(data);
         } catch (e) {
             console.error(e);
@@ -48,7 +48,7 @@ export default function RestaurantListPage() {
         }
         setCreating(true);
         try {
-            await fetchAPI('/restaurant', {
+            await fetchAPIAdmin('/restaurant', {
                 method: 'POST',
                 body: JSON.stringify({ name: newName.trim(), currency: 'EUR' }),
             });

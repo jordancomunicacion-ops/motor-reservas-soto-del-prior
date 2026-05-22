@@ -10,7 +10,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Users, Mail, ShieldCheck, Trash2, Settings2, CheckCircle2, Lock, Pencil, X, Save, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { fetchAPI } from '@/lib/api';
+import { fetchAPIAdmin } from '@/lib/api-admin';
 
 // Definición de permisos disponibles sincronizados con el Menú Principal
 const AVAILABLE_PERMISSIONS = [
@@ -82,8 +82,8 @@ export default function AccessManager({ contextId, contextType }: { contextId: s
         setLoading(true);
         try {
             const [usersData, profilesData] = await Promise.all([
-                fetchAPI<AuthorizedUser[]>(`/restaurant/${contextId}/users`),
-                fetchAPI<AccessProfile[]>(`/restaurant/${contextId}/access-profiles`).catch(() => [] as AccessProfile[])
+                fetchAPIAdmin<AuthorizedUser[]>(`/restaurant/${contextId}/users`),
+                fetchAPIAdmin<AccessProfile[]>(`/restaurant/${contextId}/access-profiles`).catch(() => [] as AccessProfile[])
             ]);
             setUsers(Array.isArray(usersData) ? usersData : []);
             const dbProfiles: AccessProfile[] = Array.isArray(profilesData) ? profilesData : [];
@@ -123,7 +123,7 @@ export default function AccessManager({ contextId, contextType }: { contextId: s
         }
         setSaving(true);
         try {
-            await fetchAPI(`/restaurant/${contextId}/users`, {
+            await fetchAPIAdmin(`/restaurant/${contextId}/users`, {
                 method: 'POST',
                 body: JSON.stringify({
                     email,
@@ -147,7 +147,7 @@ export default function AccessManager({ contextId, contextType }: { contextId: s
     const handleRemoveAccess = async (userId: string) => {
         if (!window.confirm('¿Eliminar acceso de este empleado?')) return;
         try {
-            await fetchAPI(`/restaurant/${contextId}/users/${userId}`, {
+            await fetchAPIAdmin(`/restaurant/${contextId}/users/${userId}`, {
                 method: 'DELETE'
             });
             loadAll();
@@ -197,7 +197,7 @@ export default function AccessManager({ contextId, contextType }: { contextId: s
         setSavingProfile(true);
         try {
             if (editingProfile.id) {
-                await fetchAPI(`/restaurant/access-profiles/${editingProfile.id}`, {
+                await fetchAPIAdmin(`/restaurant/access-profiles/${editingProfile.id}`, {
                     method: 'PATCH',
                     body: JSON.stringify({
                         name: editorName.trim(),
@@ -206,7 +206,7 @@ export default function AccessManager({ contextId, contextType }: { contextId: s
                     })
                 });
             } else {
-                await fetchAPI(`/restaurant/${contextId}/access-profiles`, {
+                await fetchAPIAdmin(`/restaurant/${contextId}/access-profiles`, {
                     method: 'POST',
                     body: JSON.stringify({
                         name: editorName.trim(),
@@ -229,7 +229,7 @@ export default function AccessManager({ contextId, contextType }: { contextId: s
         if (profile.system) return;
         if (!window.confirm(`¿Eliminar el perfil "${profile.name}"?`)) return;
         try {
-            await fetchAPI(`/restaurant/access-profiles/${profile.id}`, {
+            await fetchAPIAdmin(`/restaurant/access-profiles/${profile.id}`, {
                 method: 'DELETE'
             });
             if (selectedProfileId === profile.id) {

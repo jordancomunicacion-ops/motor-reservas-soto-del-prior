@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, Suspense } from 'react';
 import { useParams } from 'next/navigation';
-import { fetchAPI } from '@/lib/api';
+import { fetchAPIAdmin } from '@/lib/api-admin';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/page-header';
@@ -42,9 +42,9 @@ function HotelDashboardContent() {
     async function loadData() {
         try {
             const [hotelData, roomsData, ratesData] = await Promise.all([
-                fetchAPI<HotelDetail>(`/property/hotels/${hotelId}`),
-                fetchAPI<RoomTypeRow[]>(`/property/hotels/${hotelId}/room-types`),
-                fetchAPI<RatePlanRow[]>(`/rates/plans/${hotelId}`),
+                fetchAPIAdmin<HotelDetail>(`/property/hotels/${hotelId}`),
+                fetchAPIAdmin<RoomTypeRow[]>(`/property/hotels/${hotelId}/room-types`),
+                fetchAPIAdmin<RatePlanRow[]>(`/rates/plans/${hotelId}`),
             ]);
             setHotel(hotelData);
             const integrations = hotelData.integrations || {};

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, Suspense } from 'react';
 import { useParams } from 'next/navigation';
-import { fetchAPI } from '@/lib/api';
+import { fetchAPIAdmin } from '@/lib/api-admin';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/page-header';
 import { ArrowLeft } from 'lucide-react';
@@ -17,7 +17,7 @@ function RestaurantPlanContent() {
 
     useEffect(() => {
         if (restaurantId) {
-            fetchAPI<RestaurantSummary>(`/restaurant/${restaurantId}`).then(setRestaurant).catch(console.error);
+            fetchAPIAdmin<RestaurantSummary>(`/restaurant/${restaurantId}`).then(setRestaurant).catch(console.error);
         }
     }, [restaurantId]);
 

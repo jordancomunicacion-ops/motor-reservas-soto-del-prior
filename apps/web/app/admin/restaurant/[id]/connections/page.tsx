@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, Suspense } from 'react';
 import { useParams } from 'next/navigation';
-import { fetchAPI } from '@/lib/api';
+import { fetchAPIAdmin } from '@/lib/api-admin';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -60,7 +60,7 @@ function RestaurantConnectionsContent() {
 
     async function loadRestaurant() {
         try {
-            const data = await fetchAPI<RestaurantWithIntegrations>(`/restaurant/${restaurantId}`);
+            const data = await fetchAPIAdmin<RestaurantWithIntegrations>(`/restaurant/${restaurantId}`);
             setRestaurant(data);
             if (data.integrations) {
                 setIntegrations(prev => ({ ...prev, ...data.integrations }));
@@ -74,7 +74,7 @@ function RestaurantConnectionsContent() {
 
     async function loadConfig() {
         try {
-            const data = await fetchAPI<WidgetConfigResponse>(`/config/${restaurantId}`);
+            const data = await fetchAPIAdmin<WidgetConfigResponse>(`/config/${restaurantId}`);
             if (data) {
                 setConfig({
                     primaryColor: data.primaryColor || '#C59D5F',
@@ -98,12 +98,12 @@ function RestaurantConnectionsContent() {
     async function handleSave() {
         setSaving(true);
         try {
-            await fetchAPI(`/restaurant/${restaurantId}`, {
+            await fetchAPIAdmin(`/restaurant/${restaurantId}`, {
                 method: 'PATCH',
                 body: JSON.stringify({ integrations })
             });
 
-            await fetchAPI(`/config/${restaurantId}`, {
+            await fetchAPIAdmin(`/config/${restaurantId}`, {
                 method: 'POST',
                 body: JSON.stringify(config)
             });

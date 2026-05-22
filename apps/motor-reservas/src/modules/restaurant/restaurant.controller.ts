@@ -23,19 +23,16 @@ export class RestaurantController {
         return this.service.createRestaurant(body);
     }
 
-    @Roles('ADMIN')
     @Get()
     getRestaurants(@Req() req: AuthenticatedRequest) {
         return this.service.getRestaurants(req?.user);
     }
 
-    @Roles('ADMIN')
     @Get(':id')
     getRestaurant(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
         return this.service.getRestaurant(id, req?.user);
     }
 
-    @Roles('ADMIN')
     @Patch(':id')
     updateRestaurant(@Param('id') id: string, @Body() body: any, @Req() req: AuthenticatedRequest) {
         return this.service.updateRestaurant(id, body, req?.user);
@@ -47,44 +44,37 @@ export class RestaurantController {
         return this.service.deleteRestaurant(id, req?.user);
     }
 
-    @Roles('ADMIN')
     @Post('zones')
     createZone(@Body() body: { restaurantId: string; name: string }, @Req() req: AuthenticatedRequest) {
         return this.service.createZone(body.restaurantId, body.name, req?.user);
     }
 
-    @Roles('ADMIN')
     @Post('tables')
     createTable(@Body() body: { zoneId: string; name: string; capacity: number }, @Req() req: AuthenticatedRequest) {
         return this.service.createTable(body.zoneId, body.name, body.capacity, req?.user);
     }
 
-    @Roles('ADMIN')
     @Get(':id/tables')
     getTables(@Param('id') id: string, @Query('date') date?: string, @Req() req?: any) {
         return this.service.getTables(id, date, req?.user);
     }
 
-    @Roles('ADMIN')
     @Get(':id/zones')
     getZones(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
         return this.service.getTables(id, undefined, req?.user); // getTables returns the zones with tables
     }
 
-    @Roles('ADMIN')
     @Post(':id/zones/sync')
     syncZones(@Param('id') id: string, @Body() body: any[], @Req() req: AuthenticatedRequest) {
         return this.service.syncZones(id, body, req?.user);
     }
 
-    @Roles('ADMIN')
     @Post('zones/:id/tables/sync')
     syncTables(@Param('id') id: string, @Body() body: any[], @Req() req: AuthenticatedRequest) {
         return this.service.syncTables(id, body, req?.user);
     }
 
     // --- Bookings ---
-    @Roles('ADMIN')
     @Get(':id/bookings')
     getBookings(
         @Param('id') id: string,
@@ -96,20 +86,17 @@ export class RestaurantController {
         return this.service.getBookings(id, date, startDate, endDate, req?.user);
     }
 
-    @Roles('ADMIN')
     @Post('bookings')
     createBooking(@Body() body: any, @Req() req: AuthenticatedRequest) {
         return this.service.createBooking(body, req?.user);
     }
 
     // --- Waitlist ---
-    @Roles('ADMIN')
     @Post(':id/waitlist')
     addToWaitlist(@Param('id') id: string, @Body() body: any, @Req() req: AuthenticatedRequest) {
         return this.service.addToWaitlist(id, body, req?.user);
     }
 
-    @Roles('ADMIN')
     @Get(':id/waitlist')
     getWaitlist(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
         return this.service.getWaitlist(id, req?.user);
@@ -202,25 +189,21 @@ export class RestaurantController {
         }
     }
 
-    @Roles('ADMIN')
     @Get(':id/reviews')
     listRestaurantReviews(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
         return this.reviewService.listReviewsForRestaurant(id, req?.user);
     }
 
-    @Roles('ADMIN')
     @Get('hotel/:hotelId/reviews')
     listHotelReviews(@Param('hotelId') hotelId: string, @Req() req: AuthenticatedRequest) {
         return this.reviewService.listReviewsForHotel(hotelId, req?.user);
     }
 
-    @Roles('ADMIN')
     @Patch('reservation/:id/status')
     updateBookingStatus(@Param('id') id: string, @Body() body: UpdateBookingStatusDto, @Req() req: AuthenticatedRequest) {
         return this.service.updateBookingStatus(id, body.status, body.tableId, req?.user);
     }
 
-    @Roles('ADMIN')
     @Patch('bookings/:id')
     updateBooking(@Param('id') id: string, @Body() body: any, @Req() req: AuthenticatedRequest) {
         return this.service.updateBooking(id, body, req?.user);
@@ -238,13 +221,11 @@ export class RestaurantController {
         return this.service.getAvailableSlots(id, date, parseInt(pax), type);
     }
 
-    @Roles('ADMIN')
     @Get(':id/shifts')
     getShifts(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
         return this.service.getShifts(id, req?.user);
     }
 
-    @Roles('ADMIN')
     @Post(':id/shifts')
     async createShift(@Param('id') id: string, @Body() body: any, @Req() req: AuthenticatedRequest) {
         try {
@@ -254,49 +235,41 @@ export class RestaurantController {
         }
     }
 
-    @Roles('ADMIN')
     @Post('linked-reservation')
     createLinkedReservation(@Body() body: any, @Req() req: AuthenticatedRequest) {
         return this.service.createLinkedReservation(body, req?.user);
     }
 
-    @Roles('ADMIN')
     @Delete(':id/shifts/:shiftId')
     deleteShift(@Param('shiftId') shiftId: string, @Req() req: AuthenticatedRequest) {
         return this.service.deleteShift(shiftId, req?.user);
     }
 
-    @Roles('ADMIN')
     @Get(':id/closures')
     getClosures(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
         return this.service.getClosures(id, req?.user);
     }
 
-    @Roles('ADMIN')
     @Post(':id/closures')
     createClosure(@Param('id') id: string, @Body() body: any, @Req() req: AuthenticatedRequest) {
         return this.service.createClosure(id, body, req?.user);
     }
 
-    @Roles('ADMIN')
     @Delete(':id/closures/:closureId')
     deleteClosure(@Param('closureId') closureId: string, @Req() req: AuthenticatedRequest) {
         return this.service.deleteClosure(closureId, req?.user);
     }
 
-    @Roles('ADMIN')
     @Get(':id/openings')
     getOpenings(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
         return this.service.getOpenings(id, req?.user);
     }
 
-    @Roles('ADMIN')
     @Post(':id/openings')
     createOpening(@Param('id') id: string, @Body() body: any, @Req() req: AuthenticatedRequest) {
         return this.service.createOpening(id, body, req?.user);
     }
 
-    @Roles('ADMIN')
     @Delete(':id/openings/:openingId')
     deleteOpening(@Param('openingId') openingId: string, @Req() req: AuthenticatedRequest) {
         return this.service.deleteOpening(openingId, req?.user);

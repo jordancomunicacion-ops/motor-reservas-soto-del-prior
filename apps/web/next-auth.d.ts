@@ -6,16 +6,25 @@ declare module 'next-auth' {
         user: {
             id: string;
             role: string;
+            restaurantId: string | null;
+            hotelId: string | null;
         } & DefaultSession['user'];
     }
 
     interface User extends DefaultUser {
         role: string;
+        restaurantId?: string | null;
+        hotelId?: string | null;
+        accessToken?: string;
     }
 }
 
 declare module 'next-auth/jwt' {
     interface JWT extends DefaultJWT {
         role?: string;
+        restaurantId?: string | null;
+        hotelId?: string | null;
+        accessToken?: string;
+        accessTokenExpiresAt?: number;
     }
 }

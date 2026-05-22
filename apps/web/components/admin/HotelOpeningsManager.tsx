@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { fetchAPI } from '@/lib/api';
+import { fetchAPIAdmin } from '@/lib/api-admin';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,7 +29,7 @@ export function HotelOpeningsManager({ hotelId }: { hotelId: string }) {
 
     async function loadOpenings() {
         try {
-            const data = await fetchAPI(`/property/hotels/${hotelId}/openings`);
+            const data = await fetchAPIAdmin(`/property/hotels/${hotelId}/openings`);
             setOpenings(data);
         } catch (e) {
             console.error(e);
@@ -41,7 +41,7 @@ export function HotelOpeningsManager({ hotelId }: { hotelId: string }) {
         if (openingType === 'PERIOD' && !newOpening.endDate) return alert('La fecha de fin es obligatoria');
 
         try {
-            await fetchAPI(`/property/hotels/${hotelId}/openings`, {
+            await fetchAPIAdmin(`/property/hotels/${hotelId}/openings`, {
                 method: 'POST',
                 body: JSON.stringify({
                     date: newOpening.date,
@@ -60,7 +60,7 @@ export function HotelOpeningsManager({ hotelId }: { hotelId: string }) {
     async function handleDelete(id: string) {
         if (!confirm('¿Eliminar esta apertura?')) return;
         try {
-            await fetchAPI(`/property/hotels/${hotelId}/openings/${id}`, { method: 'DELETE' });
+            await fetchAPIAdmin(`/property/hotels/${hotelId}/openings/${id}`, { method: 'DELETE' });
             loadOpenings();
         } catch (e) {
             console.error(e);

@@ -1,6 +1,6 @@
 "use client";
 import { useState } from 'react';
-import { fetchAPI } from '@/lib/api';
+import { fetchAPIAdmin } from '@/lib/api-admin';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -28,7 +28,7 @@ export default function RoomTypesPage() {
         if (!hotelId) return;
         setLoading(true);
         try {
-            const res = await fetchAPI<RoomType[]>(`/property/hotels/${hotelId}/room-types`);
+            const res = await fetchAPIAdmin<RoomType[]>(`/property/hotels/${hotelId}/room-types`);
             setTypes(res);
         } catch (e) {
             console.error(e);

@@ -44,7 +44,6 @@ export class ConnectionsController {
         };
     }
 
-    @Roles('ADMIN')
     @Post()
     async saveConnection(
         @Req() req: AuthenticatedRequest,
@@ -64,7 +63,6 @@ export class ConnectionsController {
         });
     }
 
-    @Roles('ADMIN')
     @Get()
     async getConnections(
         @Req() req: AuthenticatedRequest,
@@ -75,7 +73,6 @@ export class ConnectionsController {
         return this.connectionsService.getConnections(scoped.hotelId, scoped.restaurantId);
     }
 
-    @Roles('ADMIN')
     @Get(':type')
     async getConnection(
         @Param('type') type: string,
@@ -87,7 +84,6 @@ export class ConnectionsController {
         return this.connectionsService.getConnection(type, scoped.hotelId, scoped.restaurantId);
     }
 
-    @Roles('ADMIN')
     @Post('test/:connectionId')
     async testConnection(@Param('connectionId') connectionId: string) {
         // Testing Google Analytics as example
@@ -102,7 +98,6 @@ export class ConnectionsController {
         );
     }
 
-    @Roles('ADMIN')
     @Delete(':connectionId')
     async deleteConnection(@Param('connectionId') connectionId: string) {
         return this.connectionsService.deleteConnection(connectionId);
@@ -113,7 +108,6 @@ export class ConnectionsController {
      * - Si llega `credentials` en el body, se testean esas (útil para "probar antes de guardar").
      * - Si no, se cargan del hotel con dual-source (tabla → JSON fallback).
      */
-    @Roles('ADMIN')
     @Post('test-ota')
     async testOta(
         @Req() req: AuthenticatedRequest,

@@ -7,7 +7,7 @@ import { es } from 'date-fns/locale';
 import { es as esCalendar } from 'react-day-picker/locale';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { fetchAPI } from '@/lib/api';
+import { fetchAPIAdmin } from '@/lib/api-admin';
 import {
     CalendarDays,
     Clock,
@@ -142,7 +142,7 @@ function CalendarReservationsContent() {
                 ? `/bookings/${contextId}`
                 : `/restaurant/${contextId}/bookings`;
 
-            await fetchAPI(endpoint, { method: 'POST', body: JSON.stringify(payload) });
+            await fetchAPIAdmin(endpoint, { method: 'POST', body: JSON.stringify(payload) });
 
             setIsSheetOpen(false);
             setFormData({ guestName: '', email: '', phone: '', pax: '2', time: '14:00', notes: '' });
@@ -176,7 +176,7 @@ function CalendarReservationsContent() {
                 }
             }
 
-            const res = await fetchAPI<Booking[]>(endpoint);
+            const res = await fetchAPIAdmin<Booking[]>(endpoint);
             let filtered = Array.isArray(res) ? res : [];
 
             const start = viewMode === 'day'

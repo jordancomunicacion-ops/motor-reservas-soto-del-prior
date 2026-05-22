@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Star, ExternalLink, Loader2, MessageSquareQuote } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { fetchAPI } from '@/lib/api';
+import { fetchAPIAdmin } from '@/lib/api-admin';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -73,7 +73,7 @@ export default function ReviewsPanel({ endpoint, headerBanner }: ReviewsPanelPro
     useEffect(() => {
         let aborted = false;
         setLoading(true);
-        fetchAPI<ReviewsResponse>(endpoint)
+        fetchAPIAdmin<ReviewsResponse>(endpoint)
             .then(d => { if (!aborted) setData(d); })
             .catch(e => console.error(e))
             .finally(() => { if (!aborted) setLoading(false); });

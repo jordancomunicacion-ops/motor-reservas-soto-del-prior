@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, Suspense } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { fetchAPI } from '@/lib/api';
+import { fetchAPIAdmin } from '@/lib/api-admin';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -92,9 +92,9 @@ function HotelInventoryContent() {
         setLoading(true);
         try {
             const [hotelData, roomsData, ratesData] = await Promise.all([
-                fetchAPI<HotelSummary>(`/property/hotels/${hotelId}`),
-                fetchAPI<RoomTypeRow[]>(`/property/hotels/${hotelId}/room-types`),
-                fetchAPI<RatePlanRow[]>(`/rates/plans/${hotelId}`),
+                fetchAPIAdmin<HotelSummary>(`/property/hotels/${hotelId}`),
+                fetchAPIAdmin<RoomTypeRow[]>(`/property/hotels/${hotelId}/room-types`),
+                fetchAPIAdmin<RatePlanRow[]>(`/rates/plans/${hotelId}`),
             ]);
             setHotel(hotelData);
             setRoomTypes(roomsData);
@@ -120,7 +120,7 @@ function HotelInventoryContent() {
                 ? `/property/room-types/${roomFormData.id}` 
                 : `/property/hotels/${hotelId}/room-types`;
             
-            await fetchAPI(url, {
+            await fetchAPIAdmin(url, {
                 method,
                 body: JSON.stringify(roomFormData)
             });
@@ -144,7 +144,7 @@ function HotelInventoryContent() {
                 ? `/rates/plans/${ratePlanFormData.id}` 
                 : `/rates/plans`;
             
-            await fetchAPI(url, {
+            await fetchAPIAdmin(url, {
                 method,
                 body: JSON.stringify({
                     ...ratePlanFormData,
@@ -163,7 +163,7 @@ function HotelInventoryContent() {
     const handleDeleteRatePlan = async (id: string) => {
         if (!confirm("¿Estás seguro de eliminar este plan? Se perderán todos los precios asociados.")) return;
         try {
-            await fetchAPI(`/rates/plans/${id}`, { method: 'DELETE' });
+            await fetchAPIAdmin(`/rates/plans/${id}`, { method: 'DELETE' });
             loadAllData();
         } catch (e) {
             alert("Error al eliminar plan de tarifas");
@@ -176,7 +176,7 @@ function HotelInventoryContent() {
             return;
         }
         try {
-            const res = await fetchAPI('/rates/prices/bulk', {
+            const res = await fetchAPIAdmin('/rates/prices/bulk', {
                 method: 'POST',
                 body: JSON.stringify({
                     hotelId,
@@ -327,7 +327,7 @@ function HotelInventoryContent() {
                                                 <Button variant="ghost" size="icon-sm" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={async () => {
                                                     if (confirm(`¿Estás seguro de que quieres eliminar la categoría "${type.name}"?`)) {
                                                         try {
-                                                            await fetchAPI(`/property/room-types/${type.id}`, { method: 'DELETE' });
+                                                            await fetchAPIAdmin(`/property/room-types/${type.id}`, { method: 'DELETE' });
                                                             loadAllData();
                                                         } catch (e) {
                                                             alert("Error al eliminar la categoría");

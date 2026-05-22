@@ -17,23 +17,33 @@ import { cn } from '@/lib/utils';
 
 interface SidebarNavProps {
     userRole?: string;
+    restaurantId?: string | null;
+    hotelId?: string | null;
 }
 
-function SidebarNav({ userRole }: SidebarNavProps) {
+function SidebarNav({ userRole, restaurantId, hotelId }: SidebarNavProps) {
     const pathname = usePathname();
     const searchParams = useSearchParams();
     const queryString = searchParams.toString();
 
-    const navItems: { href: string; label: string; icon: LucideIcon; permission: Permission }[] = [
-        { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, permission: 'view_dashboard' },
-        { href: '/admin/calendar', label: 'Calendario y reservas', icon: Calendar, permission: 'view_calendar' },
-        { href: '/admin/occupancy', label: 'Planning de ocupación', icon: Building2, permission: 'view_occupancy' },
-        { href: '/admin/restaurant', label: 'Restaurante', icon: Utensils, permission: 'manage_restaurant' },
-        { href: '/admin/hotels', label: 'Hoteles', icon: Building2, permission: 'manage_hotels' },
-        { href: '/admin/events', label: 'Eventos', icon: PartyPopper, permission: 'manage_events' },
+    // Scope: si el user pertenece solo a un restaurante, ocultamos hoteles/ocupación.
+    //        si pertenece solo a un hotel, ocultamos la sección de restaurante (a menos que el hotel
+    //        tenga restaurante vinculado, en cuyo caso lo gestionamos desde la página del hotel).
+    //        si no tiene scope (global), mostramos todo.
+    const hasRestaurantScope = !!restaurantId;
+    const hasHotelScope = !!hotelId;
+    const isGlobal = !hasRestaurantScope && !hasHotelScope;
+
+    const navItems: { href: string; label: string; icon: LucideIcon; permission: Permission; visibleInScope: boolean }[] = [
+        { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, permission: 'view_dashboard', visibleInScope: true },
+        { href: '/admin/calendar', label: 'Calendario y reservas', icon: Calendar, permission: 'view_calendar', visibleInScope: true },
+        { href: '/admin/occupancy', label: 'Planning de ocupación', icon: Building2, permission: 'view_occupancy', visibleInScope: isGlobal || hasHotelScope },
+        { href: '/admin/restaurant', label: 'Restaurante', icon: Utensils, permission: 'manage_restaurant', visibleInScope: isGlobal || hasRestaurantScope },
+        { href: '/admin/hotels', label: 'Hoteles', icon: Building2, permission: 'manage_hotels', visibleInScope: isGlobal || hasHotelScope },
+        { href: '/admin/events', label: 'Eventos', icon: PartyPopper, permission: 'manage_events', visibleInScope: true },
     ];
 
-    const visibleItems = navItems.filter(item => hasPermission(userRole, item.permission));
+    const visibleItems = navItems.filter(item => item.visibleInScope && hasPermission(userRole, item.permission));
 
     return (
         <nav className="flex-1 overflow-y-auto px-3 py-4">
@@ -77,7 +87,7 @@ function SidebarNav({ userRole }: SidebarNavProps) {
     );
 }
 
-export function Sidebar({ userRole }: { userRole?: string }) {
+export function Sidebar({ userRole, restaurantId, hotelId }: { userRole?: string; restaurantId?: string | null; hotelId?: string | null }) {
     const effectiveRole = userRole || 'ADMIN';
 
     return (
@@ -96,7 +106,7 @@ export function Sidebar({ userRole }: { userRole?: string }) {
             </div>
 
             <Suspense fallback={<div className="flex-1 p-4 text-xs text-muted-foreground">Cargando…</div>}>
-                <SidebarNav userRole={effectiveRole} />
+                <SidebarNav userRole={effectiveRole} restaurantId={restaurantId} hotelId={hotelId} />
             </Suspense>
 
             <div className="p-3 border-t border-sidebar-border">

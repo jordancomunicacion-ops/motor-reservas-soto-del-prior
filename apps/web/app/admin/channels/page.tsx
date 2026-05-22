@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from 'react';
-import { fetchAPI } from '@/lib/api';
+import { fetchAPIAdmin } from '@/lib/api-admin';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -51,7 +51,7 @@ export default function ChannelWizard() {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        fetchAPI<Hotel[]>('/property/hotels')
+        fetchAPIAdmin<Hotel[]>('/property/hotels')
             .then(list => {
                 setHotels(list || []);
                 if (list && list.length > 0) setSelectedHotel(list[0].id);
@@ -62,7 +62,7 @@ export default function ChannelWizard() {
     const loadRoomTypes = useCallback(async (hotelId: string) => {
         if (!hotelId) return;
         try {
-            const res = await fetchAPI<RoomType[]>(`/property/hotels/${hotelId}/room-types`);
+            const res = await fetchAPIAdmin<RoomType[]>(`/property/hotels/${hotelId}/room-types`);
             setRoomTypes(res || []);
         } catch {
             setRoomTypes([]);
@@ -71,7 +71,7 @@ export default function ChannelWizard() {
 
     const loadFeeds = useCallback(async () => {
         try {
-            const all = await fetchAPI<Feed[]>('/channels/feeds');
+            const all = await fetchAPIAdmin<Feed[]>('/channels/feeds');
             setFeeds((all || []).filter(f => !selectedHotel || f.roomType.hotelId === selectedHotel));
         } catch {
             setFeeds([]);
@@ -80,7 +80,7 @@ export default function ChannelWizard() {
 
     const loadLogs = useCallback(async () => {
         try {
-            const res = await fetchAPI<SyncLog[]>('/channels/logs?limit=10');
+            const res = await fetchAPIAdmin<SyncLog[]>('/channels/logs?limit=10');
             setLogs(res || []);
         } catch {
             setLogs([]);
@@ -100,12 +100,12 @@ export default function ChannelWizard() {
         setError(null);
         try {
             // 1) Validar URL contra el origen antes de guardar
-            await fetchAPI('/channels/feeds/validate', {
+            await fetchAPIAdmin('/channels/feeds/validate', {
                 method: 'POST',
                 body: JSON.stringify({ url: icalUrl })
             });
             // 2) Crear feed
-            await fetchAPI('/channels/feeds', {
+            await fetchAPIAdmin('/channels/feeds', {
                 method: 'POST',
                 body: JSON.stringify({
                     roomTypeId: selectedRoomType,
@@ -127,7 +127,7 @@ export default function ChannelWizard() {
     async function handleSyncAll() {
         setLoading(true);
         try {
-            await fetchAPI('/channels/sync', { method: 'POST' });
+            await fetchAPIAdmin('/channels/sync', { method: 'POST' });
             await loadFeeds();
             await loadLogs();
         } finally {
@@ -138,7 +138,7 @@ export default function ChannelWizard() {
     async function handleSyncFeed(feedId: string) {
         setSyncingFeed(feedId);
         try {
-            const res = await fetchAPI<SyncResult>(`/channels/feeds/${feedId}/sync`, { method: 'POST' });
+            const res = await fetchAPIAdmin<SyncResult>(`/channels/feeds/${feedId}/sync`, { method: 'POST' });
             await loadFeeds();
             await loadLogs();
             if (res.error) {
@@ -157,7 +157,7 @@ export default function ChannelWizard() {
     async function handleDeleteFeed(feedId: string) {
         if (!confirm('¿Eliminar este canal? No se borrarán las reservas ya importadas.')) return;
         try {
-            await fetchAPI(`/channels/feeds/${feedId}`, { method: 'DELETE' });
+            await fetchAPIAdmin(`/channels/feeds/${feedId}`, { method: 'DELETE' });
             await loadFeeds();
         } catch (e) {
             const msg = e instanceof Error ? e.message : 'Error desconocido';

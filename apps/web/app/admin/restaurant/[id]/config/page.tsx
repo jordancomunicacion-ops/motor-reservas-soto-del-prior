@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, Suspense } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { fetchAPI } from '@/lib/api';
+import { fetchAPIAdmin } from '@/lib/api-admin';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -110,7 +110,7 @@ function RestaurantConfigContent() {
 
     async function loadRestaurant() {
         try {
-            const data = await fetchAPI<RestaurantDetail>(`/restaurant/${restaurantId}`);
+            const data = await fetchAPIAdmin<RestaurantDetail>(`/restaurant/${restaurantId}`);
             setRestaurant(data);
             setFormData({
                 name: data.name || '',
@@ -133,7 +133,7 @@ function RestaurantConfigContent() {
 
     async function loadHotels() {
         try {
-            const data = await fetchAPI<HotelOption[]>('/property/hotels');
+            const data = await fetchAPIAdmin<HotelOption[]>('/property/hotels');
             setHotels(data);
         } catch (e) {
             console.error(e);
@@ -149,7 +149,7 @@ function RestaurantConfigContent() {
 
         setSaving(true);
         try {
-            await fetchAPI(`/restaurant/${restaurantId}`, {
+            await fetchAPIAdmin(`/restaurant/${restaurantId}`, {
                 method: 'PATCH',
                 body: JSON.stringify({
                     name: formData.name,
@@ -179,7 +179,7 @@ function RestaurantConfigContent() {
         if (!confirm) return;
 
         try {
-            await fetchAPI(`/restaurant/${restaurantId}`, {
+            await fetchAPIAdmin(`/restaurant/${restaurantId}`, {
                 method: 'DELETE'
             });
             alert('Restaurante eliminado correctamente');
@@ -196,7 +196,7 @@ function RestaurantConfigContent() {
 
         setSendingTest(true);
         try {
-            await fetchAPI('/mail/test', {
+            await fetchAPIAdmin('/mail/test', {
                 method: 'POST',
                 body: JSON.stringify({
                     to: email,

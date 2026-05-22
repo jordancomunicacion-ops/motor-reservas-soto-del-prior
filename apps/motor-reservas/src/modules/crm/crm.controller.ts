@@ -52,55 +52,47 @@ export class CrmController {
         return { success: true, event: body.event };
     }
 
-    @Roles('ADMIN')
     @Get('profiles')
     async getProfiles(@Req() req: AuthenticatedRequest, @Query('page') page: number = 1) {
         return this.crmService.getProfiles(Number(page), 50, req?.user);
     }
 
     // CRM Configuration Endpoints
-    @Roles('ADMIN')
     @Post('setup-hotel/:hotelId')
     async setupHotelCrm(@Param('hotelId') hotelId: string, @Body() config: any, @Req() req: AuthenticatedRequest) {
         await ensureHotelAccess(req?.user, this.prisma, hotelId);
         return this.crmConfigService.setupHotelCrm(hotelId, config);
     }
 
-    @Roles('ADMIN')
     @Post('setup-restaurant/:restaurantId')
     async setupRestaurantCrm(@Param('restaurantId') restaurantId: string, @Body() config: any, @Req() req: AuthenticatedRequest) {
         await ensureRestaurantAccess(req?.user, this.prisma, restaurantId);
         return this.crmConfigService.setupRestaurantCrm(restaurantId, config);
     }
 
-    @Roles('ADMIN')
     @Get('config/hotel/:hotelId')
     async getHotelConfig(@Param('hotelId') hotelId: string, @Req() req: AuthenticatedRequest) {
         await ensureHotelAccess(req?.user, this.prisma, hotelId);
         return this.crmConfigService.getCrmConfig(hotelId);
     }
 
-    @Roles('ADMIN')
     @Get('config/restaurant/:restaurantId')
     async getRestaurantConfig(@Param('restaurantId') restaurantId: string, @Req() req: AuthenticatedRequest) {
         await ensureRestaurantAccess(req?.user, this.prisma, restaurantId);
         return this.crmConfigService.getCrmConfig(undefined, restaurantId);
     }
 
-    @Roles('ADMIN')
     @Post('test-connection')
     async testConnection(@Body() body: { url: string; token?: string }) {
         return this.crmConfigService.testConnection(body.url, body.token);
     }
 
-    @Roles('ADMIN')
     @Post('disable-hotel/:hotelId')
     async disableHotelCrm(@Param('hotelId') hotelId: string, @Req() req: AuthenticatedRequest) {
         await ensureHotelAccess(req?.user, this.prisma, hotelId);
         return this.crmConfigService.disableCrm(hotelId);
     }
 
-    @Roles('ADMIN')
     @Post('disable-restaurant/:restaurantId')
     async disableRestaurantCrm(@Param('restaurantId') restaurantId: string, @Req() req: AuthenticatedRequest) {
         await ensureRestaurantAccess(req?.user, this.prisma, restaurantId);

@@ -23,7 +23,6 @@ export class RatesController {
         return plan.hotelId;
     }
 
-    @Roles('ADMIN')
     @Get('plans/:hotelId')
     async getRatePlans(@Param('hotelId') hotelId: string, @Req() req: AuthenticatedRequest) {
         await ensureHotelAccess(req?.user, this.prisma, hotelId);
@@ -47,7 +46,6 @@ export class RatesController {
         return plans;
     }
 
-    @Roles('ADMIN')
     @Post('plans')
     async createRatePlan(@Body() body: any, @Req() req: AuthenticatedRequest) {
         if (body?.hotelId) {
@@ -56,7 +54,6 @@ export class RatesController {
         return this.prisma.ratePlan.create({ data: body });
     }
 
-    @Roles('ADMIN')
     @Patch('plans/:id')
     async updateRatePlan(@Param('id') id: string, @Body() body: any, @Req() req: AuthenticatedRequest) {
         await ensureHotelAccess(req?.user, this.prisma, await this.hotelIdForRatePlan(id));
@@ -67,7 +64,6 @@ export class RatesController {
         });
     }
 
-    @Roles('ADMIN')
     @Delete('plans/:id')
     async deleteRatePlan(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
         await ensureHotelAccess(req?.user, this.prisma, await this.hotelIdForRatePlan(id));
@@ -77,7 +73,6 @@ export class RatesController {
     }
 
     // Bulk Update Prices
-    @Roles('ADMIN')
     @Post('prices/bulk')
     @HttpCode(200)
     async updatePrices(@Req() req: AuthenticatedRequest, @Body() body: {

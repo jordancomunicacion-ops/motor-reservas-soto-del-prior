@@ -8,7 +8,6 @@ import { CreateEventDto, UpdateEventDto, CreateEventBookingDto } from './event.d
 export class EventController {
   constructor(private readonly eventService: EventService) {}
 
-  @Roles('ADMIN')
   @Post()
   create(@Body() createEventDto: CreateEventDto) {
     return this.eventService.create({
@@ -32,7 +31,6 @@ export class EventController {
     return this.eventService.findOne(id);
   }
 
-  @Roles('ADMIN')
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateEventDto: UpdateEventDto) {
     const payload: any = { ...updateEventDto };
@@ -40,7 +38,6 @@ export class EventController {
     return this.eventService.update(id, payload);
   }
 
-  @Roles('ADMIN')
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.eventService.remove(id);
@@ -52,7 +49,6 @@ export class EventController {
     return this.eventService.createBooking(id, bookingData);
   }
 
-  @Roles('ADMIN')
   @Delete(':eventId/bookings/:bookingId')
   cancelBooking(
     @Param('eventId') eventId: string,

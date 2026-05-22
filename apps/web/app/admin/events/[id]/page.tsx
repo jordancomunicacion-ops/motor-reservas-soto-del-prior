@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { fetchAPI } from '@/lib/api';
+import { fetchAPIAdmin } from '@/lib/api-admin';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -68,7 +68,7 @@ export default function EventDetailPage() {
     async function loadEvent() {
         setLoading(true);
         try {
-            const data = await fetchAPI<EventDetail>(`/event/${params.id}`);
+            const data = await fetchAPIAdmin<EventDetail>(`/event/${params.id}`);
             setEvent(data);
         } catch (e) {
             console.error(e);
@@ -81,7 +81,7 @@ export default function EventDetailPage() {
         if (!event) return;
         if (!confirm('¿Cancelar esta reserva? El cliente liberará su plaza.')) return;
         try {
-            await fetchAPI(`/event/${event.id}/bookings/${bookingId}`, { method: 'DELETE' });
+            await fetchAPIAdmin(`/event/${event.id}/bookings/${bookingId}`, { method: 'DELETE' });
             loadEvent();
         } catch (e) {
             console.error(e);
@@ -101,7 +101,7 @@ export default function EventDetailPage() {
         }
         setSavingManual(true);
         try {
-            await fetchAPI(`/event/${event.id}/bookings`, {
+            await fetchAPIAdmin(`/event/${event.id}/bookings`, {
                 method: 'POST',
                 body: JSON.stringify({
                     guestName: manualForm.guestName.trim(),

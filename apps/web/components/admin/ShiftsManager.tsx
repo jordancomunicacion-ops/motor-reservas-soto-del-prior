@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { fetchAPI } from '@/lib/api';
+import { fetchAPIAdmin } from '@/lib/api-admin';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -101,7 +101,7 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
 
     async function loadShifts() {
         try {
-            const data = await fetchAPI(`/restaurant/${restaurantId}/shifts`);
+            const data = await fetchAPIAdmin(`/restaurant/${restaurantId}/shifts`);
             setShifts(data);
         } catch (e) {
             console.error(e);
@@ -112,7 +112,7 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
 
     async function loadClosures() {
         try {
-            const data = await fetchAPI(`/restaurant/${restaurantId}/closures`);
+            const data = await fetchAPIAdmin(`/restaurant/${restaurantId}/closures`);
             setClosures(data);
         } catch (e) {
             console.error(e);
@@ -121,7 +121,7 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
 
     async function loadOpenings() {
         try {
-            const data = await fetchAPI(`/restaurant/${restaurantId}/openings`);
+            const data = await fetchAPIAdmin(`/restaurant/${restaurantId}/openings`);
             setOpenings(data);
         } catch (e) {
             console.error(e);
@@ -132,7 +132,7 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
         if (!newShift.name) return alert('El nombre del turno es obligatorio');
 
         try {
-            const result = await fetchAPI(`/restaurant/${restaurantId}/shifts`, {
+            const result = await fetchAPIAdmin(`/restaurant/${restaurantId}/shifts`, {
                 method: 'POST',
                 body: JSON.stringify({
                     ...newShift,
@@ -162,7 +162,7 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
         if (!confirm('¿Estás seguro de que quieres eliminar este turno?')) return;
 
         try {
-            await fetchAPI(`/restaurant/${restaurantId}/shifts/${id}`, {
+            await fetchAPIAdmin(`/restaurant/${restaurantId}/shifts/${id}`, {
                 method: 'DELETE'
             });
             loadShifts();
@@ -183,7 +183,7 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
                 endDate: closureType === 'PERIOD' ? newClosure.endDate : undefined
             };
 
-            await fetchAPI(`/restaurant/${restaurantId}/closures`, {
+            await fetchAPIAdmin(`/restaurant/${restaurantId}/closures`, {
                 method: 'POST',
                 body: JSON.stringify(payload)
             });
@@ -199,7 +199,7 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
         if (!confirm('¿Estás seguro de que quieres eliminar este cierre?')) return;
 
         try {
-            await fetchAPI(`/restaurant/${restaurantId}/closures/${id}`, {
+            await fetchAPIAdmin(`/restaurant/${restaurantId}/closures/${id}`, {
                 method: 'DELETE'
             });
             loadClosures();
@@ -225,7 +225,7 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
                 customShifts: newOpening.customShifts,
             };
 
-            await fetchAPI(`/restaurant/${restaurantId}/openings`, {
+            await fetchAPIAdmin(`/restaurant/${restaurantId}/openings`, {
                 method: 'POST',
                 body: JSON.stringify(payload)
             });
@@ -255,7 +255,7 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
         if (!confirm('¿Estás seguro de que quieres eliminar esta apertura?')) return;
 
         try {
-            await fetchAPI(`/restaurant/${restaurantId}/openings/${id}`, {
+            await fetchAPIAdmin(`/restaurant/${restaurantId}/openings/${id}`, {
                 method: 'DELETE'
             });
             loadOpenings();

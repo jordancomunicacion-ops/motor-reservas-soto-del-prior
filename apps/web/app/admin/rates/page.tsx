@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from 'react';
-import { fetchAPI } from '@/lib/api';
+import { fetchAPIAdmin } from '@/lib/api-admin';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -32,7 +32,7 @@ export default function RatesPage() {
     });
 
     useEffect(() => {
-        fetchAPI<Hotel[]>('property/hotels').then(data => {
+        fetchAPIAdmin<Hotel[]>('property/hotels').then(data => {
             setHotels(data);
             if (data.length > 0) setSelectedHotelId(data[0].id);
         });
@@ -40,13 +40,13 @@ export default function RatesPage() {
 
     useEffect(() => {
         if (!selectedHotelId) return;
-        fetchAPI<RatePlan[]>(`rates/plans/${selectedHotelId}`).then(setRatePlans);
-        fetchAPI<RoomType[]>(`property/hotels/${selectedHotelId}/room-types`).then(setRoomTypes);
+        fetchAPIAdmin<RatePlan[]>(`rates/plans/${selectedHotelId}`).then(setRatePlans);
+        fetchAPIAdmin<RoomType[]>(`property/hotels/${selectedHotelId}/room-types`).then(setRoomTypes);
     }, [selectedHotelId]);
 
     const handleBulkUpdate = async () => {
         try {
-            await fetchAPI('rates/prices/bulk', {
+            await fetchAPIAdmin('rates/prices/bulk', {
                 method: 'POST',
                 body: JSON.stringify({
                     hotelId: selectedHotelId,

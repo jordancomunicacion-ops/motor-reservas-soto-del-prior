@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { ExternalLink, Loader2, MessageSquareQuote } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { fetchAPI } from '@/lib/api';
+import { fetchAPIAdmin } from '@/lib/api-admin';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Stars } from '@/components/admin/ReviewsPanel';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -55,7 +55,7 @@ export default function HotelReviewsPanel({ endpoint, headerBanner }: HotelRevie
     useEffect(() => {
         let aborted = false;
         setLoading(true);
-        fetchAPI<HotelReviewsResponse>(endpoint)
+        fetchAPIAdmin<HotelReviewsResponse>(endpoint)
             .then(d => { if (!aborted) setData(d); })
             .catch(e => console.error(e))
             .finally(() => { if (!aborted) setLoading(false); });

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, Suspense } from 'react';
-import { fetchAPI } from '@/lib/api';
+import { fetchAPIAdmin } from '@/lib/api-admin';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -46,7 +46,7 @@ function BookingsList() {
             const endpoint = contextType === 'hotel'
                 ? `/bookings/${contextId}`
                 : `/restaurant/${contextId}/bookings?date=${new Date().toISOString().split('T')[0]}`;
-            const res = await fetchAPI<BookingRow[]>(endpoint);
+            const res = await fetchAPIAdmin<BookingRow[]>(endpoint);
             setBookings(Array.isArray(res) ? res : []);
         } catch (e) {
             console.error(e);

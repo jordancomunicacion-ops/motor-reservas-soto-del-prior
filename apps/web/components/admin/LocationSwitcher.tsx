@@ -4,7 +4,7 @@ import { Building2, Utensils, ChevronsUpDown, Check, Plus, Loader2 } from 'lucid
 import { useState, useEffect, Suspense, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { fetchAPI } from '@/lib/api';
+import { fetchAPIAdmin } from '@/lib/api-admin';
 import { cn } from '@/lib/utils';
 
 type ContextItem = { id: string; name: string; restaurantId?: string | null };
@@ -45,7 +45,7 @@ function LocationSwitcherContent() {
     async function loadContexts() {
         setLoading(true);
         try {
-            const data = await fetchAPI<{ hotels?: ContextItem[]; restaurants?: ContextItem[] }>('/global/contexts');
+            const data = await fetchAPIAdmin<{ hotels?: ContextItem[]; restaurants?: ContextItem[] }>('/global/contexts');
             if (data && typeof data === 'object') {
                 const hList = Array.isArray(data.hotels) ? data.hotels : [];
                 const rList = Array.isArray(data.restaurants) ? data.restaurants : [];

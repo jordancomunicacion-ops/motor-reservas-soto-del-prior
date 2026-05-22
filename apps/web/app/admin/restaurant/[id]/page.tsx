@@ -12,7 +12,7 @@ import TablePlan from '@/components/restaurant/TablePlan';
 import WaitlistPanel from '@/components/restaurant/WaitlistPanel';
 import ReservationForm from '@/components/restaurant/ReservationForm';
 import GuestProfileSheet from '@/components/restaurant/GuestProfileSheet';
-import { fetchAPI } from '@/lib/api';
+import { fetchAPIAdmin } from '@/lib/api-admin';
 import { DateSelector } from '@/components/admin/DateSelector';
 import { formatTimeInTz } from '@/lib/timezone';
 
@@ -51,10 +51,10 @@ function RestaurantDashboardContent() {
         setLoading(true);
         try {
             const [tablesRes, bookingsRes, waitlistRes, restRes] = await Promise.all([
-                fetchAPI<ZoneWithTables[]>(`/restaurant/${restaurantId}/tables?date=${format(date, 'yyyy-MM-dd')}`),
-                fetchAPI<RestaurantBooking[]>(`/restaurant/${restaurantId}/bookings?date=${format(date, 'yyyy-MM-dd')}`),
-                fetchAPI<WaitlistEntry[]>(`/restaurant/${restaurantId}/waitlist`),
-                fetchAPI<{ name?: string; timezone?: string }>(`/restaurant/${restaurantId}`).catch(() => ({ name: 'Restaurante' })),
+                fetchAPIAdmin<ZoneWithTables[]>(`/restaurant/${restaurantId}/tables?date=${format(date, 'yyyy-MM-dd')}`),
+                fetchAPIAdmin<RestaurantBooking[]>(`/restaurant/${restaurantId}/bookings?date=${format(date, 'yyyy-MM-dd')}`),
+                fetchAPIAdmin<WaitlistEntry[]>(`/restaurant/${restaurantId}/waitlist`),
+                fetchAPIAdmin<{ name?: string; timezone?: string }>(`/restaurant/${restaurantId}`).catch(() => ({ name: 'Restaurante' })),
             ]);
 
             if (Array.isArray(tablesRes)) {
@@ -79,9 +79,9 @@ function RestaurantDashboardContent() {
     const handleCreateBooking = async (data: ReservationFormPayload) => {
         try {
             if (editingBooking?.id) {
-                await fetchAPI(`/restaurant/bookings/${editingBooking.id}`, { method: 'PATCH', body: JSON.stringify(data) });
+                await fetchAPIAdmin(`/restaurant/bookings/${editingBooking.id}`, { method: 'PATCH', body: JSON.stringify(data) });
             } else {
-                await fetchAPI(`/restaurant/bookings`, { method: 'POST', body: JSON.stringify({ ...data, restaurantId }) });
+                await fetchAPIAdmin(`/restaurant/bookings`, { method: 'POST', body: JSON.stringify({ ...data, restaurantId }) });
             }
             setEditingBooking(null);
             loadData();
@@ -108,7 +108,7 @@ function RestaurantDashboardContent() {
 
     const handleStatusChange = async (bookingId: string, status: string) => {
         try {
-            await fetchAPI(`/restaurant/reservation/${bookingId}/status`, {
+            await fetchAPIAdmin(`/restaurant/reservation/${bookingId}/status`, {
                 method: 'PATCH',
                 body: JSON.stringify({ status }),
             });
@@ -118,7 +118,7 @@ function RestaurantDashboardContent() {
 
     const handleAddWaitlist = async (data: WaitlistFormPayload) => {
         try {
-            await fetchAPI(`/restaurant/${restaurantId}/waitlist`, {
+            await fetchAPIAdmin(`/restaurant/${restaurantId}/waitlist`, {
                 method: 'POST',
                 body: JSON.stringify({ ...data, date: format(date, 'yyyy-MM-dd') }),
             });
@@ -131,7 +131,7 @@ function RestaurantDashboardContent() {
 
     const handleSeatWaitlist = async (waitlistId: string) => {
         try {
-            await fetchAPI(`/restaurant/waitlist/${waitlistId}/confirm`, { method: 'POST' });
+            await fetchAPIAdmin(`/restaurant/waitlist/${waitlistId}/confirm`, { method: 'POST' });
             loadData();
         } catch {
             alert("Error al sentar cliente");
@@ -140,7 +140,7 @@ function RestaurantDashboardContent() {
 
     const handleAssignTable = async (bookingId: string, tableId: string) => {
         try {
-            await fetchAPI(`/restaurant/reservation/${bookingId}/status`, {
+            await fetchAPIAdmin(`/restaurant/reservation/${bookingId}/status`, {
                 method: 'PATCH',
                 body: JSON.stringify({ tableId, status: 'CONFIRMED' }),
             });
@@ -243,9 +243,10 @@ function RestaurantDashboardContent() {
             </div>
 
             <ReservationForm
-                isOpen={isFormOpen}
+                isOpen={isFormOpen || !!editingBooking}
                 onClose={closeForm}
                 onSubmit={handleCreateBooking}
+                onCancel={async (bookingId) => { await handleStatusChange(bookingId, 'CANCELLED'); }}
                 initialDate={date}
                 initialBooking={editingBooking}
                 timezone={restaurant?.timezone}

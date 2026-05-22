@@ -17,7 +17,7 @@ import {
     Link as LinkIcon,
     Loader2,
 } from "lucide-react";
-import { fetchAPI } from "@/lib/api";
+import { fetchAPIAdmin } from "@/lib/api-admin";
 import TablePlan, { type TableUpdates } from "./TablePlan";
 import { cn } from "@/lib/utils";
 
@@ -59,7 +59,7 @@ export default function TablePlanEditor({ restaurantId }: { restaurantId: string
     async function loadData() {
         setLoading(true);
         try {
-            const data = await fetchAPI<Zone[]>(`/restaurant/${restaurantId}/tables`);
+            const data = await fetchAPIAdmin<Zone[]>(`/restaurant/${restaurantId}/tables`);
             if (Array.isArray(data)) {
                 setZones(data);
                 if (data.length > 0 && !activeZoneId) {
@@ -81,7 +81,7 @@ export default function TablePlanEditor({ restaurantId }: { restaurantId: string
         if (!name) return;
 
         try {
-            const newZone = await fetchAPI<Zone>(`/restaurant/zones`, {
+            const newZone = await fetchAPIAdmin<Zone>(`/restaurant/zones`, {
                 method: 'POST',
                 body: JSON.stringify({ restaurantId, name }),
             });
@@ -160,7 +160,7 @@ export default function TablePlanEditor({ restaurantId }: { restaurantId: string
                 type SavedTable = Table & {
                     metadata?: { contiguousTableIds?: string[] } | null;
                 };
-                const savedTables = await fetchAPI<SavedTable[]>(`/restaurant/zones/${zone.id}/tables/sync`, {
+                const savedTables = await fetchAPIAdmin<SavedTable[]>(`/restaurant/zones/${zone.id}/tables/sync`, {
                     method: 'POST',
                     body: JSON.stringify(tablesToSync),
                 });
@@ -310,7 +310,10 @@ export default function TablePlanEditor({ restaurantId }: { restaurantId: string
                                                 type="number"
                                                 className="h-10 tabular-nums"
                                                 value={selectedTable.maxPax || selectedTable.capacity}
-                                                onChange={e => handleUpdateTable(selectedTable.id, { maxPax: parseInt(e.target.value) || selectedTable.capacity })}
+                                                onChange={e => {
+                                                    const v = parseInt(e.target.value) || selectedTable.capacity;
+                                                    handleUpdateTable(selectedTable.id, { maxPax: v, capacity: v });
+                                                }}
                                             />
                                         </div>
                                     </div>

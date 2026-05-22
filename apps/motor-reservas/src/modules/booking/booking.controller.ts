@@ -13,7 +13,6 @@ export class BookingController {
         private readonly reviewService: HotelReviewService,
     ) { }
 
-    @Roles('ADMIN')
     @Post()
     createBooking(@Body() body: CreateHotelBookingDto) {
         return this.bookingService.createBooking(body);
@@ -58,13 +57,11 @@ export class BookingController {
         }
     }
 
-    @Roles('ADMIN')
     @Get('hotel/:hotelId/reviews')
     listHotelReviews(@Param('hotelId') hotelId: string, @Req() req: AuthenticatedRequest) {
         return this.reviewService.listReviewsForHotel(hotelId, req?.user);
     }
 
-    @Roles('ADMIN')
     @Get(':hotelId')
     getBookings(@Param('hotelId') hotelId: string) {
         return this.bookingService.getBookings(hotelId);

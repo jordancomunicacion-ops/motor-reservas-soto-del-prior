@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { fetchAPI } from '@/lib/api';
+import { fetchAPIAdmin } from '@/lib/api-admin';
 import { Sparkles, Copy, Check, ExternalLink, CreditCard, Users, Loader2 } from 'lucide-react';
 
 interface WidgetConfigSectionProps {
@@ -39,7 +39,7 @@ export function WidgetConfigSection({ entityId, type }: WidgetConfigSectionProps
 
     async function loadConfig() {
         try {
-            const data = await fetchAPI(`/config/${entityId}`);
+            const data = await fetchAPIAdmin(`/config/${entityId}`);
             if (data) {
                 setConfig({
                     primaryColor: data.primaryColor || '#C59D5F',
@@ -65,7 +65,7 @@ export function WidgetConfigSection({ entityId, type }: WidgetConfigSectionProps
     async function saveConfig() {
         setSaving(true);
         try {
-            await fetchAPI(`/config/${entityId}`, {
+            await fetchAPIAdmin(`/config/${entityId}`, {
                 method: 'POST',
                 body: JSON.stringify(config)
             });

@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { PageHeader } from '@/components/ui/page-header';
-import { fetchAPI } from '@/lib/api';
+import { fetchAPIAdmin } from '@/lib/api-admin';
 import { Check, Copy, Info } from 'lucide-react';
 
 const HOTEL_ID = "DEMO-HOTEL-ID";
@@ -23,7 +23,7 @@ export default function WidgetConfigPage() {
     async function saveConfig() {
         setSaving(true);
         try {
-            await fetchAPI(`/config/${HOTEL_ID}`, {
+            await fetchAPIAdmin(`/config/${HOTEL_ID}`, {
                 method: 'POST',
                 body: JSON.stringify(config),
             });

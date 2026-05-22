@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { fetchAPI } from '@/lib/api';
+import { fetchAPIAdmin } from '@/lib/api-admin';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -56,11 +56,11 @@ export default function EventConfigPage() {
 
     useEffect(() => {
         if (formData.restaurantId) {
-            fetchAPI<ZoneSummary[]>(`/restaurant/${formData.restaurantId}/zones`)
+            fetchAPIAdmin<ZoneSummary[]>(`/restaurant/${formData.restaurantId}/zones`)
                 .then(setAvailableZones)
                 .catch(() => setAvailableZones([]));
         } else if (formData.hotelId) {
-            fetchAPI<ZoneSummary[]>(`/property/hotels/${formData.hotelId}/zones`)
+            fetchAPIAdmin<ZoneSummary[]>(`/property/hotels/${formData.hotelId}/zones`)
                 .then(setAvailableZones)
                 .catch(() => setAvailableZones([]));
         } else {
@@ -78,9 +78,9 @@ export default function EventConfigPage() {
         setLoading(true);
         try {
             const [event, hotelsData, restaurantsData] = await Promise.all([
-                fetchAPI<EventDetail | EventDetail[]>(`/event/${params.id}`),
-                fetchAPI<HotelSummary[]>('/property/hotels'),
-                fetchAPI<RestaurantSummary[]>('/restaurant'),
+                fetchAPIAdmin<EventDetail | EventDetail[]>(`/event/${params.id}`),
+                fetchAPIAdmin<HotelSummary[]>('/property/hotels'),
+                fetchAPIAdmin<RestaurantSummary[]>('/restaurant'),
             ]).catch(err => {
                 console.error('Error in Promise.all loadData:', err);
                 return [null, [], []] as const;
@@ -133,7 +133,7 @@ export default function EventConfigPage() {
         }
         setSaving(true);
         try {
-            await fetchAPI(`/event/${params.id}`, {
+            await fetchAPIAdmin(`/event/${params.id}`, {
                 method: 'PATCH',
                 body: JSON.stringify({
                     ...formData,
@@ -152,7 +152,7 @@ export default function EventConfigPage() {
     async function handleDelete() {
         if (!confirm('¿Estás seguro de que quieres eliminar este evento?')) return;
         try {
-            await fetchAPI(`/event/${params.id}`, {
+            await fetchAPIAdmin(`/event/${params.id}`, {
                 method: 'DELETE'
             });
             router.push('/admin/events');

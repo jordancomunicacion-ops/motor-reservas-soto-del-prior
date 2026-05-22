@@ -8,14 +8,12 @@ import type { AuthenticatedRequest } from '../../common/scope';
 export class ChannelManagerController {
     constructor(private readonly channelService: ChannelManagerService) { }
 
-    @Roles('ADMIN')
     @Post('sync')
     async forceSync() {
         await this.channelService.syncAllFeeds();
         return { status: 'Sync started' };
     }
 
-    @Roles('ADMIN')
     @Get('export/:roomTypeId/calendar.ics')
     async exportICal(@Param('roomTypeId') roomTypeId: string, @Res() res: Response) {
         const ics = await this.channelService.generateICal(roomTypeId);
@@ -24,13 +22,11 @@ export class ChannelManagerController {
         res.send(ics);
     }
 
-    @Roles('ADMIN')
     @Get('feeds')
     async getFeeds(@Req() req: AuthenticatedRequest) {
         return this.channelService.getFeeds(req?.user);
     }
 
-    @Roles('ADMIN')
     @Post('feeds')
     async createFeed(
         @Req() req: AuthenticatedRequest,
@@ -39,25 +35,21 @@ export class ChannelManagerController {
         return this.channelService.createFeed(body, req?.user);
     }
 
-    @Roles('ADMIN')
     @Post('feeds/validate')
     async validateFeed(@Body() body: { url: string }) {
         return this.channelService.validateICalUrl(body.url);
     }
 
-    @Roles('ADMIN')
     @Post('feeds/:id/sync')
     async syncFeed(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
         return this.channelService.syncFeed(id, req?.user);
     }
 
-    @Roles('ADMIN')
     @Delete('feeds/:id')
     async deleteFeed(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
         return this.channelService.deleteFeed(id, req?.user);
     }
 
-    @Roles('ADMIN')
     @Get('logs')
     async getLogs(
         @Req() req: AuthenticatedRequest,

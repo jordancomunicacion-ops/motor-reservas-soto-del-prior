@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState, useMemo, Suspense } from 'react';
-import { fetchAPI } from '@/lib/api';
+import { fetchAPIAdmin } from '@/lib/api-admin';
 import type {
     ZoneWithTables,
     TableWithZone,
@@ -96,6 +96,7 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
     const [selectedBookingForProfile, setSelectedBookingForProfile] = useState<GuestBookingProfile | null>(null);
+    const [editingBooking, setEditingBooking] = useState<GuestBookingProfile | null>(null);
     const [restaurantTz, setRestaurantTz] = useState<string | undefined>(undefined);
 
     const loadData = async () => {
@@ -103,10 +104,10 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
         setLoading(true);
         try {
             const [tablesRes, bookingsRes, waitlistRes, restRes] = await Promise.all([
-                fetchAPI<ZoneWithTables[]>(`/restaurant/${contextId}/tables?date=${format(date, 'yyyy-MM-dd')}`),
-                fetchAPI<RestaurantBooking[]>(`/restaurant/${contextId}/bookings?date=${format(date, 'yyyy-MM-dd')}`),
-                fetchAPI<WaitlistEntry[]>(`/restaurant/${contextId}/waitlist`),
-                fetchAPI<{ timezone?: string }>(`/restaurant/${contextId}`).catch(() => ({} as { timezone?: string })),
+                fetchAPIAdmin<ZoneWithTables[]>(`/restaurant/${contextId}/tables?date=${format(date, 'yyyy-MM-dd')}`),
+                fetchAPIAdmin<RestaurantBooking[]>(`/restaurant/${contextId}/bookings?date=${format(date, 'yyyy-MM-dd')}`),
+                fetchAPIAdmin<WaitlistEntry[]>(`/restaurant/${contextId}/waitlist`),
+                fetchAPIAdmin<{ timezone?: string }>(`/restaurant/${contextId}`).catch(() => ({} as { timezone?: string })),
             ]);
 
             if (Array.isArray(tablesRes)) {
@@ -128,7 +129,7 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
 
     const handleStatusChange = async (bookingId: string, status: string) => {
         try {
-            await fetchAPI(`/restaurant/reservation/${bookingId}/status`, {
+            await fetchAPIAdmin(`/restaurant/reservation/${bookingId}/status`, {
                 method: 'PATCH',
                 body: JSON.stringify({ status }),
             });
@@ -148,7 +149,7 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
 
     const handleAssignTable = async (bookingId: string, tableId: string) => {
         try {
-            await fetchAPI(`/restaurant/reservation/${bookingId}/status`, {
+            await fetchAPIAdmin(`/restaurant/reservation/${bookingId}/status`, {
                 method: 'PATCH',
                 body: JSON.stringify({ tableId, status: 'CONFIRMED' }),
             });
@@ -271,7 +272,7 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
                                     zones={zones}
                                     onStatusChange={handleStatusChange}
                                     onAssignTable={handleAssignTable}
-                                    onEdit={() => { }}
+                                    onEdit={(b) => setEditingBooking(b as unknown as GuestBookingProfile)}
                                     onSelectProfile={(b) => setSelectedBookingForProfile(b)}
                                     timezone={restaurantTz}
                                 />
@@ -288,18 +289,28 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
             </div>
 
             <ReservationForm
-                isOpen={isFormOpen}
-                onClose={() => setIsFormOpen(false)}
+                isOpen={isFormOpen || !!editingBooking}
+                onClose={() => { setIsFormOpen(false); setEditingBooking(null); }}
                 onSubmit={async (data) => {
                     try {
-                        await fetchAPI('/restaurant/bookings', {
-                            method: 'POST',
-                            body: JSON.stringify({ ...data, restaurantId: contextId }),
-                        });
+                        if (editingBooking?.id) {
+                            await fetchAPIAdmin(`/restaurant/bookings/${editingBooking.id}`, {
+                                method: 'PATCH',
+                                body: JSON.stringify(data),
+                            });
+                        } else {
+                            await fetchAPIAdmin('/restaurant/bookings', {
+                                method: 'POST',
+                                body: JSON.stringify({ ...data, restaurantId: contextId }),
+                            });
+                        }
+                        setEditingBooking(null);
                         loadData();
-                    } catch (e) { console.error("Error creating reservation", e); }
+                    } catch (e) { console.error("Error saving reservation", e); }
                 }}
+                onCancel={async (bookingId) => { await handleStatusChange(bookingId, 'CANCELLED'); }}
                 initialDate={date}
+                initialBooking={editingBooking}
                 initialTableId={selectedTableId}
                 timezone={restaurantTz}
             />
@@ -479,8 +490,8 @@ function CalendarContent() {
         setLoading(true);
         try {
             const [rtData, bookingsData] = await Promise.all([
-                fetchAPI<RoomType[]>(`/property/hotels/${contextId}/room-types`),
-                fetchAPI<HotelBooking[]>(`/bookings/${contextId}`),
+                fetchAPIAdmin<RoomType[]>(`/property/hotels/${contextId}/room-types`),
+                fetchAPIAdmin<HotelBooking[]>(`/bookings/${contextId}`),
             ]);
             setRoomTypes(rtData || []);
             setBookings(bookingsData || []);
@@ -506,7 +517,7 @@ function CalendarContent() {
     const [contexts, setContexts] = useState<GlobalContexts>({ hotels: [], restaurants: [] });
 
     useEffect(() => {
-        fetchAPI<GlobalContexts>('/global/contexts').then(setContexts).catch(console.error);
+        fetchAPIAdmin<GlobalContexts>('/global/contexts').then(setContexts).catch(console.error);
     }, []);
 
     const switchContext = (type: string) => {

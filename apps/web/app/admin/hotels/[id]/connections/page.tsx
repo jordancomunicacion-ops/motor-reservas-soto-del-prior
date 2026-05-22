@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, Suspense } from 'react';
 import { useParams } from 'next/navigation';
-import { fetchAPI } from '@/lib/api';
+import { fetchAPIAdmin } from '@/lib/api-admin';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -74,7 +74,7 @@ function HotelConnectionsContent() {
 
     async function loadHotel() {
         try {
-            const data = await fetchAPI<HotelWithIntegrations>(`/property/hotels/${hotelId}`);
+            const data = await fetchAPIAdmin<HotelWithIntegrations>(`/property/hotels/${hotelId}`);
             setHotel(data);
             if (data.integrations) {
                 setIntegrations(prev => ({ ...prev, ...data.integrations }));
@@ -88,7 +88,7 @@ function HotelConnectionsContent() {
 
     async function loadConfig() {
         try {
-            const data = await fetchAPI<WidgetConfigResponse>(`/config/${hotelId}`);
+            const data = await fetchAPIAdmin<WidgetConfigResponse>(`/config/${hotelId}`);
             if (data) {
                 setConfig({
                     primaryColor: data.primaryColor || '#C59D5F',
@@ -112,12 +112,12 @@ function HotelConnectionsContent() {
     async function handleSave() {
         setSaving(true);
         try {
-            await fetchAPI(`/property/hotels/${hotelId}`, {
+            await fetchAPIAdmin(`/property/hotels/${hotelId}`, {
                 method: 'PATCH',
                 body: JSON.stringify({ integrations })
             });
 
-            await fetchAPI(`/config/${hotelId}`, {
+            await fetchAPIAdmin(`/config/${hotelId}`, {
                 method: 'POST',
                 body: JSON.stringify(config)
             });

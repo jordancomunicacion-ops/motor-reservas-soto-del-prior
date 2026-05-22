@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, Suspense } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { fetchAPI } from '@/lib/api';
+import { fetchAPIAdmin } from '@/lib/api-admin';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -116,7 +116,7 @@ function HotelConfigContent() {
 
     async function loadHotel() {
         try {
-            const data = await fetchAPI<HotelDetail>(`/property/hotels/${hotelId}`);
+            const data = await fetchAPIAdmin<HotelDetail>(`/property/hotels/${hotelId}`);
             setHotel(data);
             setFormData({
                 name: data.name || '',
@@ -151,7 +151,7 @@ function HotelConfigContent() {
 
     async function loadRestaurants() {
         try {
-            const data = await fetchAPI<RestaurantOption[]>('/restaurant');
+            const data = await fetchAPIAdmin<RestaurantOption[]>('/restaurant');
             setRestaurants(data);
         } catch (e) {
             console.error(e);
@@ -167,7 +167,7 @@ function HotelConfigContent() {
 
         setSaving(true);
         try {
-            await fetchAPI(`/property/hotels/${hotelId}`, {
+            await fetchAPIAdmin(`/property/hotels/${hotelId}`, {
                 method: 'PATCH',
                 body: JSON.stringify({
                     name: formData.name,
@@ -201,7 +201,7 @@ function HotelConfigContent() {
         if (!confirm) return;
 
         try {
-            await fetchAPI(`/property/hotels/${hotelId}`, {
+            await fetchAPIAdmin(`/property/hotels/${hotelId}`, {
                 method: 'DELETE'
             });
             alert('Hotel eliminado correctamente');
@@ -218,7 +218,7 @@ function HotelConfigContent() {
 
         setSendingTest(true);
         try {
-            await fetchAPI('/mail/test', {
+            await fetchAPIAdmin('/mail/test', {
                 method: 'POST',
                 body: JSON.stringify({
                     to: email,

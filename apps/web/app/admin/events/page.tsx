@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { fetchAPI } from '@/lib/api';
+import { fetchAPIAdmin } from '@/lib/api-admin';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -79,10 +79,10 @@ export default function EventsListPage() {
         async function fetchZones() {
             try {
                 if (formData.restaurantId) {
-                    const data = await fetchAPI<ZoneSummary[]>(`/restaurant/${formData.restaurantId}/zones`);
+                    const data = await fetchAPIAdmin<ZoneSummary[]>(`/restaurant/${formData.restaurantId}/zones`);
                     setAvailableZones(data);
                 } else if (formData.hotelId) {
-                    const data = await fetchAPI<ZoneSummary[]>(`/property/hotels/${formData.hotelId}/zones`);
+                    const data = await fetchAPIAdmin<ZoneSummary[]>(`/property/hotels/${formData.hotelId}/zones`);
                     setAvailableZones(data);
                 } else {
                     setAvailableZones([]);
@@ -102,8 +102,8 @@ export default function EventsListPage() {
     async function loadEstablishments() {
         try {
             const [hotelsData, restaurantsData] = await Promise.all([
-                fetchAPI<HotelSummary[]>('/property/hotels'),
-                fetchAPI<RestaurantSummary[]>('/restaurant'),
+                fetchAPIAdmin<HotelSummary[]>('/property/hotels'),
+                fetchAPIAdmin<RestaurantSummary[]>('/restaurant'),
             ]);
             setHotels(Array.isArray(hotelsData) ? hotelsData : []);
             setRestaurants(Array.isArray(restaurantsData) ? restaurantsData : []);
@@ -115,7 +115,7 @@ export default function EventsListPage() {
     async function loadEvents() {
         setLoading(true);
         try {
-            const data = await fetchAPI<EventSummary[]>('/event');
+            const data = await fetchAPIAdmin<EventSummary[]>('/event');
             if (Array.isArray(data)) setEvents(data);
         } catch (e) {
             console.error(e);
@@ -164,7 +164,7 @@ export default function EventsListPage() {
         }
         setCreating(true);
         try {
-            await fetchAPI('/event', {
+            await fetchAPIAdmin('/event', {
                 method: 'POST',
                 body: JSON.stringify({
                     ...formData,

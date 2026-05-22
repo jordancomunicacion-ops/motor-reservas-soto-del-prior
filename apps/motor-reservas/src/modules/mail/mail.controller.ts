@@ -6,7 +6,6 @@ import { Roles } from '../../auth/roles.decorator';
 export class MailController {
     constructor(private readonly mailService: MailService) {}
 
-    @Roles('ADMIN')
     @Post('test')
     async sendTest(@Body() body: {
         to: string,
@@ -21,7 +20,6 @@ export class MailController {
         return { success: true, message: 'Email enviado correctamente', messageId: result.messageId };
     }
 
-    @Roles('ADMIN')
     @Post('test-connection')
     async testConnection(@Body() body: {
         host: string;
@@ -33,7 +31,6 @@ export class MailController {
         return await this.mailService.verifyConnection(body);
     }
 
-    @Roles('ADMIN')
     @Post('test-graph')
     async testGraph(@Body() body: {
         tenantId: string;
