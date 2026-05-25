@@ -1,10 +1,10 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Users, RotateCw, Armchair, LayoutGrid, Link as LinkIcon, MessageSquare, GlassWater, UserCheck, FileText, LogOut, UserCircle, Cake } from "lucide-react";
+import { Users, RotateCw, Armchair, LayoutGrid, Link as LinkIcon, MessageSquare, GlassWater, UserCheck, FileText, LogOut, UserCircle, Cake, Maximize2, Minus, Plus as PlusIcon } from "lucide-react";
 import type { BookingOnTable, TableNodeData, ZoneWithTables } from '@/types/restaurant';
 import type { GuestBookingProfile } from './GuestProfileSheet';
 import { formatTimeInTz } from '@/lib/timezone';
@@ -319,6 +319,9 @@ export default function TablePlan({
     const router = useRouter();
     const [activeZone, setActiveZone] = useState(activeZoneId || zones[0]?.id || "");
     const [scale, setScale] = useState(1);
+    const [autoFit, setAutoFit] = useState(true);
+    const viewportRef = useRef<HTMLDivElement>(null);
+    const pinchRef = useRef<{ dist: number; scale: number } | null>(null);
 
     useEffect(() => {
         if (activeZoneId && activeZoneId !== activeZone) {
@@ -335,10 +338,81 @@ export default function TablePlan({
     const handleZoneChange = (id: string) => {
         setActiveZone(id);
         onActiveZoneChange?.(id);
+        setAutoFit(true); // refit cuando cambia de área
     };
 
     // Filter tables by active zone
-    const activeTables = tables.filter(t => t.zoneId === activeZone);
+    const activeTables = useMemo(() => tables.filter(t => t.zoneId === activeZone), [tables, activeZone]);
+
+    // Bounding box del contenido (incluye rotación expandiendo de forma conservadora)
+    const bbox = useMemo(() => {
+        if (activeTables.length === 0) return { w: 800, h: 600 };
+        // Considerar rotación: usar el bounding box del cuadrado contenedor más grande.
+        let maxX = 0;
+        let maxY = 0;
+        activeTables.forEach(t => {
+            const w = t.width || 60;
+            const h = t.height || 60;
+            // Si la mesa está rotada, su huella visible puede ser más grande.
+            const r = ((t.rotation || 0) % 360) * Math.PI / 180;
+            const rotW = Math.abs(w * Math.cos(r)) + Math.abs(h * Math.sin(r));
+            const rotH = Math.abs(w * Math.sin(r)) + Math.abs(h * Math.cos(r));
+            maxX = Math.max(maxX, (t.x || 0) + rotW);
+            maxY = Math.max(maxY, (t.y || 0) + rotH);
+        });
+        // Mínimo razonable + margen para selección/handles
+        return { w: Math.max(maxX + 60, 400), h: Math.max(maxY + 60, 300) };
+    }, [activeTables]);
+
+    const fitToContainer = useCallback(() => {
+        const vp = viewportRef.current;
+        if (!vp) return;
+        const cw = vp.clientWidth - 16;
+        const ch = vp.clientHeight - 16;
+        if (cw <= 0 || ch <= 0) return;
+        const s = Math.min(cw / bbox.w, ch / bbox.h);
+        // Permitimos escalar por debajo de 1 todo lo necesario (hasta 0.2)
+        // y por encima sólo hasta 1 en auto-fit (evita pixelado innecesario).
+        setScale(Math.min(1, Math.max(0.2, s)));
+    }, [bbox.w, bbox.h]);
+
+    // Auto-fit inicial y al cambiar de área/tamaño del contenedor
+    useEffect(() => {
+        if (!autoFit) return;
+        fitToContainer();
+        const vp = viewportRef.current;
+        if (!vp || typeof ResizeObserver === 'undefined') return;
+        const ro = new ResizeObserver(() => {
+            if (autoFit) fitToContainer();
+        });
+        ro.observe(vp);
+        return () => ro.disconnect();
+    }, [autoFit, fitToContainer]);
+
+    const handleZoom = (delta: number) => {
+        setAutoFit(false);
+        setScale(s => Math.min(2.5, Math.max(0.2, +(s + delta).toFixed(2))));
+    };
+
+    // Pinch-to-zoom táctil
+    const handleTouchStart = (e: React.TouchEvent) => {
+        if (e.touches.length === 2) {
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            pinchRef.current = { dist: Math.hypot(dx, dy), scale };
+        }
+    };
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (e.touches.length === 2 && pinchRef.current) {
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            const dist = Math.hypot(dx, dy);
+            const factor = dist / pinchRef.current.dist;
+            setAutoFit(false);
+            setScale(Math.min(2.5, Math.max(0.2, pinchRef.current.scale * factor)));
+        }
+    };
+    const handleTouchEnd = () => { pinchRef.current = null; };
 
     // Cluster de la selección: si la mesa seleccionada está ocupada por una reserva
     // que también ocupa otras mesas (linkedTableIds), todas se resaltan juntas.
@@ -395,16 +469,17 @@ export default function TablePlan({
         );
     }
     return (
-        <div className={cn("flex flex-col h-full", className)}>
+        <div className={cn("flex flex-col h-full min-h-0", className)}>
             {/* Toolbar */}
             {!hideToolbar && (
-                <div className="flex justify-between items-center mb-4 p-2 bg-card border-b border-border sticky top-0 z-10">
-                    <div className="flex space-x-2 overflow-x-auto">
+                <div className="flex justify-between items-center gap-2 mb-2 p-2 bg-card border-b border-border sticky top-0 z-10 flex-wrap">
+                    <div className="flex gap-1.5 overflow-x-auto -mx-1 px-1 min-w-0">
                         {zones.map(z => (
                             <Button
                                 key={z.id}
                                 variant={activeZone === z.id ? "default" : "outline"}
                                 size="sm"
+                                className="shrink-0"
                                 onClick={() => handleZoneChange(z.id)}
                             >
                                 {z.name}
@@ -412,10 +487,23 @@ export default function TablePlan({
                         ))}
                     </div>
 
-                    <div className="flex items-center space-x-2">
-                        <Button variant="ghost" size="icon-sm" aria-label="Reducir zoom" onClick={() => setScale(Math.max(0.5, scale - 0.1))}>-</Button>
-                        <span className="text-[10px] font-semibold w-8 text-center tabular-nums">{Math.round(scale * 100)}%</span>
-                        <Button variant="ghost" size="icon-sm" aria-label="Aumentar zoom" onClick={() => setScale(Math.min(2, scale + 0.1))}>+</Button>
+                    <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="icon-sm" aria-label="Reducir zoom" onClick={() => handleZoom(-0.1)}>
+                            <Minus className="size-3.5" />
+                        </Button>
+                        <span className="text-[10px] font-semibold w-9 text-center tabular-nums">{Math.round(scale * 100)}%</span>
+                        <Button variant="ghost" size="icon-sm" aria-label="Aumentar zoom" onClick={() => handleZoom(0.1)}>
+                            <PlusIcon className="size-3.5" />
+                        </Button>
+                        <Button
+                            variant={autoFit ? "default" : "ghost"}
+                            size="icon-sm"
+                            aria-label="Ajustar a pantalla"
+                            title="Ajustar a pantalla"
+                            onClick={() => { setAutoFit(true); fitToContainer(); }}
+                        >
+                            <Maximize2 className="size-3.5" />
+                        </Button>
 
                         {/* Only show edit redirect if we are in service mode and have an ID.
                             Some hosts (e.g. /admin/occupancy) ocultan este atajo porque la configuración vive en otra sección. */}
@@ -425,10 +513,19 @@ export default function TablePlan({
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    className="gap-2 text-xs"
+                                    className="gap-2 text-xs hidden sm:inline-flex"
                                     onClick={() => router.push(`/admin/restaurant/${restaurantId}/plan`)}
                                 >
                                     <LayoutGrid className="size-3.5" /> Arquitecto
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="icon-sm"
+                                    className="sm:hidden"
+                                    aria-label="Arquitecto"
+                                    onClick={() => router.push(`/admin/restaurant/${restaurantId}/plan`)}
+                                >
+                                    <LayoutGrid className="size-3.5" />
                                 </Button>
                             </>
                         )}
@@ -436,41 +533,57 @@ export default function TablePlan({
                 </div>
             )}
 
-            {/* Canvas Area */}
+            {/* Canvas viewport (con scroll cuando el contenido excede el área visible) */}
             <div
-                className="flex-1 bg-muted/30 border border-border rounded-md relative overflow-hidden shadow-inner select-none"
+                ref={viewportRef}
+                className="flex-1 min-h-0 bg-muted/30 border border-border rounded-md relative overflow-auto shadow-inner select-none touch-pan-x touch-pan-y"
                 style={{
                     backgroundImage: 'radial-gradient(rgba(0,0,0,0.12) 1px, transparent 1px)',
                     backgroundSize: '20px 20px',
-                    minHeight: '600px'
                 }}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleCanvasDrop}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
             >
+                {/* Wrapper dimensionado para que los scrollbars reflejen el contenido escalado */}
                 <div
-                    className="absolute top-0 left-0 w-full h-full transition-transform origin-top-left"
-                    style={{ transform: `scale(${scale})` }}
+                    className="relative"
+                    style={{
+                        width: `${Math.max(bbox.w * scale, 1)}px`,
+                        height: `${Math.max(bbox.h * scale, 1)}px`,
+                    }}
                 >
-                    {activeTables.map(table => (
-                        <TableNode
-                            key={table.id}
-                            data={table}
-                            mode={mode}
-                            onUpdate={onTableUpdate}
-                            onDropReservation={(tid, bData) => onBookingMove(bData.id, tid)}
-                            onSelect={onTableSelect}
-                            onSelectProfile={onSelectProfile}
-                            isSelected={selectedTableId === table.id}
-                            isInSelectedCluster={selectedClusterIds.has(table.id)}
-                            timezone={timezone}
-                        />
-                    ))}
+                    <div
+                        className="absolute top-0 left-0 origin-top-left"
+                        style={{
+                            transform: `scale(${scale})`,
+                            width: `${bbox.w}px`,
+                            height: `${bbox.h}px`,
+                        }}
+                    >
+                        {activeTables.map(table => (
+                            <TableNode
+                                key={table.id}
+                                data={table}
+                                mode={mode}
+                                onUpdate={onTableUpdate}
+                                onDropReservation={(tid, bData) => onBookingMove(bData.id, tid)}
+                                onSelect={onTableSelect}
+                                onSelectProfile={onSelectProfile}
+                                isSelected={selectedTableId === table.id}
+                                isInSelectedCluster={selectedClusterIds.has(table.id)}
+                                timezone={timezone}
+                            />
+                        ))}
 
-                    {activeTables.length === 0 && (
-                        <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
-                            <p className="text-sm">No hay mesas en esta zona.</p>
-                        </div>
-                    )}
+                        {activeTables.length === 0 && (
+                            <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+                                <p className="text-sm">No hay mesas en esta zona.</p>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

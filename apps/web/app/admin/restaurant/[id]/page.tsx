@@ -4,7 +4,7 @@ import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, RefreshCw } from 'lucide-react';
+import { Plus, RefreshCw, PanelRightOpen, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -45,6 +45,7 @@ function RestaurantDashboardContent() {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingBooking, setEditingBooking] = useState<GuestBookingProfile | null>(null);
     const [selectedBookingForProfile, setSelectedBookingForProfile] = useState<GuestBookingProfile | null>(null);
+    const [sidePanelOpen, setSidePanelOpen] = useState(false);
 
     const loadData = async () => {
         if (!restaurantId) return;
@@ -152,74 +153,94 @@ function RestaurantDashboardContent() {
     const totalBookings = bookings.filter(b => b.status !== 'CANCELLED').length;
     const pendingTables = bookings.filter(b => !b.tableId);
 
+    const sidePanel = (
+        <>
+            <div className="flex-1 min-h-0">
+                <WaitlistPanel entries={waitlist} onAdd={handleAddWaitlist} onSeat={handleSeatWaitlist} />
+            </div>
+            <Card className="flex-1 min-h-0 overflow-hidden flex flex-col gap-0 py-0">
+                <div className="px-3 py-2.5 bg-warning/15 text-warning-foreground text-xs font-medium border-b border-warning/30">
+                    Pendientes de mesa ({pendingTables.length})
+                </div>
+                <CardContent className="p-0 flex-1 overflow-auto">
+                    <div className="divide-y divide-border/60">
+                        {pendingTables.map(b => (
+                            <div
+                                key={b.id}
+                                draggable
+                                onDragStart={(e) => e.dataTransfer.setData("bookingId", b.id)}
+                                className="p-3 text-sm hover:bg-accent/50 cursor-pointer transition-colors border-l-2 border-warning/60"
+                            >
+                                <div className="flex justify-between items-center">
+                                    <span className="font-medium tabular-nums">
+                                        {b.date ? formatTimeInTz(b.date, restaurant?.timezone, '—') : '—'}
+                                    </span>
+                                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                                        {b.pax} pax
+                                    </span>
+                                </div>
+                                <div className="truncate text-muted-foreground mt-0.5">{b.guestName}</div>
+                            </div>
+                        ))}
+                        {pendingTables.length === 0 && (
+                            <p className="text-xs text-muted-foreground text-center py-6 italic">
+                                No hay reservas pendientes.
+                            </p>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
+        </>
+    );
+
     return (
-        <div className="flex flex-col h-[calc(100vh-120px)] gap-4">
-            <div className="flex justify-between items-center rounded-lg border border-border bg-card px-4 py-3 gap-4 flex-wrap">
-                <div className="flex items-center gap-4 min-w-0">
-                    <h1 className="font-display text-xl font-medium tracking-tight truncate">
+        <div className="flex flex-col h-[calc(100dvh-140px)] sm:h-[calc(100dvh-120px)] gap-3 sm:gap-4 min-h-0">
+            <div className="flex justify-between items-center rounded-lg border border-border bg-card px-3 sm:px-4 py-2.5 sm:py-3 gap-2 sm:gap-4 flex-wrap">
+                <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+                    <h1 className="font-display text-base sm:text-xl font-medium tracking-tight truncate">
                         {restaurant?.name || <Skeleton className="h-6 w-32" />}
                     </h1>
                     <DateSelector date={date} onDateChange={setDate} />
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3">
                     <div className="hidden md:flex gap-4">
                         <Stat label="Reservas" value={totalBookings} />
                         <Stat label="Pax" value={totalPax} />
                     </div>
-                    <div className="h-6 w-px bg-border" />
-                    <Button onClick={() => setIsFormOpen(true)}>
-                        <Plus className="size-4" /> Nueva reserva
+                    <div className="h-6 w-px bg-border hidden md:block" />
+                    <Button onClick={() => setIsFormOpen(true)} size="sm" className="gap-1.5">
+                        <Plus className="size-4" />
+                        <span className="hidden sm:inline">Nueva reserva</span>
+                        <span className="sm:hidden">Nueva</span>
                     </Button>
                     <Button variant="outline" size="icon-sm" onClick={loadData} aria-label="Recargar">
                         <RefreshCw className={cn("size-3.5", loading && "animate-spin")} />
                     </Button>
+                    <Button
+                        variant="outline"
+                        size="icon-sm"
+                        className="lg:hidden relative"
+                        onClick={() => setSidePanelOpen(true)}
+                        aria-label="Abrir lista de espera y pendientes"
+                    >
+                        <PanelRightOpen className="size-3.5" />
+                        {(waitlist.length + pendingTables.length) > 0 && (
+                            <span className="absolute -top-1 -right-1 size-4 rounded-full bg-warning text-[9px] font-bold text-warning-foreground flex items-center justify-center tabular-nums">
+                                {waitlist.length + pendingTables.length}
+                            </span>
+                        )}
+                    </Button>
                 </div>
             </div>
 
-            <div className="flex-1 flex gap-4 overflow-hidden">
-                <aside className="w-80 hidden lg:flex flex-col gap-4">
-                    <div className="flex-1 h-1/2">
-                        <WaitlistPanel entries={waitlist} onAdd={handleAddWaitlist} onSeat={handleSeatWaitlist} />
-                    </div>
-                    <Card className="h-1/2 overflow-hidden flex flex-col gap-0 py-0">
-                        <div className="px-3 py-2.5 bg-warning/15 text-warning-foreground text-xs font-medium border-b border-warning/30">
-                            Pendientes de mesa ({pendingTables.length})
-                        </div>
-                        <CardContent className="p-0 flex-1 overflow-auto">
-                            <div className="divide-y divide-border/60">
-                                {pendingTables.map(b => {
-                                    return (
-                                        <div
-                                            key={b.id}
-                                            draggable
-                                            onDragStart={(e) => e.dataTransfer.setData("bookingId", b.id)}
-                                            className="p-3 text-sm hover:bg-accent/50 cursor-pointer transition-colors border-l-2 border-warning/60"
-                                        >
-                                            <div className="flex justify-between items-center">
-                                                <span className="font-medium tabular-nums">
-                                                    {b.date ? formatTimeInTz(b.date, restaurant?.timezone, '—') : '—'}
-                                                </span>
-                                                <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                                                    {b.pax} pax
-                                                </span>
-                                            </div>
-                                            <div className="truncate text-muted-foreground mt-0.5">{b.guestName}</div>
-                                        </div>
-                                    );
-                                })}
-                                {pendingTables.length === 0 && (
-                                    <p className="text-xs text-muted-foreground text-center py-6 italic">
-                                        No hay reservas pendientes.
-                                    </p>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
+            <div className="flex-1 flex gap-4 overflow-hidden min-h-0">
+                <aside className="w-80 hidden lg:flex flex-col gap-4 min-h-0">
+                    {sidePanel}
                 </aside>
 
-                <main className="flex-1 flex flex-col rounded-lg border border-border bg-card overflow-hidden">
-                    <div className="flex-1 overflow-hidden relative">
+                <main className="flex-1 min-w-0 flex flex-col rounded-lg border border-border bg-card overflow-hidden">
+                    <div className="flex-1 overflow-hidden relative min-h-0">
                         {view === 'ACCESS' ? (
                             <div className="h-full overflow-auto p-6">
                                 <AccessManager contextId={restaurantId} contextType="restaurant" />
@@ -241,6 +262,24 @@ function RestaurantDashboardContent() {
                     </div>
                 </main>
             </div>
+
+            {/* Drawer móvil/tablet con waitlist y pendientes */}
+            {sidePanelOpen && (
+                <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
+                    <div className="absolute inset-0 bg-black/50" onClick={() => setSidePanelOpen(false)} />
+                    <div className="absolute right-0 top-0 bottom-0 w-[min(92vw,360px)] bg-background border-l border-border flex flex-col p-3 gap-3 shadow-2xl animate-in slide-in-from-right duration-200">
+                        <div className="flex items-center justify-between">
+                            <span className="font-display text-base font-medium">Servicio</span>
+                            <Button variant="ghost" size="icon-sm" onClick={() => setSidePanelOpen(false)} aria-label="Cerrar">
+                                <X className="size-4" />
+                            </Button>
+                        </div>
+                        <div className="flex-1 flex flex-col gap-3 min-h-0">
+                            {sidePanel}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <ReservationForm
                 isOpen={isFormOpen || !!editingBooking}

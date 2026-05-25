@@ -22,7 +22,7 @@ function RestaurantPlanContent() {
     }, [restaurantId]);
 
     return (
-        <div className="flex flex-col h-[calc(100vh-120px)] space-y-4">
+        <div className="flex flex-col h-[calc(100dvh-140px)] sm:h-[calc(100dvh-120px)] space-y-3 sm:space-y-4 min-h-0">
             <PageHeader
                 eyebrow="Restaurante"
                 title={`Plano de mesas · ${restaurant?.name ?? ''}`}
