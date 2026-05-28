@@ -26,6 +26,7 @@ export const authConfig = {
             }
             if (session.user) {
                 if (token.role) session.user.role = token.role as string;
+                session.user.permissions = (token.permissions as string | null | undefined) ?? null;
                 session.user.restaurantId = (token.restaurantId as string | null | undefined) ?? null;
                 session.user.hotelId = (token.hotelId as string | null | undefined) ?? null;
             }
@@ -40,6 +41,7 @@ export const authConfig = {
         async jwt({ token, user }) {
             if (user) {
                 token.role = user.role;
+                token.permissions = (user as { permissions?: string | null }).permissions ?? null;
                 token.restaurantId = (user as { restaurantId?: string | null }).restaurantId ?? null;
                 token.hotelId = (user as { hotelId?: string | null }).hotelId ?? null;
                 const t = (user as { accessToken?: string }).accessToken;

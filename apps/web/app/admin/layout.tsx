@@ -9,12 +9,13 @@ export default async function AdminLayout({
 }) {
     const session = await auth();
     const userRole = session?.user?.role;
+    const userPermissions = session?.user?.permissions ?? null;
     const restaurantId = session?.user?.restaurantId ?? null;
     const hotelId = session?.user?.hotelId ?? null;
 
     return (
         <div data-theme="admin-dark" className="min-h-screen bg-background text-foreground">
-            <Sidebar userRole={userRole} restaurantId={restaurantId} hotelId={hotelId} />
+            <Sidebar userRole={userRole} userPermissions={userPermissions} restaurantId={restaurantId} hotelId={hotelId} />
             <div className="flex flex-col md:pl-60">
                 <header className="sticky top-0 z-20 flex h-[64px] items-center gap-3 border-b border-border bg-background/80 backdrop-blur-md px-5 sm:px-6">
                     <LocationSwitcher />

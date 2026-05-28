@@ -17,11 +17,12 @@ import { cn } from '@/lib/utils';
 
 interface SidebarNavProps {
     userRole?: string;
+    userPermissions?: string | null;
     restaurantId?: string | null;
     hotelId?: string | null;
 }
 
-function SidebarNav({ userRole, restaurantId, hotelId }: SidebarNavProps) {
+function SidebarNav({ userRole, userPermissions, restaurantId, hotelId }: SidebarNavProps) {
     const pathname = usePathname();
     const searchParams = useSearchParams();
     const queryString = searchParams.toString();
@@ -43,7 +44,7 @@ function SidebarNav({ userRole, restaurantId, hotelId }: SidebarNavProps) {
         { href: '/admin/events', label: 'Eventos', icon: PartyPopper, permission: 'manage_events', visibleInScope: true },
     ];
 
-    const visibleItems = navItems.filter(item => item.visibleInScope && hasPermission(userRole, item.permission));
+    const visibleItems = navItems.filter(item => item.visibleInScope && hasPermission(userRole, item.permission, userPermissions));
 
     return (
         <nav className="flex-1 overflow-y-auto px-3 py-4">
@@ -87,7 +88,7 @@ function SidebarNav({ userRole, restaurantId, hotelId }: SidebarNavProps) {
     );
 }
 
-export function Sidebar({ userRole, restaurantId, hotelId }: { userRole?: string; restaurantId?: string | null; hotelId?: string | null }) {
+export function Sidebar({ userRole, userPermissions, restaurantId, hotelId }: { userRole?: string; userPermissions?: string | null; restaurantId?: string | null; hotelId?: string | null }) {
     const effectiveRole = userRole || 'ADMIN';
 
     return (
@@ -106,7 +107,7 @@ export function Sidebar({ userRole, restaurantId, hotelId }: { userRole?: string
             </div>
 
             <Suspense fallback={<div className="flex-1 p-4 text-xs text-muted-foreground">Cargando…</div>}>
-                <SidebarNav userRole={effectiveRole} restaurantId={restaurantId} hotelId={hotelId} />
+                <SidebarNav userRole={effectiveRole} userPermissions={userPermissions} restaurantId={restaurantId} hotelId={hotelId} />
             </Suspense>
 
             <div className="p-3 border-t border-sidebar-border">
