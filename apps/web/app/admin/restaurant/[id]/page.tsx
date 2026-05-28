@@ -4,11 +4,12 @@ import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, RefreshCw, PanelRightOpen, X } from 'lucide-react';
+import { Plus, RefreshCw, PanelRightOpen, X, LayoutGrid, List } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 import TablePlan from '@/components/restaurant/TablePlan';
+import ReservationList from '@/components/restaurant/ReservationList';
 import WaitlistPanel from '@/components/restaurant/WaitlistPanel';
 import ReservationForm from '@/components/restaurant/ReservationForm';
 import GuestProfileSheet from '@/components/restaurant/GuestProfileSheet';
@@ -17,7 +18,6 @@ import { DateSelector } from '@/components/admin/DateSelector';
 import { formatTimeInTz } from '@/lib/timezone';
 
 import AccessManager from '@/components/admin/AccessManager';
-import { useAdminSession } from '@/components/admin/AdminSessionContext';
 import type {
     ZoneWithTables,
     TableWithZone,
@@ -32,11 +32,9 @@ import type { TableUpdates } from '@/components/restaurant/TablePlan';
 function RestaurantDashboardContent() {
     const params = useParams();
     const restaurantId = params.id as string;
-    const { can } = useAdminSession();
-    const canManageRestaurant = can('manage_restaurant');
 
     const [date, setDate] = useState(new Date());
-    const [view] = useState<'PLAN' | 'ACCESS'>('PLAN');
+    const [view, setView] = useState<'PLAN' | 'LIST' | 'ACCESS'>('PLAN');
     const [loading, setLoading] = useState(false);
 
     const [zones, setZones] = useState<ZoneWithTables[]>([]);
@@ -243,18 +241,44 @@ function RestaurantDashboardContent() {
                 </aside>
 
                 <main className="flex-1 min-w-0 flex flex-col rounded-lg border border-border bg-card overflow-hidden">
+                    {view !== 'ACCESS' && (
+                        <div className="border-b border-border px-4 py-2 flex justify-between items-center bg-muted/30">
+                            <div className="inline-flex rounded-md border border-border p-0.5 bg-background">
+                                {([
+                                    { value: 'PLAN', label: 'Plano', icon: LayoutGrid },
+                                    { value: 'LIST', label: 'Lista', icon: List },
+                                ] as const).map(({ value: v, label, icon: Icon }) => (
+                                    <button
+                                        key={v}
+                                        type="button"
+                                        onClick={() => setView(v)}
+                                        className={cn(
+                                            "inline-flex items-center gap-2 px-3 h-8 rounded text-xs font-medium transition-colors",
+                                            view === v
+                                                ? "bg-primary text-primary-foreground"
+                                                : "text-muted-foreground hover:text-foreground",
+                                        )}
+                                    >
+                                        <Icon className="size-3.5" />
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                     <div className="flex-1 overflow-hidden relative min-h-0">
-                        {view === 'ACCESS' ? (
+                        {view === 'ACCESS' && (
                             <div className="h-full overflow-auto p-6">
                                 <AccessManager contextId={restaurantId} contextType="restaurant" />
                             </div>
-                        ) : (
+                        )}
+                        {view === 'PLAN' && (
                             <TablePlan
                                 zones={zones}
                                 tables={rawTables}
                                 restaurantId={restaurantId}
                                 mode="SERVICE"
-                                hideArchitectButton={!canManageRestaurant}
+                                hideArchitectButton
                                 onTableUpdate={handleUpdateTable}
                                 onBookingMove={handleAssignTable}
                                 onSelectProfile={(b) => setSelectedBookingForProfile(b)}
@@ -262,6 +286,19 @@ function RestaurantDashboardContent() {
                                 className="h-full w-full"
                                 timezone={restaurant?.timezone}
                             />
+                        )}
+                        {view === 'LIST' && (
+                            <div className="h-full overflow-auto p-4">
+                                <ReservationList
+                                    bookings={bookings}
+                                    zones={zones}
+                                    onStatusChange={handleStatusChange}
+                                    onAssignTable={handleAssignTable}
+                                    onEdit={(b) => setEditingBooking(b as unknown as GuestBookingProfile)}
+                                    onSelectProfile={(b) => setSelectedBookingForProfile(b)}
+                                    timezone={restaurant?.timezone}
+                                />
+                            </div>
                         )}
                     </div>
                 </main>
