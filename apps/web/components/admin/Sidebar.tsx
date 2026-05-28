@@ -35,10 +35,19 @@ function SidebarNav({ userRole, userPermissions, restaurantId, hotelId }: Sideba
     const hasHotelScope = !!hotelId;
     const isGlobal = !hasRestaurantScope && !hasHotelScope;
 
-    const navItems: { href: string; label: string; icon: LucideIcon; permission: Permission; visibleInScope: boolean }[] = [
+    // Para Planning de ocupación, precomputamos el href con ?context=...&id=...
+    // según el scope del usuario, así un STAFF de restaurante entra directo a su
+    // restaurante (Plano/Lista/Valoraciones) en lugar del empty state global.
+    const occupancyHref = hasRestaurantScope
+        ? `/admin/occupancy?context=restaurant&id=${restaurantId}`
+        : hasHotelScope
+            ? `/admin/occupancy?context=hotel&id=${hotelId}`
+            : '/admin/occupancy';
+
+    const navItems: { href: string; label: string; icon: LucideIcon; permission: Permission; visibleInScope: boolean; preserveQuery?: boolean }[] = [
         { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, permission: 'view_dashboard', visibleInScope: true },
         { href: '/admin/calendar', label: 'Calendario y reservas', icon: Calendar, permission: 'view_calendar', visibleInScope: true },
-        { href: '/admin/occupancy', label: 'Planning de ocupación', icon: Building2, permission: 'view_occupancy', visibleInScope: isGlobal || hasHotelScope },
+        { href: occupancyHref, label: 'Planning de ocupación', icon: Building2, permission: 'view_occupancy', visibleInScope: true, preserveQuery: false },
         { href: '/admin/restaurant', label: 'Restaurante', icon: Utensils, permission: 'manage_restaurant', visibleInScope: isGlobal || hasRestaurantScope },
         { href: '/admin/hotels', label: 'Hoteles', icon: Building2, permission: 'manage_hotels', visibleInScope: isGlobal || hasHotelScope },
         { href: '/admin/events', label: 'Eventos', icon: PartyPopper, permission: 'manage_events', visibleInScope: true },
@@ -58,8 +67,12 @@ function SidebarNav({ userRole, userPermissions, restaurantId, hotelId }: Sideba
             </div>
             <ul className="space-y-px">
                 {visibleItems.map((item) => {
-                    const isActive = pathname === item.href;
-                    const href = queryString ? `${item.href}?${queryString}` : item.href;
+                    const itemPath = item.href.split('?')[0];
+                    const isActive = pathname === itemPath;
+                    const preserveQuery = item.preserveQuery !== false;
+                    const href = preserveQuery && queryString && !item.href.includes('?')
+                        ? `${item.href}?${queryString}`
+                        : item.href;
                     return (
                         <li key={item.href} className="relative">
                             {isActive && (
