@@ -12,14 +12,17 @@ import { Users, Mail, ShieldCheck, Trash2, Settings2, CheckCircle2, Lock, Pencil
 import { cn } from '@/lib/utils';
 import { fetchAPIAdmin } from '@/lib/api-admin';
 
-// Definición de permisos disponibles sincronizados con el Menú Principal
+// IMPORTANTE: cada permiso desbloquea un item del menú lateral. Mantener
+// labels y orden alineados 1:1 con `navItems` en `components/admin/Sidebar.tsx`.
+// La descripción dice explícitamente a qué menú da acceso para evitar
+// confusiones al asignar perfiles.
 const AVAILABLE_PERMISSIONS = [
-    { id: 'view_dashboard', label: 'Dashboard', description: 'Acceso al panel de control y resumen' },
-    { id: 'view_calendar', label: 'Calendario y Reservas', description: 'Permite ver y gestionar el listado y calendario' },
-    { id: 'view_occupancy', label: 'Planning de Ocupación', description: 'Acceso al plano de sala y gestión de mesas' },
-    { id: 'manage_restaurant', label: 'Restaurante', description: 'Acceso a la configuración y gestión del restaurante' },
-    { id: 'manage_hotels', label: 'Hoteles', description: 'Acceso a la gestión de inventario y tarifas de hotel' },
-    { id: 'manage_events', label: 'Eventos', description: 'Acceso a la creación y gestión de eventos' },
+    { id: 'view_dashboard', label: 'Dashboard', description: 'Menú "Dashboard": panel de control y resumen general.' },
+    { id: 'view_calendar', label: 'Calendario y reservas', description: 'Menú "Calendario y reservas": listado y agenda de todas las reservas.' },
+    { id: 'view_occupancy', label: 'Planning de ocupación', description: 'Menú "Planning de ocupación": pestañas Plano, Lista y Valoraciones.' },
+    { id: 'manage_restaurant', label: 'Restaurante', description: 'Menú "Restaurante": configuración, conexiones y Arquitecto de Sala.' },
+    { id: 'manage_hotels', label: 'Hoteles', description: 'Menú "Hoteles": inventario, tarifas y conexiones del hotel.' },
+    { id: 'manage_events', label: 'Eventos', description: 'Menú "Eventos": creación y gestión de eventos especiales.' },
 ];
 
 const BASE_ROLES = [
