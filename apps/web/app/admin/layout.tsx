@@ -1,5 +1,6 @@
 import { Sidebar } from "@/components/admin/Sidebar";
 import { LocationSwitcher } from "@/components/admin/LocationSwitcher";
+import { AdminSessionProvider } from "@/components/admin/AdminSessionContext";
 import { auth } from "@/auth";
 
 export default async function AdminLayout({
@@ -21,7 +22,14 @@ export default async function AdminLayout({
                     <LocationSwitcher />
                 </header>
                 <main className="flex flex-1 flex-col gap-6 p-5 sm:p-6 lg:p-8 max-w-[1600px] w-full">
-                    {children}
+                    <AdminSessionProvider
+                        role={userRole}
+                        permissions={userPermissions}
+                        restaurantId={restaurantId}
+                        hotelId={hotelId}
+                    >
+                        {children}
+                    </AdminSessionProvider>
                 </main>
             </div>
         </div>

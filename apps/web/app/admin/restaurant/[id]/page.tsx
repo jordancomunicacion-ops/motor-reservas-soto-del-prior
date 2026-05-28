@@ -17,6 +17,7 @@ import { DateSelector } from '@/components/admin/DateSelector';
 import { formatTimeInTz } from '@/lib/timezone';
 
 import AccessManager from '@/components/admin/AccessManager';
+import { useAdminSession } from '@/components/admin/AdminSessionContext';
 import type {
     ZoneWithTables,
     TableWithZone,
@@ -31,6 +32,8 @@ import type { TableUpdates } from '@/components/restaurant/TablePlan';
 function RestaurantDashboardContent() {
     const params = useParams();
     const restaurantId = params.id as string;
+    const { can } = useAdminSession();
+    const canManageRestaurant = can('manage_restaurant');
 
     const [date, setDate] = useState(new Date());
     const [view] = useState<'PLAN' | 'ACCESS'>('PLAN');
@@ -251,6 +254,7 @@ function RestaurantDashboardContent() {
                                 tables={rawTables}
                                 restaurantId={restaurantId}
                                 mode="SERVICE"
+                                hideArchitectButton={!canManageRestaurant}
                                 onTableUpdate={handleUpdateTable}
                                 onBookingMove={handleAssignTable}
                                 onSelectProfile={(b) => setSelectedBookingForProfile(b)}
