@@ -39,7 +39,6 @@ import GuestProfileSheet from '@/components/restaurant/GuestProfileSheet';
 import { DateSelector } from '@/components/admin/DateSelector';
 import ReviewsPanel from '@/components/admin/ReviewsPanel';
 import HotelReviewsPanel from '@/components/admin/HotelReviewsPanel';
-import { useAdminSession } from '@/components/admin/AdminSessionContext';
 import { formatTimeInTz } from '@/lib/timezone';
 
 interface RoomType { id: string; name: string; rooms: Room[] }
@@ -86,8 +85,6 @@ function SegmentedTabs<T extends string>({
 }
 
 function RestaurantPlanning({ contextId }: { contextId: string }) {
-    const { can } = useAdminSession();
-    const canManageRestaurant = can('manage_restaurant');
     const [date, setDate] = useState(new Date());
     const [view, setView] = useState<'PLAN' | 'LIST' | 'REVIEWS'>('PLAN');
     const [loading, setLoading] = useState(false);
@@ -262,7 +259,10 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
                                 onBookingMove={handleAssignTable}
                                 onTableSelect={handleQuickRes}
                                 onSelectProfile={(b) => setSelectedBookingForProfile(b)}
-                                hideArchitectButton={!canManageRestaurant}
+                                /* Arquitecto visible para todos los que llegan aquí:
+                                   tener view_occupancy = haber accedido al Planning =
+                                   poder editar el plano. El editor (/plan) está gateado
+                                   por view_occupancy en su layout. */
                                 className="h-full w-full"
                                 timezone={restaurantTz}
                             />
