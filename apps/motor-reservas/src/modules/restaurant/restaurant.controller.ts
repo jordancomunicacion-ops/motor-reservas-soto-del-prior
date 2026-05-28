@@ -33,6 +33,15 @@ export class RestaurantController {
         return this.service.getRestaurant(id, req?.user);
     }
 
+    // Endpoint público para el widget embebido. Devuelve datos saneados (sin
+    // secretos de integraciones, sin mailConfig, sin personal). Necesario
+    // porque GET /restaurant/:id requiere JWT desde el refactor scope-based.
+    @Public()
+    @Get(':id/public-info')
+    getPublicInfo(@Param('id') id: string) {
+        return this.service.getPublicInfo(id);
+    }
+
     @Patch(':id')
     updateRestaurant(@Param('id') id: string, @Body() body: any, @Req() req: AuthenticatedRequest) {
         return this.service.updateRestaurant(id, body, req?.user);
@@ -245,6 +254,9 @@ export class RestaurantController {
         return this.service.deleteShift(shiftId, req?.user);
     }
 
+    // Público: el widget anónimo necesita conocer los días cerrados para
+    // pintar el calendario. Sólo devuelve fechas — no hay datos sensibles.
+    @Public()
     @Get(':id/closures')
     getClosures(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
         return this.service.getClosures(id, req?.user);
@@ -260,6 +272,9 @@ export class RestaurantController {
         return this.service.deleteClosure(closureId, req?.user);
     }
 
+    // Público: el widget anónimo necesita las aperturas excepcionales para
+    // pintar el calendario. Sólo devuelve fechas/shiftIds — no hay datos sensibles.
+    @Public()
     @Get(':id/openings')
     getOpenings(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
         return this.service.getOpenings(id, req?.user);

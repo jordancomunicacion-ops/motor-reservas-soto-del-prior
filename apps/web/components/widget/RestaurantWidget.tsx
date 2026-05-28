@@ -27,7 +27,7 @@ export function RestaurantWidget() {
 
     useEffect(() => {
         if (!restaurantId) return;
-        fetchAPI<RestaurantResponse>(`/restaurant/${restaurantId}`)
+        fetchAPI<RestaurantResponse>(`/restaurant/${restaurantId}/public-info`)
             .then(data => {
                 if (data?.widgetConfig) {
                     setWidgetConfig(data.widgetConfig);
@@ -125,7 +125,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
 
     useEffect(() => {
         if (!restaurantId) return;
-        fetchAPI<RestaurantResponse>(`/restaurant/${restaurantId}`)
+        fetchAPI<RestaurantResponse>(`/restaurant/${restaurantId}/public-info`)
             .then(data => {
                 if (data?.name) setRestaurantName(data.name);
                 if (data?.shifts) setRestaurantShifts(data.shifts);

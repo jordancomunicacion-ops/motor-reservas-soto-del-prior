@@ -134,6 +134,65 @@ export class RestaurantService {
         return sanitizeMailConfig(restaurant);
     }
 
+    /**
+     * Datos públicos del restaurante para el widget embebido. Devuelve sólo lo
+     * estrictamente necesario para pintar el calendario y el formulario, sin
+     * mailConfig, sin secretos de integraciones (de Stripe sólo `enabled` y
+     * `publicKey`) y sin datos privados de personal/usuarios.
+     *
+     * IMPORTANTE: este endpoint NO requiere auth — todo lo que se devuelva
+     * aquí queda expuesto al mundo. Cualquier dato sensible debe filtrarse
+     * en este método antes de salir.
+     */
+    async getPublicInfo(id: string) {
+        const restaurant = await this.prisma.restaurant.findUnique({
+            where: { id },
+            select: {
+                id: true,
+                name: true,
+                currency: true,
+                timezone: true,
+                defaultDuration: true,
+                integrations: true,
+                widgetConfig: true,
+                shifts: {
+                    where: { isActive: true },
+                    select: {
+                        id: true,
+                        name: true,
+                        type: true,
+                        startTime: true,
+                        endTime: true,
+                        daysOfWeek: true,
+                    },
+                },
+            },
+        });
+        if (!restaurant) throw new NotFoundException('Restaurante no encontrado');
+
+        // Sanitizar `integrations`: exponer sólo lo que el widget necesita y
+        // que no es secreto (Stripe publicKey y enabled).
+        const rawIntegrations = (restaurant.integrations ?? {}) as Record<string, unknown>;
+        const stripeRaw = (rawIntegrations.stripe ?? {}) as Record<string, unknown>;
+        const safeIntegrations = {
+            stripe: {
+                enabled: !!stripeRaw.enabled,
+                publicKey: typeof stripeRaw.publicKey === 'string' ? stripeRaw.publicKey : '',
+            },
+        };
+
+        return {
+            id: restaurant.id,
+            name: restaurant.name,
+            currency: restaurant.currency,
+            timezone: restaurant.timezone,
+            defaultDuration: restaurant.defaultDuration,
+            widgetConfig: restaurant.widgetConfig,
+            shifts: restaurant.shifts,
+            integrations: safeIntegrations,
+        };
+    }
+
 
     async updateRestaurant(id: string, data: any, user?: AuthenticatedUser) {
         if (user) await ensureRestaurantAccess(user, this.prisma, id);
