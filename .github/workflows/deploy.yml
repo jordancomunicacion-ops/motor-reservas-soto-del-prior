@@ -72,7 +72,11 @@ jobs:
           REMOTE_USER="${REMOTE_USER:-root}"
           REMOTE_PATH="${REMOTE_PATH:-/root/SOTOdelPRIOR/apps/reservas}"
           TARGET="$REMOTE_USER@$REMOTE_HOST"
-          ARCHIVE="deploy.tar.gz"
+          # El paquete se escribe FUERA del repo ($RUNNER_TEMP). Si se creara dentro
+          # de '.', tar detectaría que el directorio cambia mientras lo lee y saldría
+          # con código 1 ("file changed as we read it"), abortando por set -e.
+          ARCHIVE_NAME="deploy.tar.gz"
+          ARCHIVE="${RUNNER_TEMP:-/tmp}/$ARCHIVE_NAME"
 
           KEY=~/.ssh/deploy_key
           HOSTCHK="-o StrictHostKeyChecking=accept-new"
@@ -83,13 +87,14 @@ jobs:
           echo "::group::[1/5] Empaquetando proyecto"
           # Mismos excludes que DESPLEGAR.bat. El .env vive solo en el servidor
           # (DB_PASS, JWT_SECRET, SMTP...) y lo preserva el paso 3.
-          tar \
+          # tar devuelve 1 ante avisos no fatales (p. ej. "file changed"); lo
+          # toleramos (rc<=1) y solo abortamos ante errores reales (rc>=2).
+          tar --warning=no-file-changed \
             --exclude=node_modules --exclude=.next --exclude=.git --exclude=.idea \
             --exclude=.vscode --exclude=.claude --exclude=dist --exclude=build \
             --exclude=db_data --exclude=pg_data --exclude='*.log' --exclude='*.db' \
-            --exclude='*.db-journal' --exclude="$ARCHIVE" --exclude=deploy.env \
-            --exclude=./.env \
-            -czf "$ARCHIVE" .
+            --exclude='*.db-journal' --exclude=deploy.env --exclude=./.env \
+            -czf "$ARCHIVE" . || { rc=$?; [ "$rc" -le 1 ] || exit "$rc"; }
           echo "::endgroup::"
 
           echo "::group::[2/5] Limpiando Docker y verificando espacio"
@@ -102,11 +107,11 @@ jobs:
           echo "::endgroup::"
 
           echo "::group::[4/5] Subiendo paquete"
-          $SCP "$ARCHIVE" "$TARGET:$REMOTE_PATH/$ARCHIVE"
+          $SCP "$ARCHIVE" "$TARGET:$REMOTE_PATH/$ARCHIVE_NAME"
           echo "::endgroup::"
 
           echo "::group::[5/5] Instalando en el servidor (setup_remote.sh)"
-          $SSH "$TARGET" "cd $REMOTE_PATH && tar -xzf $ARCHIVE > /dev/null && sed -i 's/\r\$//' setup_remote.sh && bash setup_remote.sh"
+          $SSH "$TARGET" "cd $REMOTE_PATH && tar -xzf $ARCHIVE_NAME > /dev/null && sed -i 's/\r\$//' setup_remote.sh && bash setup_remote.sh"
           echo "::endgroup::"
 
           echo "✅ Despliegue completado."
