@@ -20,7 +20,11 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20.18.1'
+          # 20.19.x es el mínimo que soporta require() de un módulo ESM. Vitest carga
+          # su config (CJS) haciendo require de `std-env` (ESM); en 20.18.1 eso lanza
+          # ERR_REQUIRE_ESM y los tests de web ni arrancan. Se mantiene el major 20
+          # para seguir alineado con el runtime (Dockerfiles en node:20.18.1).
+          node-version: '20.19.4'
           cache: 'npm'
 
       - name: Install dependencies
@@ -32,11 +36,16 @@ jobs:
       - name: Install rolldown linux binding (npm optional deps bug)
         run: npm install @rolldown/binding-linux-x64-gnu --no-save --no-audit --no-fund
 
-      - name: Prisma generate (motor-reservas)
-        run: npx prisma generate --schema=apps/motor-reservas/prisma/schema.prisma
-
+      # Ambos schemas generan al MISMO @prisma/client (monorepo, una sola copia del
+      # paquete), así que la última generación gana. El schema de motor-reservas es
+      # un superconjunto del de web (incluye HotelReview, ResReview, modifyToken…),
+      # por lo que debe generarse EL ÚLTIMO: si web se genera después, el cliente
+      # pierde esos modelos y el typecheck de motor-reservas falla.
       - name: Prisma generate (web)
         run: npx prisma generate --schema=apps/web/prisma/schema.prisma
+
+      - name: Prisma generate (motor-reservas)
+        run: npx prisma generate --schema=apps/motor-reservas/prisma/schema.prisma
 
       - name: Prisma validate (motor-reservas)
         run: npx prisma validate --schema=apps/motor-reservas/prisma/schema.prisma

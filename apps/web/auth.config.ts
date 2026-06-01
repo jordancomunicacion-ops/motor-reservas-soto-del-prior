@@ -55,18 +55,28 @@ export const authConfig = {
                 }
             }
 
-            // Refrescar accessToken si estamos cerca de expiración (best-effort, no rompe la sesión si falla).
+            // (Re)generar el accessToken del motor cuando haga falta (best-effort, no rompe la
+            // sesión si falla). Dos casos:
+            //   1. missingToken: la sesión no tiene accessToken (sesión creada antes de añadir el
+            //      token motor, o por cualquier otro motivo). Sin esto, esa sesión da 401 en
+            //      /api/proxy/* indefinidamente y el panel sale vacío (sin hoteles ni restaurantes)
+            //      hasta que el usuario cierra sesión y vuelve a entrar.
+            //   2. nearExpiry: el token existe pero está cerca de caducar.
             // Import dinámico: el callback jwt() corre en Node runtime (no edge), pero la `authConfig`
             // se importa también desde el middleware edge — el dynamic import evita bundlear jsonwebtoken allí.
             const now = Math.floor(Date.now() / 1000);
-            if (token.sub && token.accessTokenExpiresAt && token.accessTokenExpiresAt - now < REFRESH_WINDOW_SECONDS) {
+            const missingToken = !token.accessToken;
+            const nearExpiry = !!token.accessTokenExpiresAt && token.accessTokenExpiresAt - now < REFRESH_WINDOW_SECONDS;
+            // `bootstrap-admin` no es un usuario real en BD: el motor rechazaría su JWT igualmente,
+            // así que no tiene sentido mintearlo.
+            if (token.sub && token.sub !== 'bootstrap-admin' && (missingToken || nearExpiry)) {
                 try {
                     const { signMotorToken } = await import('@/lib/motor-token');
                     const refreshed = signMotorToken(token.sub);
                     token.accessToken = refreshed.token;
                     token.accessTokenExpiresAt = refreshed.expiresAt;
                 } catch (err) {
-                    console.warn('[AUTH] Could not refresh motor JWT:', err instanceof Error ? err.message : err);
+                    console.warn('[AUTH] Could not (re)mint motor JWT:', err instanceof Error ? err.message : err);
                 }
             }
             return token;
