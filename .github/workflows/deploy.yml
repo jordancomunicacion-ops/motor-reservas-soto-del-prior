@@ -1,0 +1,112 @@
+name: Deploy Reservas (SOTO del PRIOR)
+
+# Despliegue MANUAL a producción. Replica exactamente lo que hace DESPLEGAR.bat
+# desde el PC de despliegue: empaqueta el repo, lo sube por SSH al servidor y
+# ejecuta setup_remote.sh (docker compose up -d --build + prisma migrate deploy + seed).
+#
+# Dos formas de dispararlo (un merge normal a main NUNCA despliega):
+#   1. Botón "Run workflow" en la pestaña Actions (workflow_dispatch).
+#   2. Empujando un tag `deploy-*` (p. ej. `git tag deploy-20260601-1200 && git push origin deploy-20260601-1200`).
+#
+# Secrets requeridos (Settings -> Secrets and variables -> Actions):
+#   - SSH_PRIVATE_KEY : clave privada dedicada al deploy, cuya pública esté en
+#                       ~/.ssh/authorized_keys del servidor (REMOTE_USER).
+#   - REMOTE_HOST     : host/IP del servidor de producción.
+#   - REMOTE_USER     : (opcional) usuario SSH. Por defecto: root.
+#   - REMOTE_PATH     : (opcional) ruta del proyecto en el servidor.
+#                       Por defecto: /root/SOTOdelPRIOR/apps/reservas
+#   - SSH_KNOWN_HOSTS : (opcional) clave de host del servidor (salida de
+#                       `ssh-keyscan tu.servidor.com`). Si se omite, se confía
+#                       en la clave en el primer contacto (StrictHostKeyChecking=accept-new).
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'deploy-*'
+
+# Evita despliegues solapados pisándose entre sí.
+concurrency:
+  group: deploy-reservas
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Permite añadir aprobadores requeridos / restricciones de rama desde
+    # Settings -> Environments -> production (opcional, recomendado).
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SSH_PRIVATE_KEY:-}" ]; then
+            echo "::error::Falta el secret SSH_PRIVATE_KEY"; exit 1
+          fi
+          if [ -z "${REMOTE_HOST:-}" ]; then
+            echo "::error::Falta el secret REMOTE_HOST"; exit 1
+          fi
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          if [ -n "${SSH_KNOWN_HOSTS:-}" ]; then
+            printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+            chmod 644 ~/.ssh/known_hosts
+          fi
+
+      - name: Desplegar en el servidor
+        env:
+          REMOTE_USER: ${{ secrets.REMOTE_USER }}
+          REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
+          REMOTE_PATH: ${{ secrets.REMOTE_PATH }}
+        run: |
+          set -euo pipefail
+          REMOTE_USER="${REMOTE_USER:-root}"
+          REMOTE_PATH="${REMOTE_PATH:-/root/SOTOdelPRIOR/apps/reservas}"
+          TARGET="$REMOTE_USER@$REMOTE_HOST"
+          ARCHIVE="deploy.tar.gz"
+
+          KEY=~/.ssh/deploy_key
+          HOSTCHK="-o StrictHostKeyChecking=accept-new"
+          [ -f ~/.ssh/known_hosts ] && HOSTCHK="-o StrictHostKeyChecking=yes"
+          SSH="ssh -i $KEY $HOSTCHK -o ServerAliveInterval=30 -o ServerAliveCountMax=20 -o ConnectTimeout=30"
+          SCP="scp -i $KEY $HOSTCHK -o ConnectTimeout=30"
+
+          echo "::group::[1/5] Empaquetando proyecto"
+          # Mismos excludes que DESPLEGAR.bat. El .env vive solo en el servidor
+          # (DB_PASS, JWT_SECRET, SMTP...) y lo preserva el paso 3.
+          tar \
+            --exclude=node_modules --exclude=.next --exclude=.git --exclude=.idea \
+            --exclude=.vscode --exclude=.claude --exclude=dist --exclude=build \
+            --exclude=db_data --exclude=pg_data --exclude='*.log' --exclude='*.db' \
+            --exclude='*.db-journal' --exclude="$ARCHIVE" --exclude=deploy.env \
+            --exclude=./.env \
+            -czf "$ARCHIVE" .
+          echo "::endgroup::"
+
+          echo "::group::[2/5] Limpiando Docker y verificando espacio"
+          # prune -af SIN --volumes: preserva el volumen reservas_db_data (BD de prod).
+          $SSH "$TARGET" "df -h / && docker compose -f $REMOTE_PATH/docker-compose.yml down --remove-orphans 2>/dev/null || true && docker system prune -af && journalctl --vacuum-size=100M 2>/dev/null || true && df -h /"
+          echo "::endgroup::"
+
+          echo "::group::[3/5] Limpiando despliegue anterior (preserva DB y .env)"
+          $SSH "$TARGET" "mkdir -p $REMOTE_PATH && cd $REMOTE_PATH && find . -maxdepth 1 ! -name 'pg_data' ! -name 'db_data' ! -name '.env' ! -name '.' -exec rm -rf {} +"
+          echo "::endgroup::"
+
+          echo "::group::[4/5] Subiendo paquete"
+          $SCP "$ARCHIVE" "$TARGET:$REMOTE_PATH/$ARCHIVE"
+          echo "::endgroup::"
+
+          echo "::group::[5/5] Instalando en el servidor (setup_remote.sh)"
+          $SSH "$TARGET" "cd $REMOTE_PATH && tar -xzf $ARCHIVE > /dev/null && sed -i 's/\r\$//' setup_remote.sh && bash setup_remote.sh"
+          echo "::endgroup::"
+
+          echo "✅ Despliegue completado."
