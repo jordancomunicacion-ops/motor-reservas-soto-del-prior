@@ -30,5 +30,6 @@ declare module 'next-auth/jwt' {
         hotelId?: string | null;
         accessToken?: string;
         accessTokenExpiresAt?: number;
+        permsSyncedAt?: number;
     }
 }

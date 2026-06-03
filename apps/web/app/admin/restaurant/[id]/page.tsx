@@ -330,6 +330,7 @@ function RestaurantDashboardContent() {
                 initialDate={date}
                 initialBooking={editingBooking}
                 timezone={restaurant?.timezone}
+                restaurantId={restaurantId}
             />
 
             <GuestProfileSheet

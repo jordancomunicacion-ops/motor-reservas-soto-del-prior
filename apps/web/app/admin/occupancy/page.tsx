@@ -316,6 +316,7 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
                 initialBooking={editingBooking}
                 initialTableId={selectedTableId}
                 timezone={restaurantTz}
+                restaurantId={contextId ?? undefined}
             />
 
             <GuestProfileSheet

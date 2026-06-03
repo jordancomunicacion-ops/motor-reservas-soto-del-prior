@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { fetchAPIAdmin } from "@/lib/api-admin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,9 +45,13 @@ interface ReservationFormProps {
     initialBooking?: GuestBookingProfile | null;
     initialTableId?: string | null;
     timezone?: string;
+    restaurantId?: string;
 }
 
-export default function ReservationForm({ isOpen, onClose, onSubmit, onCancel, initialDate, initialBooking, initialTableId, timezone }: ReservationFormProps) {
+// Horas por defecto cuando no hay turnos configurados o falla la consulta de disponibilidad.
+const FALLBACK_TIMES = ['12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '19:00', '19:30', '20:00', '20:30', '21:00', '21:30', '22:00', '22:30'];
+
+export default function ReservationForm({ isOpen, onClose, onSubmit, onCancel, initialDate, initialBooking, initialTableId, timezone, restaurantId }: ReservationFormProps) {
     const isEditing = !!initialBooking;
 
     const initialDateStr = initialBooking?.date
@@ -96,6 +101,25 @@ export default function ReservationForm({ isOpen, onClose, onSubmit, onCancel, i
         !!(initialBooking?.instagram || initialBooking?.facebook || initialBooking?.tiktok ||
             initialBooking?.linkedin || initialBooking?.xTwitter)
     );
+
+    // Horas reales según los turnos configurados (incluye horarios especiales y desayunos).
+    const [apiSlots, setApiSlots] = useState<string[]>([]);
+    useEffect(() => {
+        if (!isOpen || !restaurantId || !dateStr) return;
+        let cancelled = false;
+        const paxNum = parseInt(pax) || 2;
+        fetchAPIAdmin<{ slots?: string[] }>(`/restaurant/${restaurantId}/slots?date=${dateStr}&pax=${paxNum}`)
+            .then(data => { if (!cancelled) setApiSlots(Array.isArray(data?.slots) ? data.slots : []); })
+            .catch(() => { if (!cancelled) setApiSlots([]); });
+        return () => { cancelled = true; };
+    }, [isOpen, restaurantId, dateStr, pax]);
+
+    // Unión de las horas reales con las de respaldo, para no perder la opción de sobre-reservar.
+    const timeOptions = useMemo(() => {
+        const set = new Set<string>([...apiSlots, ...FALLBACK_TIMES]);
+        if (time) set.add(time);
+        return Array.from(set).sort();
+    }, [apiSlots, time]);
 
     const handleSubmit = () => {
         if (!dateStr) return;
@@ -165,7 +189,7 @@ export default function ReservationForm({ isOpen, onClose, onSubmit, onCancel, i
                             <Select value={time} onValueChange={setTime}>
                                 <SelectTrigger className="w-full h-10"><SelectValue /></SelectTrigger>
                                 <SelectContent>
-                                    {['12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '19:00', '19:30', '20:00', '20:30', '21:00', '21:30', '22:00', '22:30'].map(t => (
+                                    {timeOptions.map(t => (
                                         <SelectItem key={t} value={t}>{t}</SelectItem>
                                     ))}
                                 </SelectContent>

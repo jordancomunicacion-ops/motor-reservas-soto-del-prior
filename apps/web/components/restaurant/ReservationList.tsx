@@ -205,6 +205,11 @@ export default function ReservationList({ bookings, zones = [], onStatusChange, 
                                 <TableCell className="text-right">
                                     <div className="flex justify-end gap-1">
                                         {/* Status Flow Actions */}
+                                        {(booking.status === 'PENDING' || booking.status === 'PENDING_CONFIRMATION') && (
+                                            <Button size="sm" variant="success" className="h-7 text-[10px]" onClick={() => onStatusChange(booking.id, 'CONFIRMED')}>
+                                                Confirmar
+                                            </Button>
+                                        )}
                                         {booking.status === 'CONFIRMED' && (
                                             <>
                                                 <Button size="sm" variant="tonal" className="h-7 text-[10px]" onClick={() => onStatusChange(booking.id, 'BAR_ARRIVAL')}>
