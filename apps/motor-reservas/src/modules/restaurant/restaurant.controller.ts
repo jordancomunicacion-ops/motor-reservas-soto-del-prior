@@ -28,6 +28,8 @@ export class RestaurantController {
         return this.service.getRestaurants(req?.user);
     }
 
+    // @Public: el widget embebido lee config/nombre del restaurante sin sesión.
+    @Public()
     @Get(':id')
     getRestaurant(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
         return this.service.getRestaurant(id, req?.user);
@@ -101,6 +103,8 @@ export class RestaurantController {
     }
 
     // --- Waitlist ---
+    // @Public: el widget permite apuntarse a lista de espera sin sesión.
+    @Public()
     @Post(':id/waitlist')
     addToWaitlist(@Param('id') id: string, @Body() body: any, @Req() req: AuthenticatedRequest) {
         return this.service.addToWaitlist(id, body, req?.user);
