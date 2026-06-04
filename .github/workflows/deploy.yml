@@ -102,8 +102,10 @@ jobs:
           $SSH "$TARGET" "df -h / && docker compose -f $REMOTE_PATH/docker-compose.yml down --remove-orphans 2>/dev/null || true && docker system prune -af && journalctl --vacuum-size=100M 2>/dev/null || true && df -h /"
           echo "::endgroup::"
 
-          echo "::group::[3/5] Limpiando despliegue anterior (preserva DB y .env)"
-          $SSH "$TARGET" "mkdir -p $REMOTE_PATH && cd $REMOTE_PATH && find . -maxdepth 1 ! -name 'pg_data' ! -name 'db_data' ! -name '.env' ! -name '.' -exec rm -rf {} +"
+          echo "::group::[3/5] Limpiando despliegue anterior (preserva DB, .env y .git)"
+          # Se preserva tambien .git para que el deploy manual via DESPLEGAR.bat
+          # (git pull, estilo cocina/crm) siga funcionando tras un deploy del CI.
+          $SSH "$TARGET" "mkdir -p $REMOTE_PATH && cd $REMOTE_PATH && find . -maxdepth 1 ! -name 'pg_data' ! -name 'db_data' ! -name '.env' ! -name '.git' ! -name '.' -exec rm -rf {} +"
           echo "::endgroup::"
 
           echo "::group::[4/5] Subiendo paquete"
