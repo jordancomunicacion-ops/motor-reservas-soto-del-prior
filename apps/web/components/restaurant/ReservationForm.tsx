@@ -121,8 +121,12 @@ export default function ReservationForm({ isOpen, onClose, onSubmit, onCancel, i
         return Array.from(set).sort();
     }, [apiSlots, time]);
 
+    // Para identificar al cliente basta con uno de los dos: email o teléfono.
+    const hasContact = !!(email.trim() || phone.trim());
+
     const handleSubmit = () => {
         if (!dateStr) return;
+        if (!name.trim() || !hasContact) return;
         const bookingDate = zonedDateToUtc(dateStr, time, timezone);
 
         const tagsArr = tagsInput.split(',').map((t: string) => t.trim()).filter(Boolean);
@@ -186,14 +190,19 @@ export default function ReservationForm({ isOpen, onClose, onSubmit, onCancel, i
                         </div>
                         <div className="flex flex-col space-y-1.5">
                             <Label className="text-eyebrow">Hora</Label>
-                            <Select value={time} onValueChange={setTime}>
-                                <SelectTrigger className="w-full h-10"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    {timeOptions.map(t => (
-                                        <SelectItem key={t} value={t}>{t}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            {/* Hora libre (cualquier hora del día) con sugerencias según turnos/horarios especiales. */}
+                            <Input
+                                type="time"
+                                className="h-10"
+                                list="reservation-time-options"
+                                value={time}
+                                onChange={(e) => setTime(e.target.value)}
+                            />
+                            <datalist id="reservation-time-options">
+                                {timeOptions.map(t => (
+                                    <option key={t} value={t} />
+                                ))}
+                            </datalist>
                         </div>
                     </div>
 
@@ -230,6 +239,11 @@ export default function ReservationForm({ isOpen, onClose, onSubmit, onCancel, i
                             <Input className="h-10" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+34 600..." />
                         </div>
                     </div>
+                    {!hasContact && (
+                        <p className="text-xs text-muted-foreground -mt-2">
+                            Indica al menos un dato de contacto: email <span className="font-medium">o</span> teléfono.
+                        </p>
+                    )}
 
                     {/* Notas */}
                     <div className="flex flex-col space-y-1.5">
@@ -340,7 +354,7 @@ export default function ReservationForm({ isOpen, onClose, onSubmit, onCancel, i
                     </div>
                     <div className="flex gap-2">
                         <Button variant="outline" onClick={onClose}>Cerrar</Button>
-                        <Button onClick={handleSubmit} disabled={!name}>{isEditing ? 'Guardar' : 'Crear Reserva'}</Button>
+                        <Button onClick={handleSubmit} disabled={!name.trim() || !hasContact}>{isEditing ? 'Guardar' : 'Crear Reserva'}</Button>
                     </div>
                 </div>
             </div>

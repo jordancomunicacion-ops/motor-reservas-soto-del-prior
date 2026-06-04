@@ -41,6 +41,7 @@ import { PageHeader } from '@/components/ui/page-header';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import GuestProfileSheet from '@/components/restaurant/GuestProfileSheet';
+import ReservationForm, { type ReservationFormPayload } from '@/components/restaurant/ReservationForm';
 import { formatTimeInTz, formatDayMonthInTz } from '@/lib/timezone';
 
 interface Booking {
@@ -93,6 +94,7 @@ function CalendarReservationsContent() {
     const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('day');
 
     const [isSheetOpen, setIsSheetOpen] = useState(false);
+    const [isResFormOpen, setIsResFormOpen] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
     const [formData, setFormData] = useState({
         guestName: '',
@@ -110,6 +112,7 @@ function CalendarReservationsContent() {
         if (contextId && date) loadBookings();
     }, [contextId, contextType, date, viewMode]);
 
+    // Alta de reservas de HOTEL (el formulario propio de esta pantalla).
     async function handleCreateBooking(e: React.FormEvent) {
         e.preventDefault();
         if (!contextId || !date) return;
@@ -118,31 +121,16 @@ function CalendarReservationsContent() {
         try {
             const formattedDate = format(date, 'yyyy-MM-dd');
 
-            const payload = contextType === 'hotel'
-                ? {
-                    guestName: formData.guestName,
-                    email: formData.email,
-                    phone: formData.phone,
-                    checkInDate: formattedDate,
-                    status: 'CONFIRMED',
-                    pax: parseInt(formData.pax),
-                }
-                : {
-                    guestName: formData.guestName,
-                    email: formData.email,
-                    phone: formData.phone,
-                    date: formattedDate,
-                    time: formData.time,
-                    pax: parseInt(formData.pax),
-                    status: 'CONFIRMED',
-                    notes: formData.notes,
-                };
+            const payload = {
+                guestName: formData.guestName,
+                email: formData.email,
+                phone: formData.phone,
+                checkInDate: formattedDate,
+                status: 'CONFIRMED',
+                pax: parseInt(formData.pax),
+            };
 
-            const endpoint = contextType === 'hotel'
-                ? `/bookings/${contextId}`
-                : `/restaurant/${contextId}/bookings`;
-
-            await fetchAPIAdmin(endpoint, { method: 'POST', body: JSON.stringify(payload) });
+            await fetchAPIAdmin(`/bookings/${contextId}`, { method: 'POST', body: JSON.stringify(payload) });
 
             setIsSheetOpen(false);
             setFormData({ guestName: '', email: '', phone: '', pax: '2', time: '14:00', notes: '' });
@@ -152,6 +140,22 @@ function CalendarReservationsContent() {
             alert("No se pudo crear la reserva. Por favor, revisa los datos.");
         } finally {
             setIsCreating(false);
+        }
+    }
+
+    // Alta de reservas de RESTAURANTE: usa el formulario unificado (mismo de dashboard/plano).
+    async function handleCreateRestaurantBooking(data: ReservationFormPayload) {
+        if (!contextId) return;
+        try {
+            await fetchAPIAdmin('/restaurant/bookings', {
+                method: 'POST',
+                body: JSON.stringify({ ...data, restaurantId: contextId }),
+            });
+            setIsResFormOpen(false);
+            loadBookings();
+        } catch (error) {
+            console.error("Error creating booking", error);
+            alert("No se pudo crear la reserva. Por favor, revisa los datos.");
         }
     }
 
@@ -359,6 +363,11 @@ function CalendarReservationsContent() {
                     </div>
 
                     <div className="p-3 border-t border-border/60 bg-muted/30">
+                        {contextType === 'restaurant' ? (
+                            <Button className="w-full" size="default" onClick={() => setIsResFormOpen(true)}>
+                                <Plus className="size-4" /> Nueva reserva
+                            </Button>
+                        ) : (
                         <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                             <SheetTrigger asChild>
                                 <Button className="w-full" size="default">
@@ -454,6 +463,7 @@ function CalendarReservationsContent() {
                                 </form>
                             </SheetContent>
                         </Sheet>
+                        )}
                     </div>
                 </Card>
             </div>
@@ -463,6 +473,16 @@ function CalendarReservationsContent() {
                 isOpen={isProfileOpen}
                 onClose={() => setIsProfileOpen(false)}
             />
+
+            {contextType === 'restaurant' && (
+                <ReservationForm
+                    isOpen={isResFormOpen}
+                    onClose={() => setIsResFormOpen(false)}
+                    onSubmit={handleCreateRestaurantBooking}
+                    initialDate={date}
+                    restaurantId={contextId ?? undefined}
+                />
+            )}
         </div>
     );
 }

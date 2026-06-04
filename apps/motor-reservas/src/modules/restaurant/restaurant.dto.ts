@@ -1,5 +1,5 @@
 import { IsString, IsEmail, IsOptional, IsNumber, Min, Max, IsDateString, IsEnum, IsArray } from 'class-validator';
-import { BookingStatus, UserRole } from '../../common/enums';
+import { ResBookingStatus, UserRole } from '../../common/enums';
 
 export class CreateRestaurantDto {
   @IsString()
@@ -136,8 +136,8 @@ export class CreatePublicReservationDto {
 }
 
 export class UpdateBookingStatusDto {
-  @IsEnum(BookingStatus)
-  status: BookingStatus;
+  @IsEnum(ResBookingStatus)
+  status: ResBookingStatus;
 
   @IsOptional()
   @IsString()

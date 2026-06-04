@@ -565,6 +565,12 @@ export class RestaurantService {
         if (user && data?.restaurantId) await ensureRestaurantAccess(user, this.prisma, data.restaurantId);
         const { name, ...rest } = data;
 
+        // El cliente se identifica por email y/o teléfono: basta con uno de los dos.
+        const hasContact = !!((data.guestEmail || '').trim() || (data.guestPhone || '').trim());
+        if (!hasContact) {
+            throw new BadRequestException('Indica al menos un email o un teléfono de contacto.');
+        }
+
         const booking = await this.prisma.$transaction(async (tx) => {
             const created = await tx.resBooking.create({
                 data: {
