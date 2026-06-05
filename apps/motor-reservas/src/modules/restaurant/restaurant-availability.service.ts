@@ -10,7 +10,7 @@ import {
     type SlotBooking,
     type SlotTable,
 } from './availability-helpers';
-import { toDateOnlyString, zonedDateToUtc, zonedDayOfWeek, zonedDayRangeUtc } from '../../common/timezone';
+import { toDateOnlyString, utcToZonedDateOnly, zonedDateToUtc, zonedDayOfWeek, zonedDayRangeUtc } from '../../common/timezone';
 
 export type TxOrPrisma = PrismaService | Prisma.TransactionClient;
 
@@ -50,6 +50,33 @@ export class RestaurantAvailabilityService {
             defaultDuration: r?.defaultDuration || 90,
             bufferMinutes: r?.bufferMinutes ?? 15,
         };
+    }
+
+    /**
+     * IDs de aperturas excepcionales (RestaurantOpening) cuyo rango de fechas cubre
+     * el día civil `dayStr` (yyyy-mm-dd). Sirve para decidir qué mesas extra "existen" ese día.
+     */
+    async activeOpeningIds(restaurantId: string, dayStr: string, client: TxOrPrisma = this.prisma): Promise<string[]> {
+        const openings = await client.restaurantOpening.findMany({
+            where: { restaurantId },
+            select: { id: true, date: true, endDate: true },
+        });
+        return openings
+            .filter(o => {
+                const startStr = toDateOnlyString(o.date);
+                const endStr = o.endDate ? toDateOnlyString(o.endDate) : startStr;
+                return startStr <= dayStr && dayStr <= endStr;
+            })
+            .map(o => o.id);
+    }
+
+    /**
+     * Cláusula Prisma para filtrar mesas según la fecha: incluye siempre las del plano
+     * base (openingId = null) y, sólo si su apertura cubre el día, las mesas extra.
+     */
+    private tableOpeningWhere(activeOpeningIds: string[]): Prisma.TableWhereInput {
+        if (activeOpeningIds.length === 0) return { openingId: null };
+        return { OR: [{ openingId: null }, { openingId: { in: activeOpeningIds } }] };
     }
 
     async getAvailableSlots(restaurantId: string, dateStr: string, pax: number, type?: string) {
@@ -145,10 +172,12 @@ export class RestaurantAvailabilityService {
             zoneIds: new Set(e.zones.map(z => z.id)),
         }));
 
+        const activeOpeningIds = await this.activeOpeningIds(restaurantId, dayStr);
         const allTables = await this.prisma.table.findMany({
             where: {
                 zone: { restaurantId },
                 isActive: true,
+                ...this.tableOpeningWhere(activeOpeningIds),
             },
             include: { zone: { select: { id: true } } },
         });
@@ -233,6 +262,9 @@ export class RestaurantAvailabilityService {
     ): Promise<string | null> {
         const blockedZoneIds = await this.blockedZoneIdsForRange(restaurantId, date, duration, client);
 
+        const { timezone } = await this.getRestaurantConfig(restaurantId);
+        const activeOpeningIds = await this.activeOpeningIds(restaurantId, utcToZonedDateOnly(date, timezone), client);
+
         const tables = await client.table.findMany({
             where: {
                 zone: {
@@ -242,6 +274,7 @@ export class RestaurantAvailabilityService {
                 isActive: true,
                 maxPax: { gte: pax },
                 minPax: { lte: pax },
+                ...this.tableOpeningWhere(activeOpeningIds),
             },
             orderBy: { maxPax: 'asc' },
         });
@@ -270,6 +303,9 @@ export class RestaurantAvailabilityService {
     ): Promise<{ tableId: string; linkedTableIds: string[] } | null> {
         const blockedZoneIds = await this.blockedZoneIdsForRange(restaurantId, date, duration, client);
 
+        const { timezone } = await this.getRestaurantConfig(restaurantId);
+        const activeOpeningIds = await this.activeOpeningIds(restaurantId, utcToZonedDateOnly(date, timezone), client);
+
         const tables = await client.table.findMany({
             where: {
                 zone: {
@@ -277,6 +313,7 @@ export class RestaurantAvailabilityService {
                     id: blockedZoneIds.length > 0 ? { notIn: blockedZoneIds } : undefined,
                 },
                 isActive: true,
+                ...this.tableOpeningWhere(activeOpeningIds),
             },
         });
 

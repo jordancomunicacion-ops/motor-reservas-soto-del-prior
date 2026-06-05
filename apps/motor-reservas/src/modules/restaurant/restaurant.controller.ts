@@ -66,8 +66,8 @@ export class RestaurantController {
     }
 
     @Get(':id/tables')
-    getTables(@Param('id') id: string, @Query('date') date?: string, @Req() req?: any) {
-        return this.service.getTables(id, date, req?.user);
+    getTables(@Param('id') id: string, @Query('date') date?: string, @Query('mode') mode?: string, @Req() req?: any) {
+        return this.service.getTables(id, date, req?.user, { mode: mode === 'editor' ? 'editor' : 'service' });
     }
 
     @Get(':id/zones')
@@ -292,6 +292,17 @@ export class RestaurantController {
     @Delete(':id/openings/:openingId')
     deleteOpening(@Param('openingId') openingId: string, @Req() req: AuthenticatedRequest) {
         return this.service.deleteOpening(openingId, req?.user);
+    }
+
+    @Post('openings/:openingId/tables')
+    addOpeningTables(@Param('openingId') openingId: string, @Body() body: any, @Req() req: AuthenticatedRequest) {
+        const tables = Array.isArray(body) ? body : (body?.tables ?? []);
+        return this.service.addOpeningTables(openingId, tables, req?.user);
+    }
+
+    @Delete('tables/:tableId')
+    deleteTable(@Param('tableId') tableId: string, @Req() req: AuthenticatedRequest) {
+        return this.service.deleteTable(tableId, req?.user);
     }
 
     @Public()

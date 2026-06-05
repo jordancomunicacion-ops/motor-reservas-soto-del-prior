@@ -620,6 +620,7 @@ model RestaurantOpening {
   reason       String?
   shiftIds     String     // CSV de Shift.id reutilizados (puede estar vacío si hay customShifts)
   customShifts Json?      // [{ name, type, startTime, endTime, slotInterval }] turnos ad-hoc sólo para esta apertura
+  tables       Table[]    // Mesas extra que sólo existen/operan durante esta apertura
   createdAt    DateTime   @default(now())
 
   @@index([restaurantId, date])
@@ -645,6 +646,11 @@ model Table {
   name     String // "Mesa 1"
   capacity Int    @default(4)
 
+  // Mesa extra ligada a una apertura excepcional: sólo existe/opera durante esa fecha.
+  // null = mesa normal del plano base (siempre activa).
+  openingId String?
+  opening   RestaurantOpening? @relation(fields: [openingId], references: [id], onDelete: Cascade)
+
   // Visual Plan Coords
   x        Int    @default(0)
   y        Int    @default(0)
@@ -662,6 +668,8 @@ model Table {
 
   resBookings ResBooking[]
   tableHolds  TableHold[]
+
+  @@index([openingId])
 }
 
 model ResBooking {

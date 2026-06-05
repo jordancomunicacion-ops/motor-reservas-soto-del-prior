@@ -1,4 +1,4 @@
-import { zonedDateToUtc, zonedDayRangeUtc, toDateOnlyString, zonedDayOfWeek } from './timezone';
+import { zonedDateToUtc, zonedDayRangeUtc, toDateOnlyString, zonedDayOfWeek, utcToZonedDateOnly } from './timezone';
 
 describe('zonedDateToUtc', () => {
     it('Madrid invierno (CET, UTC+1): 13:00 local → 12:00 UTC', () => {
@@ -58,5 +58,16 @@ describe('zonedDayOfWeek', () => {
     });
     it('2026-05-17 (domingo) en Madrid', () => {
         expect(zonedDayOfWeek('2026-05-17', 'Europe/Madrid')).toBe(0);
+    });
+});
+
+describe('utcToZonedDateOnly', () => {
+    it('instante UTC dentro del día civil de Madrid', () => {
+        // 2026-07-15 21:00 Madrid (verano, UTC+2) => 19:00 UTC mismo día
+        expect(utcToZonedDateOnly(new Date('2026-07-15T19:00:00Z'), 'Europe/Madrid')).toBe('2026-07-15');
+    });
+    it('cruce de medianoche: 23:30 UTC es ya el día siguiente en Madrid', () => {
+        // 23:30 UTC en verano = 01:30 del día siguiente en Madrid
+        expect(utcToZonedDateOnly(new Date('2026-07-15T23:30:00Z'), 'Europe/Madrid')).toBe('2026-07-16');
     });
 });

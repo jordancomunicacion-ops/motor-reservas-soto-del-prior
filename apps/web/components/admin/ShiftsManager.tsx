@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, Clock, Coffee, Utensils, Moon, CalendarOff, CalendarCheck } from 'lucide-react';
+import { Plus, Trash2, Clock, Coffee, Utensils, Moon, CalendarOff, CalendarCheck, Armchair } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -27,6 +27,26 @@ interface CustomShift {
     slotInterval: number;
 }
 
+interface OpeningTable {
+    id: string;
+    name: string;
+    capacity: number;
+    minPax?: number;
+    maxPax?: number;
+    zoneId: string;
+}
+
+interface DraftExtraTable {
+    name: string;
+    capacity: number;
+    zoneId: string;
+}
+
+interface ZoneLite {
+    id: string;
+    name: string;
+}
+
 interface Opening {
     id: string;
     date: string;
@@ -34,6 +54,7 @@ interface Opening {
     reason?: string;
     shiftIds: string;
     customShifts?: CustomShift[] | null;
+    tables?: OpeningTable[] | null;
 }
 
 interface Shift {
@@ -90,13 +111,17 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
 
     const [openings, setOpenings] = useState<Opening[]>([]);
     const [openingType, setOpeningType] = useState<'SINGLE' | 'PERIOD'>('SINGLE');
-    const [newOpening, setNewOpening] = useState<{ date: string; endDate: string; reason: string; shiftIds: string[]; customShifts: CustomShift[] }>({ date: '', endDate: '', reason: '', shiftIds: [], customShifts: [] });
+    const [newOpening, setNewOpening] = useState<{ date: string; endDate: string; reason: string; shiftIds: string[]; customShifts: CustomShift[]; extraTables: DraftExtraTable[] }>({ date: '', endDate: '', reason: '', shiftIds: [], customShifts: [], extraTables: [] });
     const [draftCustomShift, setDraftCustomShift] = useState<CustomShift>({ name: 'Comida', type: 'LUNCH', startTime: '13:00', endTime: '16:00', slotInterval: 30 });
+
+    const [zones, setZones] = useState<ZoneLite[]>([]);
+    const [draftExtraTable, setDraftExtraTable] = useState<DraftExtraTable>({ name: '', capacity: 4, zoneId: '' });
 
     useEffect(() => {
         loadShifts();
         loadClosures();
         loadOpenings();
+        loadZones();
     }, [restaurantId]);
 
     async function loadShifts() {
@@ -123,6 +148,18 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
         try {
             const data = await fetchAPIAdmin(`/restaurant/${restaurantId}/openings`);
             setOpenings(data);
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    async function loadZones() {
+        try {
+            const data = await fetchAPIAdmin<Array<{ id: string; name: string }>>(`/restaurant/${restaurantId}/zones`);
+            const zs = (data || []).map(z => ({ id: z.id, name: z.name }));
+            setZones(zs);
+            // Pre-selecciona la primera zona para el borrador de mesa extra.
+            if (zs.length > 0) setDraftExtraTable(prev => ({ ...prev, zoneId: prev.zoneId || zs[0].id }));
         } catch (e) {
             console.error(e);
         }
@@ -223,13 +260,14 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
                 endDate: openingType === 'PERIOD' ? newOpening.endDate : undefined,
                 shiftIds: newOpening.shiftIds,
                 customShifts: newOpening.customShifts,
+                extraTables: newOpening.extraTables,
             };
 
             await fetchAPIAdmin(`/restaurant/${restaurantId}/openings`, {
                 method: 'POST',
                 body: JSON.stringify(payload)
             });
-            setNewOpening({ date: '', endDate: '', reason: '', shiftIds: [], customShifts: [] });
+            setNewOpening({ date: '', endDate: '', reason: '', shiftIds: [], customShifts: [], extraTables: [] });
             loadOpenings();
         } catch (e) {
             console.error(e);
@@ -249,6 +287,53 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
 
     function handleRemoveCustomShift(idx: number) {
         setNewOpening(prev => ({ ...prev, customShifts: prev.customShifts.filter((_, i) => i !== idx) }));
+    }
+
+    function handleAddExtraTable() {
+        const t = draftExtraTable;
+        if (zones.length === 0) return alert('Crea primero una zona en el plano de mesas');
+        if (!t.zoneId) return alert('Selecciona una zona para la mesa');
+        const capacity = Number(t.capacity) || 4;
+        const name = (t.name || '').trim() || `Extra ${newOpening.extraTables.length + 1}`;
+        setNewOpening(prev => ({ ...prev, extraTables: [...prev.extraTables, { name, capacity, zoneId: t.zoneId }] }));
+        setDraftExtraTable({ name: '', capacity: 4, zoneId: t.zoneId });
+    }
+
+    function handleRemoveExtraTable(idx: number) {
+        setNewOpening(prev => ({ ...prev, extraTables: prev.extraTables.filter((_, i) => i !== idx) }));
+    }
+
+    async function handleAddTableToOpening(openingId: string) {
+        if (zones.length === 0) return alert('Crea primero una zona en el plano de mesas');
+        const t = draftExtraTable;
+        const capacity = Number(t.capacity) || 4;
+        const name = (t.name || '').trim();
+        try {
+            await fetchAPIAdmin(`/restaurant/openings/${openingId}/tables`, {
+                method: 'POST',
+                body: JSON.stringify([{ name: name || undefined, capacity, zoneId: t.zoneId || zones[0].id }]),
+            });
+            setDraftExtraTable({ name: '', capacity: 4, zoneId: t.zoneId || zones[0].id });
+            loadOpenings();
+        } catch (e) {
+            console.error(e);
+            const message = e instanceof Error ? e.message : 'Error desconocido';
+            alert(`Error al añadir la mesa: ${message}`);
+        }
+    }
+
+    async function handleDeleteOpeningTable(tableId: string) {
+        try {
+            await fetchAPIAdmin(`/restaurant/tables/${tableId}`, { method: 'DELETE' });
+            loadOpenings();
+        } catch (e) {
+            console.error(e);
+            alert('Error al eliminar la mesa');
+        }
+    }
+
+    function zoneName(zoneId: string) {
+        return zones.find(z => z.id === zoneId)?.name || 'Zona';
     }
 
     async function handleDeleteOpening(id: string) {
@@ -766,6 +851,86 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
                                 </div>
                             )}
                         </div>
+
+                        <div className="pt-4 border-t border-dashed border-emerald-500/30">
+                            <Label className="text-eyebrow mb-2 block">Mesas extra sólo para esta apertura</Label>
+                            <p className="text-xs text-muted-foreground mb-3">
+                                Añade mesas adicionales que sólo existirán ese día. Aparecerán en el dibujo de mesas (en gris hasta que llegue la fecha) y podrás colocarlas desde el <em>Arquitecto de Sala</em>.
+                            </p>
+
+                            {zones.length === 0 ? (
+                                <p className="text-xs text-amber-600">Crea al menos una zona en el plano de mesas para poder añadir mesas extra.</p>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end bg-card/60 p-3 rounded-md border border-dashed border-emerald-500/20">
+                                    <div className="space-y-1.5 md:col-span-2">
+                                        <Label className="text-eyebrow">Zona</Label>
+                                        <Select
+                                            value={draftExtraTable.zoneId}
+                                            onValueChange={(val) => setDraftExtraTable({ ...draftExtraTable, zoneId: val })}
+                                        >
+                                            <SelectTrigger className="w-full h-9">
+                                                <SelectValue placeholder="Zona" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {zones.map(z => (
+                                                    <SelectItem key={z.id} value={z.id}>{z.name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-1.5 md:col-span-2">
+                                        <Label className="text-eyebrow">Nombre (opcional)</Label>
+                                        <Input
+                                            className="h-9"
+                                            value={draftExtraTable.name}
+                                            onChange={(e) => setDraftExtraTable({ ...draftExtraTable, name: e.target.value })}
+                                            placeholder={`Extra ${newOpening.extraTables.length + 1}`}
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label className="text-eyebrow">Comensales</Label>
+                                        <Input
+                                            type="number"
+                                            min={1}
+                                            className="h-9"
+                                            value={draftExtraTable.capacity}
+                                            onChange={(e) => setDraftExtraTable({ ...draftExtraTable, capacity: parseInt(e.target.value) || 4 })}
+                                        />
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        onClick={handleAddExtraTable}
+                                        variant="outline"
+                                        className="h-9 gap-2 border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10"
+                                    >
+                                        <Plus className="size-4" /> Añadir
+                                    </Button>
+                                </div>
+                            )}
+
+                            {newOpening.extraTables.length > 0 && (
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                    {newOpening.extraTables.map((t, idx) => (
+                                        <span
+                                            key={idx}
+                                            className="inline-flex items-center gap-2 pl-2 pr-1 h-8 rounded-md bg-amber-500/10 border border-amber-500/40 text-sm"
+                                        >
+                                            <Armchair className="size-3.5 text-amber-700" />
+                                            <span className="text-amber-900">{t.name}</span>
+                                            <span className="opacity-70 text-xs text-amber-700">{zoneName(t.zoneId)} · {t.capacity}p</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleRemoveExtraTable(idx)}
+                                                className="size-6 grid place-items-center rounded text-amber-700 hover:bg-amber-500/20"
+                                                aria-label="Quitar mesa extra"
+                                            >
+                                                <Trash2 className="size-3.5" />
+                                            </button>
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -827,6 +992,32 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
                                                         );
                                                     })}
                                                 </>
+                                            )}
+                                        </div>
+                                        <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                                            {(opening.tables || []).map(t => (
+                                                <span key={t.id} className="inline-flex items-center gap-1 pl-1.5 pr-0.5 h-5 rounded text-[10px] bg-amber-500/10 text-amber-800 border border-amber-500/30">
+                                                    <Armchair className="size-3" />
+                                                    {t.name} <span className="opacity-70">{zoneName(t.zoneId)}·{t.capacity}p</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDeleteOpeningTable(t.id)}
+                                                        className="size-4 grid place-items-center rounded text-amber-700 hover:bg-amber-500/20"
+                                                        aria-label="Quitar mesa extra"
+                                                    >
+                                                        <Trash2 className="size-2.5" />
+                                                    </button>
+                                                </span>
+                                            ))}
+                                            {zones.length > 0 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleAddTableToOpening(opening.id)}
+                                                    className="inline-flex items-center gap-1 px-1.5 h-5 rounded text-[10px] border border-dashed border-amber-500/50 text-amber-700 hover:bg-amber-500/10"
+                                                    title="Añadir una mesa extra a esta apertura"
+                                                >
+                                                    <Plus className="size-3" /> mesa
+                                                </button>
                                             )}
                                         </div>
                                     </div>
