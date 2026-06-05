@@ -18,6 +18,7 @@ import {
     Loader2,
     X,
     Settings2,
+    CalendarClock,
 } from "lucide-react";
 import { fetchAPIAdmin } from "@/lib/api-admin";
 import TablePlan, { type TableUpdates } from "./TablePlan";
@@ -43,6 +44,8 @@ interface Table {
     rotation: number;
     seatsLostPerJoin: number;
     contiguousTableIds?: string[];
+    openingId?: string | null;
+    opening?: { id: string; date: string | Date; endDate?: string | Date | null; reason?: string | null } | null;
 }
 
 export default function TablePlanEditor({ restaurantId }: { restaurantId: string }) {
@@ -68,7 +71,7 @@ export default function TablePlanEditor({ restaurantId }: { restaurantId: string
     async function loadData() {
         setLoading(true);
         try {
-            const data = await fetchAPIAdmin<Zone[]>(`/restaurant/${restaurantId}/tables`);
+            const data = await fetchAPIAdmin<Zone[]>(`/restaurant/${restaurantId}/tables?mode=editor`);
             if (Array.isArray(data)) {
                 setZones(data);
                 if (data.length > 0 && !activeZoneId) {
@@ -181,11 +184,17 @@ export default function TablePlanEditor({ restaurantId }: { restaurantId: string
 
                 updatedZones[i] = {
                     ...zone,
-                    tables: savedTables.map(st => ({
-                        ...st,
-                        contiguousTableIds: (st.metadata?.contiguousTableIds || st.contiguousTableIds || [])
-                            .map(oldId => idMap[oldId] || oldId),
-                    })),
+                    tables: savedTables.map((st, idx) => {
+                        // El sync no devuelve la relación `opening`; la conservamos del estado previo
+                        // para no perder la etiqueta de fecha especial en el plano hasta recargar.
+                        const original = zone.tables.find(t => t.id === tablesToSync[idx].originalId);
+                        return {
+                            ...st,
+                            opening: original?.opening ?? null,
+                            contiguousTableIds: (st.metadata?.contiguousTableIds || st.contiguousTableIds || [])
+                                .map(oldId => idMap[oldId] || oldId),
+                        };
+                    }),
                 };
             }
 
@@ -227,6 +236,18 @@ export default function TablePlanEditor({ restaurantId }: { restaurantId: string
                     </div>
                 ) : (
                     <>
+                        {selectedTable.openingId && (
+                            <div className="flex items-start gap-2 rounded-md border border-dashed border-amber-400 bg-amber-50 p-2.5 text-[11px] text-amber-900">
+                                <CalendarClock className="size-3.5 mt-0.5 shrink-0" />
+                                <span>
+                                    Mesa extra de una <strong>fecha especial</strong>
+                                    {selectedTable.opening
+                                        ? ` (${new Date(selectedTable.opening.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}${selectedTable.opening.reason ? ` · ${selectedTable.opening.reason}` : ''})`
+                                        : ''}.
+                                    Sólo aparece en el plano y acepta reservas ese día. Colócala donde quieras; se gestiona desde <em>Turnos y Calendario</em>.
+                                </span>
+                            </div>
+                        )}
                         <div className="space-y-1.5">
                             <Label htmlFor="t-name" className="text-eyebrow inline-flex items-center gap-1.5">
                                 <Type className="size-3" /> Nombre / etiqueta

@@ -491,18 +491,37 @@ export class RestaurantService {
         return statsMap;
     }
 
-    async getTables(restaurantId: string, dateStr?: string, user?: AuthenticatedUser) {
+    async getTables(restaurantId: string, dateStr?: string, user?: AuthenticatedUser, opts?: { mode?: 'editor' | 'service' }) {
         if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
         const { timezone } = await this.getRestaurantConfig(restaurantId);
         const dayStr = toDateOnlyString(dateStr || new Date());
         const { start, end } = zonedDayRangeUtc(dayStr, timezone);
 
+        const editor = opts?.mode === 'editor';
+
+        // Vista de servicio: las mesas extra de una apertura excepcional sólo aparecen
+        // el día que cubre su apertura. Vista de editor (arquitecto): se muestran todas
+        // (las extra se pintan en gris hasta que llegue su fecha) y se anota su apertura.
+        let tableWhere: any = { isActive: true };
+        if (!editor) {
+            const activeOpeningIds = await this.availability.activeOpeningIds(restaurantId, dayStr);
+            tableWhere = {
+                isActive: true,
+                ...(activeOpeningIds.length > 0
+                    ? { OR: [{ openingId: null }, { openingId: { in: activeOpeningIds } }] }
+                    : { openingId: null }),
+            };
+        }
+
         const zones = await this.prisma.zone.findMany({
             where: { restaurantId, isActive: true },
             orderBy: { index: 'asc' },
             include: {
-                tables: { 
-                    where: { isActive: true }
+                tables: {
+                    where: tableWhere,
+                    ...(editor
+                        ? { include: { opening: { select: { id: true, date: true, endDate: true, reason: true } } } }
+                        : {}),
                 }
             }
         });
@@ -1205,7 +1224,56 @@ export class RestaurantService {
         if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
         return this.prisma.restaurantOpening.findMany({
             where: { restaurantId },
-            orderBy: { date: 'asc' }
+            orderBy: { date: 'asc' },
+            include: {
+                tables: {
+                    select: { id: true, name: true, capacity: true, minPax: true, maxPax: true, zoneId: true },
+                    orderBy: { name: 'asc' },
+                },
+            },
+        });
+    }
+
+    /**
+     * Valida y normaliza una lista de mesas extra para una apertura excepcional.
+     * Cada mesa debe pertenecer a una zona del restaurante. Devuelve los datos listos
+     * para `table.create`, con coordenadas escalonadas por defecto para no apilarlas.
+     */
+    private async buildOpeningTablesData(
+        restaurantId: string,
+        tables: Array<{ name?: string; capacity?: number; zoneId?: string; minPax?: number; maxPax?: number; x?: number; y?: number; shape?: string }>,
+        startIndex = 0,
+    ): Promise<Array<any>> {
+        if (!Array.isArray(tables) || tables.length === 0) return [];
+
+        const zoneIds = [...new Set(tables.map(t => t.zoneId).filter(Boolean) as string[])];
+        if (zoneIds.length === 0) {
+            throw new BadRequestException('Cada mesa extra necesita una zona (zoneId)');
+        }
+        const zones = await this.prisma.zone.findMany({
+            where: { id: { in: zoneIds }, restaurantId },
+            select: { id: true },
+        });
+        const validZoneIds = new Set(zones.map(z => z.id));
+        for (const zid of zoneIds) {
+            if (!validZoneIds.has(zid)) {
+                throw new BadRequestException('Alguna de las zonas indicadas no pertenece a este restaurante');
+            }
+        }
+
+        return tables.map((t, i) => {
+            const capacity = Number(t.capacity) || 4;
+            const idx = startIndex + i;
+            return {
+                zoneId: t.zoneId as string,
+                name: (t.name || `Extra ${idx + 1}`).toString().slice(0, 60),
+                capacity,
+                minPax: Number(t.minPax) || 1,
+                maxPax: Number(t.maxPax) || capacity,
+                x: Number.isFinite(t.x as number) ? Number(t.x) : 60 + (idx % 6) * 80,
+                y: Number.isFinite(t.y as number) ? Number(t.y) : 60 + Math.floor(idx / 6) * 80,
+                shape: t.shape === 'ROUND' ? 'ROUND' : 'RECTANGLE',
+            };
         });
     }
 
@@ -1217,6 +1285,7 @@ export class RestaurantService {
             reason?: string;
             shiftIds?: string[];
             customShifts?: Array<{ name: string; type: string; startTime: string; endTime: string; slotInterval: number }>;
+            extraTables?: Array<{ name?: string; capacity?: number; zoneId?: string; minPax?: number; maxPax?: number; x?: number; y?: number; shape?: string }>;
         },
         user?: AuthenticatedUser
     ) {
@@ -1260,16 +1329,68 @@ export class RestaurantService {
             }
         }
 
-        return this.prisma.restaurantOpening.create({
-            data: {
-                restaurantId,
-                date: new Date(data.date),
-                endDate: data.endDate ? new Date(data.endDate) : null,
-                reason: data.reason,
-                shiftIds: shiftIds.join(','),
-                customShifts: customShifts.length > 0 ? customShifts : undefined
+        const extraTablesData = await this.buildOpeningTablesData(restaurantId, data.extraTables ?? []);
+
+        return this.prisma.$transaction(async (tx) => {
+            const opening = await tx.restaurantOpening.create({
+                data: {
+                    restaurantId,
+                    date: new Date(data.date),
+                    endDate: data.endDate ? new Date(data.endDate) : null,
+                    reason: data.reason,
+                    shiftIds: shiftIds.join(','),
+                    customShifts: customShifts.length > 0 ? customShifts : undefined
+                }
+            });
+
+            for (const td of extraTablesData) {
+                await tx.table.create({ data: { ...td, openingId: opening.id } });
             }
+
+            return tx.restaurantOpening.findUnique({
+                where: { id: opening.id },
+                include: {
+                    tables: {
+                        select: { id: true, name: true, capacity: true, minPax: true, maxPax: true, zoneId: true },
+                        orderBy: { name: 'asc' },
+                    },
+                },
+            });
         });
+    }
+
+    /** Añade mesas extra a una apertura excepcional ya existente. */
+    async addOpeningTables(
+        openingId: string,
+        tables: Array<{ name?: string; capacity?: number; zoneId?: string; minPax?: number; maxPax?: number; x?: number; y?: number; shape?: string }>,
+        user?: AuthenticatedUser,
+    ) {
+        const restaurantId = await this.restaurantIdForOpening(openingId);
+        if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
+
+        const existing = await this.prisma.table.count({ where: { openingId } });
+        const data = await this.buildOpeningTablesData(restaurantId, tables, existing);
+
+        await this.prisma.$transaction(
+            data.map(td => this.prisma.table.create({ data: { ...td, openingId } })),
+        );
+
+        return this.prisma.table.findMany({
+            where: { openingId },
+            select: { id: true, name: true, capacity: true, minPax: true, maxPax: true, zoneId: true },
+            orderBy: { name: 'asc' },
+        });
+    }
+
+    /** Elimina una mesa concreta (p. ej. una mesa extra de una apertura). */
+    async deleteTable(tableId: string, user?: AuthenticatedUser) {
+        const table = await this.prisma.table.findUnique({
+            where: { id: tableId },
+            select: { zoneId: true },
+        });
+        if (!table) throw new NotFoundException('Mesa no encontrada');
+        if (user) await this.ensureZoneAccess(user, table.zoneId);
+        return this.prisma.table.delete({ where: { id: tableId } });
     }
 
     async deleteOpening(id: string, user?: AuthenticatedUser) {

@@ -604,6 +604,7 @@ model RestaurantOpening {
   reason       String?
   shiftIds     String
   customShifts Json?
+  tables       Table[]
   createdAt    DateTime   @default(now())
 
   @@index([restaurantId, date])
@@ -629,6 +630,9 @@ model Table {
   name     String // "Mesa 1"
   capacity Int    @default(4)
 
+  openingId String?
+  opening   RestaurantOpening? @relation(fields: [openingId], references: [id], onDelete: Cascade)
+
   // Visual Plan Coords
   x        Int    @default(0)
   y        Int    @default(0)
@@ -646,6 +650,8 @@ model Table {
 
   resBookings ResBooking[]
   tableHolds  TableHold[]
+
+  @@index([openingId])
 }
 
 model ResBooking {

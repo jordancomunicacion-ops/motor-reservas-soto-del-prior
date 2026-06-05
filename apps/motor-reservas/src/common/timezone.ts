@@ -60,6 +60,21 @@ export function toDateOnlyString(input: string | Date): string {
     return `${input.getUTCFullYear()}-${String(input.getUTCMonth() + 1).padStart(2, '0')}-${String(input.getUTCDate()).padStart(2, '0')}`;
 }
 
+/** Convierte un instante UTC (Date) al día civil yyyy-mm-dd en la zona dada. */
+export function utcToZonedDateOnly(date: Date, timezone: string): string {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).formatToParts(date);
+    const map: Record<string, string> = {};
+    for (const p of parts) {
+        if (p.type !== 'literal') map[p.type] = p.value;
+    }
+    return `${map.year}-${map.month}-${map.day}`;
+}
+
 /** Day-of-week (0-6, dom=0) del día civil yyyy-mm-dd en la zona dada. */
 export function zonedDayOfWeek(yyyyMmDd: string, timezone: string): number {
     const utc = zonedDateToUtc(yyyyMmDd, '12:00', timezone); // 12:00 evita ambigüedades de DST

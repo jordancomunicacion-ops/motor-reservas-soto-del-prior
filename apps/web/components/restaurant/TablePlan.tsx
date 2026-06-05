@@ -4,12 +4,24 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Users, RotateCw, Armchair, LayoutGrid, Link as LinkIcon, MessageSquare, GlassWater, UserCheck, FileText, LogOut, UserCircle, Cake, Maximize2, Minus, Plus as PlusIcon } from "lucide-react";
+import { Users, RotateCw, Armchair, LayoutGrid, Link as LinkIcon, MessageSquare, GlassWater, UserCheck, FileText, LogOut, UserCircle, Cake, Maximize2, Minus, Plus as PlusIcon, CalendarClock } from "lucide-react";
 import type { BookingOnTable, TableNodeData, ZoneWithTables } from '@/types/restaurant';
 import type { GuestBookingProfile } from './GuestProfileSheet';
 import { formatTimeInTz } from '@/lib/timezone';
 
 export type TableUpdates = Partial<TableNodeData> & { bookingStatus?: string };
+
+/** Etiqueta legible de la apertura de una mesa extra (ej: "12 abr" o "12 abr · Cena especial"). */
+function openingLabel(opening?: TableNodeData['opening']): string {
+    if (!opening) return '';
+    try {
+        const d = new Date(opening.date);
+        const fecha = d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+        return opening.reason ? `${fecha} · ${opening.reason}` : fecha;
+    } catch {
+        return opening.reason || '';
+    }
+}
 
 interface TableProps {
     data: TableNodeData;
@@ -47,8 +59,17 @@ function TableNode({ data, onUpdate, onDropReservation, onSelect, onSelectProfil
     // El plano de sala mantiene colores de estado vivos porque es información operativa
     // codificada por color (libre / sentada / postre / etc). No se tokeniza para no perder
     // el lenguaje visual del servicio.
+    // Mesa extra de una apertura excepcional: sólo "existe" su día. En el editor se
+    // muestra atenuada/ámbar (aún no activa) para poder colocarla; en servicio sólo
+    // llega aquí el día que toca, y se pinta como una mesa normal.
+    const isOpeningTable = !!data.openingId;
+
     const getStatusStyle = () => {
-        if (mode === 'EDIT') return "bg-muted border-border text-foreground";
+        if (mode === 'EDIT') {
+            return isOpeningTable
+                ? "bg-amber-100/70 border-amber-400 border-dashed text-amber-900"
+                : "bg-muted border-border text-foreground";
+        }
         if (!data.isActive) return "bg-muted border-border text-muted-foreground";
 
         const bookings: BookingOnTable[] = data.resBookings || [];
@@ -214,6 +235,16 @@ function TableNode({ data, onUpdate, onDropReservation, onSelect, onSelectProfil
                         </div>
                     )}
                 </>
+            )}
+
+            {/* Marca de mesa extra de fecha especial (sólo en editor) */}
+            {mode === 'EDIT' && isOpeningTable && (
+                <div
+                    className="absolute -top-1.5 -right-1.5 bg-amber-500 rounded-full p-0.5 shadow-sm"
+                    title={openingLabel(data.opening) || 'Mesa de fecha especial'}
+                >
+                    <CalendarClock className="size-2.5 text-white" />
+                </div>
             )}
 
             {/* Indicator if table has contiguous links */}

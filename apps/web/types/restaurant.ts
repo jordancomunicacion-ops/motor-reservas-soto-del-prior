@@ -42,6 +42,10 @@ export interface TableNodeData extends TableSummary {
     /** legado: algunos shapes lo traen fuera de metadata */
     contiguousTableIds?: string[];
     zoneId?: string;
+    /** Si la mesa es extra de una apertura excepcional, su id; null/ausente = mesa del plano base. */
+    openingId?: string | null;
+    /** Datos de la apertura a la que pertenece (sólo se rellena en modo editor). */
+    opening?: { id: string; date: string | Date; endDate?: string | Date | null; reason?: string | null } | null;
 }
 
 export interface ZoneWithTables {
