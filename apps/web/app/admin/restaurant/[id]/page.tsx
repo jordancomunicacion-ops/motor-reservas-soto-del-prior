@@ -152,7 +152,7 @@ function RestaurantDashboardContent() {
             loadData();
         } catch (e) {
             console.error("Error assigning table", e);
-            alert("Error al asignar la mesa");
+            alert(e instanceof Error && e.message ? e.message : "Error al asignar la mesa");
         }
     };
 

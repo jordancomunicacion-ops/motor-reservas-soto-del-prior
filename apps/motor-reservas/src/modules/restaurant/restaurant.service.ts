@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { WaitlistService } from './waitlist.service';
@@ -659,6 +659,20 @@ export class RestaurantService {
         if (!startTable) return [];
         if (pax <= startTable.maxPax) return [];
 
+        const bookings = await this.activeBookingsAround(restaurantId, date, excludeBookingId);
+        const freeTables = tables.filter(t =>
+            t.id === startTableId || !isTableBooked(t, date, duration, bookings),
+        );
+        const cluster = findClusterForPax(startTable, freeTables, pax);
+        if (!cluster) return [];
+        return cluster.filter(id => id !== startTableId);
+    }
+
+    /**
+     * Reservas activas (bloquean mesa) en ±24h alrededor de `date`, en el formato
+     * SlotBooking que esperan los helpers de disponibilidad (incluye linkedTableIds).
+     */
+    private async activeBookingsAround(restaurantId: string, date: Date, excludeBookingId: string): Promise<SlotBooking[]> {
         const bookingsRaw = await this.prisma.resBooking.findMany({
             where: {
                 restaurantId,
@@ -668,7 +682,7 @@ export class RestaurantService {
             },
             select: { id: true, date: true, duration: true, tableId: true, metadata: true },
         });
-        const bookings: SlotBooking[] = bookingsRaw.map(b => {
+        return bookingsRaw.map(b => {
             const meta = (b.metadata as { linkedTableIds?: unknown } | null) || {};
             const linked = Array.isArray(meta.linkedTableIds) ? (meta.linkedTableIds as string[]) : undefined;
             return {
@@ -679,12 +693,18 @@ export class RestaurantService {
                 ...(linked ? { linkedTableIds: linked } : {}),
             };
         });
-        const freeTables = tables.filter(t =>
-            t.id === startTableId || !isTableBooked(t, date, duration, bookings),
-        );
-        const cluster = findClusterForPax(startTable, freeTables, pax);
-        if (!cluster) return [];
-        return cluster.filter(id => id !== startTableId);
+    }
+
+    /**
+     * Indica si `tableId` está ocupada por otra reserva activa durante el rango
+     * [date, date + duration) de la reserva que se quiere asignar.
+     */
+    private async isTableOccupied(restaurantId: string, tableId: string, date: Date, duration: number, excludeBookingId: string): Promise<boolean> {
+        const bookings = await this.activeBookingsAround(restaurantId, date, excludeBookingId);
+        // isTableBooked solo usa el id de la mesa para el matching; el resto de
+        // campos de SlotTable no intervienen en el cálculo de solape.
+        const tableStub: SlotTable = { id: tableId, minPax: 0, maxPax: 0, seatsLostPerJoin: 0, metadata: null };
+        return isTableBooked(tableStub, date, duration, bookings);
     }
 
     async updateBookingStatus(bookingId: string, status: string, tableId?: string, user?: AuthenticatedUser) {
@@ -709,6 +729,9 @@ export class RestaurantService {
                 select: { pax: true, date: true, duration: true, restaurantId: true, metadata: true }
             });
             if (prev) {
+                if (await this.isTableOccupied(prev.restaurantId, tableId, prev.date, prev.duration, bookingId)) {
+                    throw new ConflictException('La mesa ya está ocupada por otra reserva en ese horario');
+                }
                 const linked = await this.computeManualCluster(prev.restaurantId, tableId, prev.pax, prev.date, prev.duration, bookingId);
                 updateData.metadata = { ...((prev.metadata as any) || {}), linkedTableIds: linked };
             }

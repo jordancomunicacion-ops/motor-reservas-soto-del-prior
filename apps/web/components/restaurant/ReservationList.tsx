@@ -40,6 +40,33 @@ export interface ListBooking extends GuestBookingProfile {
     status: string;
     tableId?: string | null;
     table?: { name?: string } | null;
+    metadata?: { linkedTableIds?: string[] } | null;
+}
+
+// Estados que NO bloquean mesa (mismo criterio que el backend en
+// restaurant-availability.service.ts / availability-helpers.isTableBooked).
+const NON_BLOCKING_STATUSES = ['CANCELLED', 'RELEASED', 'NO_SHOW'];
+const DEFAULT_DURATION_MIN = 90;
+
+/**
+ * Indica si una mesa está ocupada por OTRA reserva activa durante el rango
+ * horario de `target` (date + duration). Réplica en cliente de isTableBooked
+ * del motor, incluyendo las mesas enlazadas de clusters (linkedTableIds).
+ */
+function isTableOccupiedFor(target: ListBooking, tableId: string, all: ListBooking[]): boolean {
+    if (!target.date) return false;
+    const start = new Date(target.date).getTime();
+    const end = start + (target.duration || DEFAULT_DURATION_MIN) * 60000;
+    return all.some(b => {
+        if (b.id === target.id || !b.date) return false;
+        if (NON_BLOCKING_STATUSES.includes(b.status)) return false;
+        const linked = b.metadata?.linkedTableIds;
+        const matchesTable = b.tableId === tableId || (Array.isArray(linked) && linked.includes(tableId));
+        if (!matchesTable) return false;
+        const bStart = new Date(b.date).getTime();
+        const bEnd = bStart + (b.duration || DEFAULT_DURATION_MIN) * 60000;
+        return bStart < end && bEnd > start;
+    });
 }
 
 interface ReservationListProps {
@@ -319,15 +346,24 @@ export default function ReservationList({ bookings, zones = [], onStatusChange, 
                                                                     <DropdownMenuLabel className="text-eyebrow py-1">
                                                                         {zone.name}
                                                                     </DropdownMenuLabel>
-                                                                    {zone.tables.map((table) => (
-                                                                        <DropdownMenuItem
-                                                                            key={table.id}
-                                                                            onSelect={() => onAssignTable?.(booking.id, table.id)}
-                                                                            className={cn("text-xs pl-4", booking.tableId === table.id && "bg-muted font-medium")}
-                                                                        >
-                                                                            {table.name} ({table.capacity}p)
-                                                                        </DropdownMenuItem>
-                                                                    ))}
+                                                                    {zone.tables.map((table) => {
+                                                                        const occupied = booking.tableId !== table.id && isTableOccupiedFor(booking, table.id, bookings);
+                                                                        return (
+                                                                            <DropdownMenuItem
+                                                                                key={table.id}
+                                                                                disabled={occupied}
+                                                                                onSelect={() => onAssignTable?.(booking.id, table.id)}
+                                                                                className={cn(
+                                                                                    "text-xs pl-4",
+                                                                                    booking.tableId === table.id && "bg-muted font-medium",
+                                                                                    occupied && "text-muted-foreground/50",
+                                                                                )}
+                                                                            >
+                                                                                {table.name} ({table.capacity}p)
+                                                                                {occupied && <span className="ml-auto pl-2 text-[10px] uppercase">Ocupada</span>}
+                                                                            </DropdownMenuItem>
+                                                                        );
+                                                                    })}
                                                                 </div>
                                                             ))
                                                         )}

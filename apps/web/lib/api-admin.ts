@@ -26,7 +26,14 @@ export async function fetchAPIAdmin<T = any>(endpoint: string, options: RequestI
 
     if (!res.ok) {
         if (isDev) console.warn(`[api-admin] ${options.method || 'GET'} /${path} → ${res.status}`);
-        throw new Error(`Server returned ${res.status}`);
+        // NestJS devuelve { message: string | string[] } en los errores; lo
+        // propagamos para que la UI pueda mostrar el motivo real.
+        let serverMessage = '';
+        try {
+            const body = await res.json();
+            serverMessage = Array.isArray(body?.message) ? body.message.join(', ') : (body?.message || '');
+        } catch { /* cuerpo no-JSON: nos quedamos con el status */ }
+        throw new Error(serverMessage || `Server returned ${res.status}`);
     }
 
     const contentType = res.headers.get('content-type');
