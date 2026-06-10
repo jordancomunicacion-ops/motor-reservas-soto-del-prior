@@ -3,7 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { MoreHorizontal, XCircle, UserCircle, Edit2, Mail, MessageSquare, Utensils, Star, AlertTriangle, Clock, MapPin } from "lucide-react";
+import { MoreHorizontal, XCircle, UserCircle, Edit2, Mail, MessageSquare, Utensils, Star, AlertTriangle, Clock, MapPin, RefreshCw } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { formatTimeInTz } from "@/lib/timezone";
@@ -65,6 +65,7 @@ const STATUS_TONE: Record<string, StatusTone> = {
     BILL_REQUESTED: 'info',
     CLEANING: 'neutral',
     RELEASED: 'warning',
+    FINISHED: 'neutral',
     TO_REVIEW: 'info',
 };
 
@@ -79,8 +80,22 @@ const STATUS_LABELS: Record<string, string> = {
     BILL_REQUESTED: "Cuenta",
     CLEANING: "Limpiar",
     RELEASED: "Liberada",
+    FINISHED: "Finalizada",
     TO_REVIEW: "A Revisar",
 };
+
+// Estados que el backend acepta (enum ResBookingStatus de Prisma) y que tiene
+// sentido fijar a mano desde el listado. PENDING se omite: es un estado
+// transitorio previo al pago.
+const MANUAL_STATUSES = [
+    'PENDING_CONFIRMATION',
+    'CONFIRMED',
+    'SEATED',
+    'FINISHED',
+    'RELEASED',
+    'NO_SHOW',
+    'CANCELLED',
+];
 
 export default function ReservationList({ bookings, zones = [], onStatusChange, onAssignTable, onEdit, onSelectProfile, timezone }: ReservationListProps) {
     return (
@@ -259,6 +274,28 @@ export default function ReservationList({ bookings, zones = [], onStatusChange, 
                                                 <DropdownMenuItem onSelect={() => onEdit(booking)}>
                                                     <Edit2 className="size-4 mr-2" /> Editar Reserva
                                                 </DropdownMenuItem>
+                                                <DropdownMenuSub>
+                                                    <DropdownMenuSubTrigger>
+                                                        <RefreshCw className="size-4 mr-2" /> Cambiar Estado
+                                                    </DropdownMenuSubTrigger>
+                                                    <DropdownMenuSubContent
+                                                        sideOffset={4}
+                                                        collisionPadding={12}
+                                                        className="max-h-[var(--radix-dropdown-menu-content-available-height)] overflow-y-auto overflow-x-hidden min-w-[160px]"
+                                                    >
+                                                        {MANUAL_STATUSES.map((status) => (
+                                                            <DropdownMenuItem
+                                                                key={status}
+                                                                onSelect={() => onStatusChange(booking.id, status)}
+                                                                className={cn("text-xs", booking.status === status && "bg-muted font-medium")}
+                                                            >
+                                                                <StatusBadge tone={STATUS_TONE[status] || 'neutral'} dot className="uppercase text-[10px]">
+                                                                    {STATUS_LABELS[status] || status}
+                                                                </StatusBadge>
+                                                            </DropdownMenuItem>
+                                                        ))}
+                                                    </DropdownMenuSubContent>
+                                                </DropdownMenuSub>
                                                 <DropdownMenuSub>
                                                     <DropdownMenuSubTrigger>
                                                         <MapPin className="size-4 mr-2" /> Cambiar Mesa
