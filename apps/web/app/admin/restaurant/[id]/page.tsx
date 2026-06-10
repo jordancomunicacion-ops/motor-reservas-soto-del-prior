@@ -115,7 +115,10 @@ function RestaurantDashboardContent() {
                 body: JSON.stringify({ status }),
             });
             loadData();
-        } catch (e) { console.error("Error updating status", e); }
+        } catch (e) {
+            console.error("Error updating status", e);
+            alert("Error al cambiar el estado de la reserva");
+        }
     };
 
     const handleAddWaitlist = async (data: WaitlistFormPayload) => {
@@ -147,7 +150,10 @@ function RestaurantDashboardContent() {
                 body: JSON.stringify({ tableId, status: 'CONFIRMED' }),
             });
             loadData();
-        } catch (e) { console.error("Error assigning table", e); }
+        } catch (e) {
+            console.error("Error assigning table", e);
+            alert("Error al asignar la mesa");
+        }
     };
 
     const totalPax = bookings.reduce((sum, b) => sum + (b.status !== 'CANCELLED' ? (b.pax ?? 0) : 0), 0);

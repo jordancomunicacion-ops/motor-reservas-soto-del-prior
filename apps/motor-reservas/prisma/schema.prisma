@@ -44,6 +44,12 @@ enum ResBookingStatus {
   FINISHED
   CANCELLED
   NO_SHOW
+  // Fases del flujo de servicio en sala (TablePlan / ReservationList)
+  BAR_ARRIVAL
+  DESSERT
+  BILL_REQUESTED
+  CLEANING
+  TO_REVIEW
 }
 
 enum ResBookingOrigin {

@@ -85,14 +85,19 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 // Estados que el backend acepta (enum ResBookingStatus de Prisma) y que tiene
-// sentido fijar a mano desde el listado. PENDING se omite: es un estado
-// transitorio previo al pago.
+// sentido fijar a mano desde el listado, ordenados según el flujo de servicio.
+// PENDING se omite: es un estado transitorio previo al pago.
 const MANUAL_STATUSES = [
     'PENDING_CONFIRMATION',
     'CONFIRMED',
+    'BAR_ARRIVAL',
     'SEATED',
-    'FINISHED',
+    'DESSERT',
+    'BILL_REQUESTED',
+    'CLEANING',
+    'TO_REVIEW',
     'RELEASED',
+    'FINISHED',
     'NO_SHOW',
     'CANCELLED',
 ];

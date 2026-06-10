@@ -33,6 +33,12 @@ export enum ResBookingStatus {
   FINISHED = 'FINISHED',
   CANCELLED = 'CANCELLED',
   NO_SHOW = 'NO_SHOW',
+  // Fases del flujo de servicio en sala (TablePlan / ReservationList)
+  BAR_ARRIVAL = 'BAR_ARRIVAL',
+  DESSERT = 'DESSERT',
+  BILL_REQUESTED = 'BILL_REQUESTED',
+  CLEANING = 'CLEANING',
+  TO_REVIEW = 'TO_REVIEW',
 }
 
 export enum ResBookingOrigin {
