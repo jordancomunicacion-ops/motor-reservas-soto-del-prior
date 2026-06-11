@@ -40,15 +40,17 @@ export class RestaurantAvailabilityService {
 
     constructor(private readonly prisma: PrismaService) {}
 
-    private async getRestaurantConfig(restaurantId: string): Promise<{ timezone: string; defaultDuration: number; bufferMinutes: number }> {
+    private async getRestaurantConfig(restaurantId: string): Promise<{ timezone: string; defaultDuration: number; bufferMinutes: number; largeGroupApprovalEnabled: boolean; largeGroupThreshold: number }> {
         const r = await this.prisma.restaurant.findUnique({
             where: { id: restaurantId },
-            select: { timezone: true, defaultDuration: true, bufferMinutes: true },
+            select: { timezone: true, defaultDuration: true, bufferMinutes: true, largeGroupApprovalEnabled: true, largeGroupThreshold: true },
         });
         return {
             timezone: r?.timezone || 'Europe/Madrid',
             defaultDuration: r?.defaultDuration || 90,
             bufferMinutes: r?.bufferMinutes ?? 15,
+            largeGroupApprovalEnabled: r?.largeGroupApprovalEnabled ?? false,
+            largeGroupThreshold: r?.largeGroupThreshold ?? 10,
         };
     }
 
@@ -81,9 +83,14 @@ export class RestaurantAvailabilityService {
 
     async getAvailableSlots(restaurantId: string, dateStr: string, pax: number, type?: string) {
         this.logger.debug(`Buscando huecos restaurant=${restaurantId} fecha=${dateStr} pax=${pax}`);
-        const { timezone, defaultDuration, bufferMinutes } = await this.getRestaurantConfig(restaurantId);
+        const { timezone, defaultDuration, bufferMinutes, largeGroupApprovalEnabled, largeGroupThreshold } = await this.getRestaurantConfig(restaurantId);
         const dayStr = toDateOnlyString(dateStr);
         const todayStr = toDateOnlyString(new Date());
+
+        // Grupo grande: si supera el umbral configurado, ofrecemos todos los horarios
+        // del turno sin filtrar por disponibilidad de mesas; la reserva quedará sujeta
+        // a autorización manual del restaurante.
+        const requiresApproval = largeGroupApprovalEnabled && pax >= largeGroupThreshold;
 
         if (dayStr < todayStr) {
             return { slots: [], closed: true, message: 'Fecha pasada' };
@@ -219,7 +226,7 @@ export class RestaurantAvailabilityService {
                     ? allTables.filter(t => !blockedZoneIds.has(t.zone.id))
                     : allTables;
 
-                if (isSlotAvailable(slotTime, pax, candidateTables as SlotTable[], bookings, defaultDuration, bufferMinutes)) {
+                if (requiresApproval || isSlotAvailable(slotTime, pax, candidateTables as SlotTable[], bookings, defaultDuration, bufferMinutes)) {
                     if (!slotsForShift.includes(slot)) slotsForShift.push(slot);
                     if (!availableSlots.includes(slot)) {
                         availableSlots.push(slot);
@@ -244,6 +251,7 @@ export class RestaurantAvailabilityService {
             shiftSlots,
             closed: activeShifts.length === 0,
             events: dayEvents,
+            requiresApproval,
         };
     }
 

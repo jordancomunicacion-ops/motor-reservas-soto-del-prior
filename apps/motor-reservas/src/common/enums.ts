@@ -27,6 +27,9 @@ export enum BookingSource {
 export enum ResBookingStatus {
   PENDING = 'PENDING',
   PENDING_CONFIRMATION = 'PENDING_CONFIRMATION',
+  // Grupo grande que supera el umbral configurado: aceptado pero pendiente de
+  // autorización manual del restaurante (puede reorganizar mesas a mano).
+  PENDING_APPROVAL = 'PENDING_APPROVAL',
   CONFIRMED = 'CONFIRMED',
   RELEASED = 'RELEASED',
   SEATED = 'SEATED',

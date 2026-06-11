@@ -102,6 +102,7 @@ function TableNode({ data, onUpdate, onDropReservation, onSelect, onSelectProfil
             case 'NO_SHOW': return "bg-red-600 border-red-700 text-white";
             case 'CANCELLED': return "bg-slate-500 border-slate-600 text-white";
             case 'PENDING_CONFIRMATION': return "bg-orange-500 border-orange-600 text-white";
+            case 'PENDING_APPROVAL': return "bg-amber-600 border-amber-700 text-white";
             case 'TO_REVIEW': return "bg-blue-500 border-blue-600 text-white";
             case 'CONFIRMED': return "bg-lime-500 border-lime-600 text-white";
             case 'BAR_ARRIVAL': return "bg-purple-500 border-purple-600 text-white";
