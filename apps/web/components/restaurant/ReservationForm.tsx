@@ -51,6 +51,17 @@ interface ReservationFormProps {
 // Horas por defecto cuando no hay turnos configurados o falla la consulta de disponibilidad.
 const FALLBACK_TIMES = ['12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '19:00', '19:30', '20:00', '20:30', '21:00', '21:30', '22:00', '22:30'];
 
+// Las etiquetas se guardan como JSON array, pero pueden venir como texto plano de datos antiguos.
+function tagsToInput(tags: string | null | undefined): string {
+    if (!tags) return "";
+    try {
+        const parsed = JSON.parse(tags);
+        return Array.isArray(parsed) ? parsed.join(', ') : tags;
+    } catch {
+        return tags;
+    }
+}
+
 export default function ReservationForm({ isOpen, onClose, onSubmit, onCancel, initialDate, initialBooking, initialTableId, timezone, restaurantId }: ReservationFormProps) {
     const isEditing = !!initialBooking;
 
@@ -76,15 +87,7 @@ export default function ReservationForm({ isOpen, onClose, onSubmit, onCancel, i
     const [age, setAge] = useState(initialBooking?.guestAge ? String(initialBooking.guestAge) : "");
     const [gender, setGender] = useState(initialBooking?.guestGender || "");
     const [notes, setNotes] = useState(initialBooking?.notes || "");
-    const [tagsInput, setTagsInput] = useState(() => {
-        if (!initialBooking?.tags) return "";
-        try {
-            const parsed = JSON.parse(initialBooking.tags);
-            return Array.isArray(parsed) ? parsed.join(', ') : initialBooking.tags;
-        } catch {
-            return initialBooking.tags;
-        }
-    });
+    const [tagsInput, setTagsInput] = useState(() => tagsToInput(initialBooking?.tags));
     const [isMealPlan, setIsMealPlan] = useState(!!initialBooking?.isMealPlan);
 
     const [instagram, setInstagram] = useState(initialBooking?.instagram || "");
@@ -101,6 +104,49 @@ export default function ReservationForm({ isOpen, onClose, onSubmit, onCancel, i
         !!(initialBooking?.instagram || initialBooking?.facebook || initialBooking?.tiktok ||
             initialBooking?.linkedin || initialBooking?.xTwitter)
     );
+
+    // El modal permanece montado entre aperturas (con isOpen=false solo se oculta),
+    // así que al abrirse hay que re-sincronizar todos los campos con la reserva
+    // seleccionada; si no, se muestran (y se guardan) los datos de la apertura anterior.
+    const [wasOpen, setWasOpen] = useState(isOpen);
+    if (isOpen !== wasOpen) {
+        setWasOpen(isOpen);
+        if (isOpen) {
+            setDateStr(
+                initialBooking?.date
+                    ? formatDateOnlyInTz(initialBooking.date, timezone)
+                    : initialDate
+                        ? format(initialDate, "yyyy-MM-dd")
+                        : format(new Date(), "yyyy-MM-dd")
+            );
+            setTime(initialBooking?.date ? formatTimeInTz(initialBooking.date, timezone, '20:00') : "20:00");
+            setPax(String(initialBooking?.pax || 2));
+            setDuration(String(initialBooking?.duration || 90));
+            setName(initialBooking?.guestName || "");
+            setSurname2(initialBooking?.guestSurname2 || "");
+            setEmail(initialBooking?.guestEmail || "");
+            setPhone(initialBooking?.guestPhone || "");
+            setWhatsapp(initialBooking?.guestWhatsapp || "");
+            setAge(initialBooking?.guestAge ? String(initialBooking.guestAge) : "");
+            setGender(initialBooking?.guestGender || "");
+            setNotes(initialBooking?.notes || "");
+            setTagsInput(tagsToInput(initialBooking?.tags));
+            setIsMealPlan(!!initialBooking?.isMealPlan);
+            setInstagram(initialBooking?.instagram || "");
+            setFacebook(initialBooking?.facebook || "");
+            setTiktok(initialBooking?.tiktok || "");
+            setLinkedinHandle(initialBooking?.linkedin || "");
+            setXTwitter(initialBooking?.xTwitter || "");
+            setShowExtra(
+                !!(initialBooking?.guestSurname2 || initialBooking?.guestAge || initialBooking?.guestGender ||
+                    initialBooking?.guestWhatsapp || initialBooking?.isMealPlan || initialBooking?.tags)
+            );
+            setShowSocial(
+                !!(initialBooking?.instagram || initialBooking?.facebook || initialBooking?.tiktok ||
+                    initialBooking?.linkedin || initialBooking?.xTwitter)
+            );
+        }
+    }
 
     // Horas reales según los turnos configurados (incluye horarios especiales y desayunos).
     const [apiSlots, setApiSlots] = useState<string[]>([]);
