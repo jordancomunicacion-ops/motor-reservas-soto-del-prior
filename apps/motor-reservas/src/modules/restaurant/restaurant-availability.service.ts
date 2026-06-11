@@ -81,8 +81,8 @@ export class RestaurantAvailabilityService {
         return { OR: [{ openingId: null }, { openingId: { in: activeOpeningIds } }] };
     }
 
-    async getAvailableSlots(restaurantId: string, dateStr: string, pax: number, type?: string) {
-        this.logger.debug(`Buscando huecos restaurant=${restaurantId} fecha=${dateStr} pax=${pax}`);
+    async getAvailableSlots(restaurantId: string, dateStr: string, pax: number, type?: string, zoneId?: string) {
+        this.logger.debug(`Buscando huecos restaurant=${restaurantId} fecha=${dateStr} pax=${pax}${zoneId ? ` zona=${zoneId}` : ''}`);
         const { timezone, defaultDuration, bufferMinutes, largeGroupApprovalEnabled, largeGroupThreshold } = await this.getRestaurantConfig(restaurantId);
         const dayStr = toDateOnlyString(dateStr);
         const todayStr = toDateOnlyString(new Date());
@@ -182,7 +182,7 @@ export class RestaurantAvailabilityService {
         const activeOpeningIds = await this.activeOpeningIds(restaurantId, dayStr);
         const allTables = await this.prisma.table.findMany({
             where: {
-                zone: { restaurantId },
+                zone: { restaurantId, ...(zoneId ? { id: zoneId } : {}) },
                 isActive: true,
                 ...this.tableOpeningWhere(activeOpeningIds),
             },
@@ -308,8 +308,12 @@ export class RestaurantAvailabilityService {
         client: TxOrPrisma = this.prisma,
         bufferMinutes = 0,
         excludeBookingId?: string,
+        zoneId?: string,
     ): Promise<{ tableId: string; linkedTableIds: string[] } | null> {
         const blockedZoneIds = await this.blockedZoneIdsForRange(restaurantId, date, duration, client);
+
+        // La zona preferida por el cliente queda bloqueada por un evento: no hay mesa válida.
+        if (zoneId && blockedZoneIds.includes(zoneId)) return null;
 
         const { timezone } = await this.getRestaurantConfig(restaurantId);
         const activeOpeningIds = await this.activeOpeningIds(restaurantId, utcToZonedDateOnly(date, timezone), client);
@@ -318,7 +322,7 @@ export class RestaurantAvailabilityService {
             where: {
                 zone: {
                     restaurantId,
-                    id: blockedZoneIds.length > 0 ? { notIn: blockedZoneIds } : undefined,
+                    id: zoneId ?? (blockedZoneIds.length > 0 ? { notIn: blockedZoneIds } : undefined),
                 },
                 isActive: true,
                 ...this.tableOpeningWhere(activeOpeningIds),

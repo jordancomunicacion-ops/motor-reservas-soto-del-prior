@@ -10,7 +10,7 @@ import { fetchAPI } from '@/lib/api';
 import { loadStripe, type Stripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import { WidgetCardForm } from './WidgetCardForm';
-import { BASE_STEPS, type WidgetConfig, type RestaurantResponse, type SlotsResponse, type CreatedBooking, type RestaurantEvent, type Closure, type Opening, type ShiftSlots } from './widget-types';
+import { BASE_STEPS, type WidgetConfig, type RestaurantResponse, type SlotsResponse, type CreatedBooking, type RestaurantEvent, type Closure, type Opening, type ShiftSlots, type WidgetZone } from './widget-types';
 import { computeDayStatus, shouldRequireStripe } from './widget-helpers';
 
 const logWidgetError = (context: string, err: unknown) => {
@@ -79,6 +79,9 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
     const [dayEvents, setDayEvents] = useState<RestaurantEvent[]>([]);
     const [selectedEvent, setSelectedEvent] = useState<RestaurantEvent | null>(null);
     const [eventDates, setEventDates] = useState<string[]>([]);
+    const [zones, setZones] = useState<WidgetZone[]>([]);
+    // null = sin preferencia de zona (el motor elige en cualquier zona del local)
+    const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
 
     const [additionalData, setAdditionalData] = useState({
         surname2: '',
@@ -149,12 +152,17 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
                 }
             })
             .catch(err => logWidgetError('load events', err));
+        fetchAPI<WidgetZone[]>(`/restaurant/${restaurantId}/public-zones`)
+            .then(data => {
+                if (Array.isArray(data)) setZones(data);
+            })
+            .catch(err => logWidgetError('load zones', err));
     }, [restaurantId]);
 
     useEffect(() => {
         if (selectedDate) handleDateSelect(selectedDate);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [pax]);
+    }, [pax, selectedZoneId]);
 
     const getDayStatus = (date: Date) => computeDayStatus(date, closures, restaurantShifts, eventDates, openings);
 
@@ -168,7 +176,8 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
 
         try {
             const dateStr = format(date, 'yyyy-MM-dd');
-            const data = await fetchAPI<SlotsResponse>(`/restaurant/${restaurantId}/slots?date=${dateStr}&pax=${pax}`);
+            const zoneParam = selectedZoneId ? `&zoneId=${selectedZoneId}` : '';
+            const data = await fetchAPI<SlotsResponse>(`/restaurant/${restaurantId}/slots?date=${dateStr}&pax=${pax}${zoneParam}`);
 
             const groups = data?.shiftSlots || [];
             // Fallback: si el backend antiguo no devuelve shiftSlots, los inferimos del array plano.
@@ -259,6 +268,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
                         linkedin: additionalData.linkedin || undefined,
                         xTwitter: additionalData.xTwitter || undefined,
                         paymentMethodId,
+                        zoneId: selectedZoneId || undefined,
                     }),
                 });
             }
@@ -414,6 +424,42 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
                                             </button>
                                         </div>
                                     </div>
+
+                                    {/* Zone Selector: sólo si el local tiene más de una zona activa */}
+                                    {zones.length > 1 && (
+                                        <div className="mb-6 bg-gray-50 p-3 rounded-none border-l-4 border-[#C59D5F]">
+                                            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2 block" style={{ fontFamily: "'Oswald', sans-serif" }}>¿Dónde prefieres sentarte?</label>
+                                            <div className="flex flex-wrap gap-2">
+                                                <button
+                                                    onClick={() => setSelectedZoneId(null)}
+                                                    className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-colors"
+                                                    style={{
+                                                        fontFamily: "'Oswald', sans-serif",
+                                                        backgroundColor: selectedZoneId === null ? colors.accent : 'white',
+                                                        color: selectedZoneId === null ? 'white' : colors.text,
+                                                        borderColor: selectedZoneId === null ? colors.accent : '#E5E7EB',
+                                                    }}
+                                                >
+                                                    Cualquiera
+                                                </button>
+                                                {zones.map(zone => (
+                                                    <button
+                                                        key={zone.id}
+                                                        onClick={() => setSelectedZoneId(zone.id)}
+                                                        className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-colors"
+                                                        style={{
+                                                            fontFamily: "'Oswald', sans-serif",
+                                                            backgroundColor: selectedZoneId === zone.id ? colors.accent : 'white',
+                                                            color: selectedZoneId === zone.id ? 'white' : colors.text,
+                                                            borderColor: selectedZoneId === zone.id ? colors.accent : '#E5E7EB',
+                                                        }}
+                                                    >
+                                                        {zone.name}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
 
                                     <div className="flex justify-between items-center mb-2">
                                         <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-1 hover:bg-gray-100 rounded-full transition-colors bg-transparent text-gray-500">
@@ -625,6 +671,12 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
                                         <div className="font-bold text-gray-500 w-16 uppercase text-xs">Lugar</div>
                                         <div>{restaurantName || 'Restaurante'}</div>
                                     </div>
+                                    {selectedZoneId && (
+                                        <div className="flex items-center gap-2">
+                                            <div className="font-bold text-gray-500 w-16 uppercase text-xs">Zona</div>
+                                            <div>{zones.find(z => z.id === selectedZoneId)?.name || ''}</div>
+                                        </div>
+                                    )}
                                 </div>
                                 {selectedEvent && (
                                     <div className="mt-3 pt-3 border-t border-dashed border-gray-300 flex items-center gap-2 text-indigo-700">

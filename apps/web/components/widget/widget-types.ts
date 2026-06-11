@@ -25,6 +25,13 @@ export type Shift = {
     daysOfWeek: string;
 };
 
+/** Zona del local (Comedor, Bar...) que el cliente puede elegir al reservar. */
+export type WidgetZone = {
+    id: string;
+    name: string;
+    index: number;
+};
+
 export type WidgetConfig = {
     primaryColor?: string | null;
     customCss?: string | null;

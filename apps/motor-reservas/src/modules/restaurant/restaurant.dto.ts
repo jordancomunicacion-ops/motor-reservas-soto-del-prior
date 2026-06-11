@@ -133,6 +133,11 @@ export class CreatePublicReservationDto {
   @IsOptional()
   @IsString()
   paymentMethodId?: string;
+
+  /** Zona preferida del local elegida por el cliente (Comedor, Bar...). */
+  @IsOptional()
+  @IsString()
+  zoneId?: string;
 }
 
 export class UpdateBookingStatusDto {

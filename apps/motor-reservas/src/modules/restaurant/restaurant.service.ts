@@ -575,6 +575,34 @@ export class RestaurantService {
     // --- Bookings ---
     async updateBooking(id: string, data: any, user?: AuthenticatedUser) {
         if (user) await ensureRestaurantAccess(user, this.prisma, await this.restaurantIdForBooking(id));
+
+        // Si la reserva ya tiene mesa asignada (manual o automática) y la edición
+        // cambia fecha/hora, duración o pax, la mesa se conserva pero hay que
+        // validar que siga libre en el nuevo horario y recalcular el cluster.
+        // Sin esta comprobación una edición desde el admin podía dejar dos
+        // reservas solapadas sobre la misma mesa.
+        const prev = await this.prisma.resBooking.findUnique({
+            where: { id },
+            select: { tableId: true, pax: true, date: true, duration: true, restaurantId: true, metadata: true },
+        });
+        const keptTableId = data.tableId ?? prev?.tableId;
+        if (prev && keptTableId && prev.restaurantId && data.tableId !== null) {
+            const newDate = data.date ? new Date(data.date) : prev.date;
+            const newDuration = data.duration ?? prev.duration;
+            const newPax = data.pax ?? prev.pax;
+            const slotChanged = newDate.getTime() !== prev.date.getTime()
+                || newDuration !== prev.duration
+                || newPax !== prev.pax
+                || keptTableId !== prev.tableId;
+            if (slotChanged) {
+                if (await this.isTableOccupied(prev.restaurantId, keptTableId, newDate, newDuration, id)) {
+                    throw new ConflictException('La mesa asignada está ocupada por otra reserva en el nuevo horario. Cambia primero la mesa o elige otro horario.');
+                }
+                const linked = await this.computeManualCluster(prev.restaurantId, keptTableId, newPax, newDate, newDuration, id);
+                data.metadata = { ...((prev.metadata as any) || {}), linkedTableIds: linked };
+            }
+        }
+
         return this.prisma.resBooking.update({
             where: { id },
             data,
@@ -888,8 +916,20 @@ export class RestaurantService {
         }
     }
 
-    getAvailableSlots(restaurantId: string, dateStr: string, pax: number, type?: string) {
-        return this.availability.getAvailableSlots(restaurantId, dateStr, pax, type);
+    getAvailableSlots(restaurantId: string, dateStr: string, pax: number, type?: string, zoneId?: string) {
+        return this.availability.getAvailableSlots(restaurantId, dateStr, pax, type, zoneId);
+    }
+
+    /**
+     * Zonas activas del restaurante para el widget público: sólo id, nombre y orden.
+     * Permite al cliente elegir en qué zona del local quiere reservar.
+     */
+    getPublicZones(restaurantId: string) {
+        return this.prisma.zone.findMany({
+            where: { restaurantId, isActive: true },
+            select: { id: true, name: true, index: true },
+            orderBy: { index: 'asc' },
+        });
     }
 
     async createLinkedReservation(data: {
@@ -1000,6 +1040,10 @@ export class RestaurantService {
 
         const { timezone, defaultDuration, bufferMinutes } = await this.getRestaurantConfig(booking.restaurantId);
 
+        // Mantener la zona elegida por el cliente al crear la reserva.
+        const bookingMeta = (booking.metadata as { preferredZoneId?: unknown } | null) || {};
+        const preferredZoneId = typeof bookingMeta.preferredZoneId === 'string' ? bookingMeta.preferredZoneId : undefined;
+
         const changingSlot = body.date != null || body.time != null || (body.pax != null && body.pax !== booking.pax);
         let newStart = booking.date;
         const newPax = body.pax ?? booking.pax;
@@ -1040,7 +1084,7 @@ export class RestaurantService {
 
             if (newPax <= 12) {
                 const preCheck = await this.availability.findAvailableCluster(
-                    booking.restaurantId, newStart, newPax, defaultDuration, this.prisma, bufferMinutes, booking.id
+                    booking.restaurantId, newStart, newPax, defaultDuration, this.prisma, bufferMinutes, booking.id, preferredZoneId
                 );
                 if (!preCheck) {
                     throw new BadRequestException('No hay disponibilidad para la nueva fecha/hora.');
@@ -1062,7 +1106,7 @@ export class RestaurantService {
 
             if (changingSlot && newPax <= 12) {
                 const cluster = await this.availability.findAvailableCluster(
-                    booking.restaurantId, newStart, newPax, defaultDuration, tx, bufferMinutes, booking.id
+                    booking.restaurantId, newStart, newPax, defaultDuration, tx, bufferMinutes, booking.id, preferredZoneId
                 );
                 if (cluster) {
                     return tx.resBooking.update({
@@ -1143,9 +1187,23 @@ export class RestaurantService {
         // Pre-check: disponibilidad para grupos ≤ 12 (los grandes se gestionan a mano).
         // Si el grupo requiere autorización, se omite el pre-check: la reserva se acepta
         // y el restaurante decide manualmente, aunque ahora mismo no haya hueco automático.
+        // Zona preferida elegida por el cliente en el widget (opcional). Se valida que
+        // pertenezca al restaurante para no aceptar ids arbitrarios.
+        let preferredZoneId: string | undefined;
+        if (data.zoneId) {
+            const zone = await this.prisma.zone.findFirst({
+                where: { id: data.zoneId, restaurantId: data.restaurantId, isActive: true },
+                select: { id: true },
+            });
+            if (!zone) {
+                throw new BadRequestException('La zona seleccionada no existe o no está disponible.');
+            }
+            preferredZoneId = zone.id;
+        }
+
         if (!requiresApproval && data.pax <= 12) {
             const preCheck = await this.availability.findAvailableCluster(
-                data.restaurantId, start, data.pax, defaultDuration, this.prisma, bufferMinutes
+                data.restaurantId, start, data.pax, defaultDuration, this.prisma, bufferMinutes, undefined, preferredZoneId
             );
             if (!preCheck) {
                 throw new BadRequestException('No hay disponibilidad para la hora solicitada.');
@@ -1176,12 +1234,15 @@ export class RestaurantService {
                         : $Enums.ResBookingStatus.PENDING_CONFIRMATION,
                     origin: ResBookingOrigin.WEB,
                     stripePaymentMethodId: data.paymentMethodId,
-                    modifyToken: randomBytes(24).toString('hex')
+                    modifyToken: randomBytes(24).toString('hex'),
+                    // Guardamos la preferencia para que las reasignaciones posteriores
+                    // (autoAssignPendingBookings, ediciones) la sigan respetando.
+                    ...(preferredZoneId ? { metadata: { preferredZoneId } } : {})
                 }
             });
 
             if (data.pax <= 12) {
-                const cluster = await this.availability.findAvailableCluster(data.restaurantId, start, data.pax, defaultDuration, tx, bufferMinutes);
+                const cluster = await this.availability.findAvailableCluster(data.restaurantId, start, data.pax, defaultDuration, tx, bufferMinutes, undefined, preferredZoneId);
                 if (cluster) {
                     return tx.resBooking.update({
                         where: { id: created.id },
@@ -1531,7 +1592,9 @@ export class RestaurantService {
                 restaurantId,
                 date: { gte: startOfDay, lte: endOfDay },
                 tableId: null,
-                status: { notIn: [ResBookingStatus.CANCELLED, ResBookingStatus.NO_SHOW] }
+                // RELEASED también queda fuera: esas reservas ya no bloquean mesa,
+                // asignarles una sólo generaría ruido en el plano de sala.
+                status: { notIn: [ResBookingStatus.CANCELLED, ResBookingStatus.NO_SHOW, ResBookingStatus.RELEASED] }
             },
             orderBy: { pax: 'desc' }
         });
@@ -1543,7 +1606,11 @@ export class RestaurantService {
         for (const booking of pendingBookings) {
             if (booking.pax > 12) continue;
 
-            const cluster = await this.availability.findAvailableCluster(restaurantId, new Date(booking.date), booking.pax, defaultDuration, this.prisma, bufferMinutes);
+            // Si el cliente eligió zona en el widget, la reasignación automática la respeta.
+            const meta = (booking.metadata as { preferredZoneId?: unknown } | null) || {};
+            const preferredZoneId = typeof meta.preferredZoneId === 'string' ? meta.preferredZoneId : undefined;
+
+            const cluster = await this.availability.findAvailableCluster(restaurantId, new Date(booking.date), booking.pax, defaultDuration, this.prisma, bufferMinutes, undefined, preferredZoneId);
             if (cluster) {
                 await this.prisma.resBooking.update({
                     where: { id: booking.id },

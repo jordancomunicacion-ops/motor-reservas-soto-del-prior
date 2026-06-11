@@ -75,6 +75,14 @@ export class RestaurantController {
         return this.service.getTables(id, undefined, req?.user); // getTables returns the zones with tables
     }
 
+    // @Public: el widget muestra un selector de zona (Comedor, Bar...) al cliente.
+    // Sólo expone id, nombre y orden de las zonas activas — sin datos sensibles.
+    @Public()
+    @Get(':id/public-zones')
+    getPublicZones(@Param('id') id: string) {
+        return this.service.getPublicZones(id);
+    }
+
     @Post(':id/zones/sync')
     syncZones(@Param('id') id: string, @Body() body: any[], @Req() req: AuthenticatedRequest) {
         return this.service.syncZones(id, body, req?.user);
@@ -229,9 +237,10 @@ export class RestaurantController {
         @Param('id') id: string,
         @Query('date') date: string,
         @Query('pax') pax: string,
-        @Query('type') type?: string
+        @Query('type') type?: string,
+        @Query('zoneId') zoneId?: string
     ) {
-        return this.service.getAvailableSlots(id, date, parseInt(pax), type);
+        return this.service.getAvailableSlots(id, date, parseInt(pax), type, zoneId || undefined);
     }
 
     @Get(':id/shifts')
