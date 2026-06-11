@@ -289,6 +289,11 @@ export class RestaurantController {
         return this.service.createOpening(id, body, req?.user);
     }
 
+    @Patch('openings/:openingId')
+    updateOpening(@Param('openingId') openingId: string, @Body() body: any, @Req() req: AuthenticatedRequest) {
+        return this.service.updateOpening(openingId, body, req?.user);
+    }
+
     @Delete(':id/openings/:openingId')
     deleteOpening(@Param('openingId') openingId: string, @Req() req: AuthenticatedRequest) {
         return this.service.deleteOpening(openingId, req?.user);
