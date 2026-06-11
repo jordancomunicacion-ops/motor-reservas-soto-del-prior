@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { PageHeader } from '@/components/ui/page-header';
 import { ArrowLeft, Save, Building2, Trash2, Hotel, Users, Sparkles, Mail, Star, Info } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import Link from 'next/link';
 import { ShiftsManager } from '@/components/admin/ShiftsManager';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -23,6 +24,8 @@ interface RestaurantDetail {
     timezone?: string;
     hotel?: { id: string } | null;
     defaultDuration?: number;
+    largeGroupApprovalEnabled?: boolean;
+    largeGroupThreshold?: number;
     contactEmail?: string | null;
     emailTemplates?: typeof DEFAULT_EMAIL_TEMPLATES | null;
     mailConfig?: MailConfigValue | null;
@@ -77,6 +80,8 @@ function RestaurantConfigContent() {
         timezone: 'Europe/Madrid',
         hotelId: '',
         defaultDuration: 90,
+        largeGroupApprovalEnabled: false,
+        largeGroupThreshold: 10,
         contactEmail: '',
         googleReviewUrl: '',
         reviewMinScoreForGoogle: 4,
@@ -118,6 +123,8 @@ function RestaurantConfigContent() {
                 timezone: data.timezone || 'Europe/Madrid',
                 hotelId: data.hotel?.id || '',
                 defaultDuration: data.defaultDuration || 90,
+                largeGroupApprovalEnabled: data.largeGroupApprovalEnabled ?? false,
+                largeGroupThreshold: data.largeGroupThreshold ?? 10,
                 contactEmail: data.contactEmail || '',
                 googleReviewUrl: data.googleReviewUrl || '',
                 reviewMinScoreForGoogle: data.reviewMinScoreForGoogle ?? 4,
@@ -156,6 +163,8 @@ function RestaurantConfigContent() {
                     currency: formData.currency,
                     hotelId: formData.hotelId,
                     defaultDuration: Number(formData.defaultDuration),
+                    largeGroupApprovalEnabled: formData.largeGroupApprovalEnabled,
+                    largeGroupThreshold: Math.max(1, Number(formData.largeGroupThreshold) || 10),
                     contactEmail: formData.contactEmail,
                     googleReviewUrl: formData.googleReviewUrl?.trim() || null,
                     reviewMinScoreForGoogle: Number(formData.reviewMinScoreForGoogle) || 4,
@@ -281,6 +290,40 @@ function RestaurantConfigContent() {
                             />
                             <span className="text-sm text-muted-foreground italic">Duración estimada de una comida/cena.</span>
                         </div>
+                    </div>
+
+                    <div className="pt-4 border-t border-border/60 space-y-4">
+                        <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                            <Users className="size-4" /> Reservas de Grupos Grandes
+                        </div>
+                        <div className="flex items-center justify-between gap-4 rounded-md border border-border/60 p-3">
+                            <div>
+                                <p className="text-sm font-medium">Requerir autorización para grupos grandes</p>
+                                <p className="text-xs text-muted-foreground">
+                                    Cuando está activo, las reservas web a partir del número de comensales indicado se aceptan aunque el motor no encuentre mesas libres, pero quedan pendientes de tu autorización (puedes reorganizar las mesas a mano).
+                                </p>
+                            </div>
+                            <Switch
+                                checked={formData.largeGroupApprovalEnabled}
+                                onCheckedChange={(checked) => setFormData({ ...formData, largeGroupApprovalEnabled: checked })}
+                            />
+                        </div>
+                        {formData.largeGroupApprovalEnabled && (
+                            <div className="space-y-1.5">
+                                <Label htmlFor="rest-large-group" className="text-eyebrow">Se considera grupo grande a partir de (personas)</Label>
+                                <div className="flex items-center gap-2">
+                                    <Input
+                                        id="rest-large-group"
+                                        type="number"
+                                        min={1}
+                                        className="h-10 w-32"
+                                        value={formData.largeGroupThreshold}
+                                        onChange={(e) => setFormData({ ...formData, largeGroupThreshold: parseInt(e.target.value) || 1 })}
+                                    />
+                                    <span className="text-sm text-muted-foreground italic">A partir de este número, la reserva requiere confirmación del restaurante.</span>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <div className="pt-4 border-t border-border/60 space-y-4">

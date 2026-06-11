@@ -61,6 +61,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [timeSlots, setTimeSlots] = useState<{ lunch: string[]; dinner: string[]; groups: ShiftSlots[] } | null>(null);
+    const [requiresApproval, setRequiresApproval] = useState(false);
     const [selectedTime, setSelectedTime] = useState<string | null>(null);
     const [formData, setFormData] = useState({ name: '', surname: '', email: '', phone: '', prefix: '+34' });
     const [pax, setPax] = useState(2);
@@ -180,6 +181,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
                 dinner,
                 groups,
             });
+            setRequiresApproval(!!data?.requiresApproval);
             const eventsFromResponse =
                 data?.events ??
                 (data?.event ? [data.event as RestaurantEvent] : []);
@@ -189,6 +191,7 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
         } catch (e) {
             console.error('Error fetching slots:', e);
             setTimeSlots({ lunch: [], dinner: [], groups: [] });
+            setRequiresApproval(false);
             setDayEvents([]);
         } finally {
             setLoadingSlots(false);
@@ -486,6 +489,15 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
                                             <span className="text-[#C59D5F]">Disponibilidad:</span> {format(selectedDate, "d 'de' MMMM", { locale: es })}
                                         </h3>
 
+                                        {requiresApproval && (
+                                            <div className="mb-4 p-3 bg-amber-50 border-l-4 border-amber-400 flex gap-2 items-start">
+                                                <Info className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                                                <p className="text-xs text-amber-800">
+                                                    Para grupos de <strong>{pax} personas</strong>, la reserva queda <strong>pendiente de confirmación</strong> del restaurante. Elige tu hora preferida y te contactaremos para confirmar la disponibilidad.
+                                                </p>
+                                            </div>
+                                        )}
+
                                         {dayEvents.length > 0 && (
                                             <div className="mb-6 space-y-3">
                                                 {dayEvents.map(evt => {
@@ -744,14 +756,17 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
                     )}
 
                     {/* STEP 4: CONFIRMATION */}
-                    {currentStep === 4 && (
+                    {currentStep === 4 && (() => {
+                        const pendingApproval = createdBooking?.status === 'PENDING_APPROVAL';
+                        const amberHeader = createdBooking?.isWaitlist || pendingApproval;
+                        return (
                         <div className="animate-in fade-in zoom-in duration-500 h-full pt-4 text-center">
                             <div className="flex flex-col items-center justify-center pb-8 border-b border-gray-100 mb-8">
-                                <div className={`w-20 h-20 rounded-full flex items-center justify-center shadow-lg mb-6 ${createdBooking?.isWaitlist ? 'bg-amber-500' : 'bg-[#C59D5F]'}`}>
-                                    {createdBooking?.isWaitlist ? <Clock className="w-10 h-10 text-white" /> : <Check className="w-10 h-10 text-white" strokeWidth={4} />}
+                                <div className={`w-20 h-20 rounded-full flex items-center justify-center shadow-lg mb-6 ${amberHeader ? 'bg-amber-500' : 'bg-[#C59D5F]'}`}>
+                                    {amberHeader ? <Clock className="w-10 h-10 text-white" /> : <Check className="w-10 h-10 text-white" strokeWidth={4} />}
                                 </div>
                                 <h2 className="text-3xl font-bold uppercase tracking-wide" style={{ fontFamily: "'Oswald', sans-serif" }}>
-                                    {createdBooking?.isWaitlist ? 'Lista de Espera' : 'Reserva Confirmada'}
+                                    {createdBooking?.isWaitlist ? 'Lista de Espera' : pendingApproval ? 'Solicitud Recibida' : 'Reserva Confirmada'}
                                 </h2>
                             </div>
                             <div className="max-w-md mx-auto space-y-3 mb-8">
@@ -762,13 +777,16 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
                                 <p>
                                     {createdBooking?.isWaitlist
                                         ? `Te avisaremos si se libera una mesa para ${pax} personas.`
-                                        : `${pax} personas en ${restaurantName}.`
+                                        : pendingApproval
+                                            ? `Hemos recibido tu solicitud para ${pax} personas en ${restaurantName}. El restaurante confirmará la disponibilidad y te avisará en breve.`
+                                            : `${pax} personas en ${restaurantName}.`
                                     }
                                 </p>
                             </div>
                             <Button className="px-8 py-3 bg-black text-white font-bold uppercase tracking-wider text-xs rounded-none" onClick={() => window.location.reload()}>Volver al Inicio</Button>
                         </div>
-                    )}
+                        );
+                    })()}
 
                     {/* STEP 5: WAITLIST FORM */}
                     {currentStep === 5 && selectedDate && (

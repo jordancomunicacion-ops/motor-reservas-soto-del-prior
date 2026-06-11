@@ -91,15 +91,17 @@ export class RestaurantService {
         return o.restaurantId;
     }
 
-    private async getRestaurantConfig(restaurantId: string): Promise<{ timezone: string; defaultDuration: number; bufferMinutes: number }> {
+    private async getRestaurantConfig(restaurantId: string): Promise<{ timezone: string; defaultDuration: number; bufferMinutes: number; largeGroupApprovalEnabled: boolean; largeGroupThreshold: number }> {
         const r = await this.prisma.restaurant.findUnique({
             where: { id: restaurantId },
-            select: { timezone: true, defaultDuration: true, bufferMinutes: true }
+            select: { timezone: true, defaultDuration: true, bufferMinutes: true, largeGroupApprovalEnabled: true, largeGroupThreshold: true }
         });
         return {
             timezone: r?.timezone || 'Europe/Madrid',
             defaultDuration: r?.defaultDuration || 90,
-            bufferMinutes: r?.bufferMinutes ?? 15
+            bufferMinutes: r?.bufferMinutes ?? 15,
+            largeGroupApprovalEnabled: r?.largeGroupApprovalEnabled ?? false,
+            largeGroupThreshold: r?.largeGroupThreshold ?? 10
         };
     }
 
@@ -1102,9 +1104,14 @@ export class RestaurantService {
         if (!data?.time) {
             throw new BadRequestException('Falta el campo "time" (HH:mm) en la reserva.');
         }
-        const { timezone, defaultDuration, bufferMinutes } = await this.getRestaurantConfig(data.restaurantId);
+        const { timezone, defaultDuration, bufferMinutes, largeGroupApprovalEnabled, largeGroupThreshold } = await this.getRestaurantConfig(data.restaurantId);
         const dayStr = toDateOnlyString(data.date);
         const start = zonedDateToUtc(dayStr, data.time, timezone);
+
+        // Grupo grande: a partir del umbral configurado la reserva se acepta aunque
+        // el motor no encuentre mesas libres (el restaurante reorganiza a mano), pero
+        // queda pendiente de autorización manual.
+        const requiresApproval = largeGroupApprovalEnabled && data.pax >= largeGroupThreshold;
 
         // Pre-check: cierres del restaurante. Una apertura excepcional para esa fecha anula el cierre.
         const opening = await this.prisma.restaurantOpening.findFirst({
@@ -1134,7 +1141,9 @@ export class RestaurantService {
         }
 
         // Pre-check: disponibilidad para grupos ≤ 12 (los grandes se gestionan a mano).
-        if (data.pax <= 12) {
+        // Si el grupo requiere autorización, se omite el pre-check: la reserva se acepta
+        // y el restaurante decide manualmente, aunque ahora mismo no haya hueco automático.
+        if (!requiresApproval && data.pax <= 12) {
             const preCheck = await this.availability.findAvailableCluster(
                 data.restaurantId, start, data.pax, defaultDuration, this.prisma, bufferMinutes
             );
@@ -1162,7 +1171,9 @@ export class RestaurantService {
                     linkedin: data.linkedin,
                     xTwitter: data.xTwitter,
                     notes: data.notes,
-                    status: $Enums.ResBookingStatus.PENDING_CONFIRMATION,
+                    status: requiresApproval
+                        ? $Enums.ResBookingStatus.PENDING_APPROVAL
+                        : $Enums.ResBookingStatus.PENDING_CONFIRMATION,
                     origin: ResBookingOrigin.WEB,
                     stripePaymentMethodId: data.paymentMethodId,
                     modifyToken: randomBytes(24).toString('hex')

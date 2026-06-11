@@ -38,6 +38,7 @@ enum BookingSource {
 enum ResBookingStatus {
   PENDING
   PENDING_CONFIRMATION
+  PENDING_APPROVAL
   CONFIRMED
   RELEASED
   SEATED
@@ -542,6 +543,13 @@ model Restaurant {
   defaultDuration Int                  @default(90)
   timezone        String               @default("Europe/Madrid")
   bufferMinutes   Int                  @default(15)
+
+  // Reservas de grupos grandes: a partir de `largeGroupThreshold` comensales, si
+  // `largeGroupApprovalEnabled`, la reserva se acepta aunque el motor no encuentre
+  // mesas libres, pero queda PENDING_APPROVAL a la espera de autorización manual.
+  largeGroupApprovalEnabled Boolean @default(false)
+  largeGroupThreshold       Int     @default(10)
+
   zones           Zone[]
   bookings        ResBooking[]
   waitlist        RestaurantWaitlist[]

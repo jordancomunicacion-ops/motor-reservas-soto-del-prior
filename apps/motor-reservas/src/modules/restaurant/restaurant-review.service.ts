@@ -11,6 +11,7 @@ const NON_REVIEWABLE_STATUSES: $Enums.ResBookingStatus[] = [
     $Enums.ResBookingStatus.CANCELLED,
     $Enums.ResBookingStatus.NO_SHOW,
     $Enums.ResBookingStatus.PENDING_CONFIRMATION,
+    $Enums.ResBookingStatus.PENDING_APPROVAL,
     $Enums.ResBookingStatus.RELEASED,
     $Enums.ResBookingStatus.PENDING,
 ];

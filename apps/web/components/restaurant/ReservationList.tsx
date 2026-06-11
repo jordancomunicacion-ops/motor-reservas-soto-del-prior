@@ -85,6 +85,7 @@ const STATUS_TONE: Record<string, StatusTone> = {
     NO_SHOW: 'danger',
     CANCELLED: 'neutral',
     PENDING_CONFIRMATION: 'warning',
+    PENDING_APPROVAL: 'accent',
     CONFIRMED: 'success',
     BAR_ARRIVAL: 'accent',
     SEATED: 'success',
@@ -100,6 +101,7 @@ const STATUS_LABELS: Record<string, string> = {
     NO_SHOW: "No Show",
     CANCELLED: "Cancelada",
     PENDING_CONFIRMATION: "Pendiente",
+    PENDING_APPROVAL: "Autorizar grupo",
     CONFIRMED: "Confirmada",
     BAR_ARRIVAL: "En Barra",
     SEATED: "Sentada",
@@ -116,6 +118,7 @@ const STATUS_LABELS: Record<string, string> = {
 // PENDING se omite: es un estado transitorio previo al pago.
 const MANUAL_STATUSES = [
     'PENDING_CONFIRMATION',
+    'PENDING_APPROVAL',
     'CONFIRMED',
     'BAR_ARRIVAL',
     'SEATED',
@@ -255,6 +258,11 @@ export default function ReservationList({ bookings, zones = [], onStatusChange, 
                                         {(booking.status === 'PENDING' || booking.status === 'PENDING_CONFIRMATION') && (
                                             <Button size="sm" variant="success" className="h-7 text-[10px]" onClick={() => onStatusChange(booking.id, 'CONFIRMED')}>
                                                 Confirmar
+                                            </Button>
+                                        )}
+                                        {booking.status === 'PENDING_APPROVAL' && (
+                                            <Button size="sm" variant="success" className="h-7 text-[10px]" onClick={() => onStatusChange(booking.id, 'CONFIRMED')}>
+                                                Autorizar
                                             </Button>
                                         )}
                                         {booking.status === 'CONFIRMED' && (

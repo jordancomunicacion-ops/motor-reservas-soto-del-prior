@@ -207,7 +207,7 @@ export class CrmService {
                 (profile.phone && b.guestPhone === profile.phone)
             );
 
-            const committed = matching.filter(b => b.status !== 'PENDING_CONFIRMATION');
+            const committed = matching.filter(b => b.status !== 'PENDING_CONFIRMATION' && b.status !== 'PENDING_APPROVAL');
             const totalBookings = committed.length;
             const seatedCount = committed.filter(b => b.status === 'SEATED').length;
             const cancelledCount = committed.filter(b => b.status === 'CANCELLED' || b.status === 'NO_SHOW').length;

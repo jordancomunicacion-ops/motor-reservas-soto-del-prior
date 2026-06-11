@@ -87,9 +87,13 @@ export interface SlotsResponse {
     events?: RestaurantEvent[];
     /** @deprecated Se mantiene por compatibilidad: usar `events` en su lugar. */
     event?: RestaurantEvent | null;
+    /** Grupo grande: los horarios mostrados quedan sujetos a autorización del restaurante. */
+    requiresApproval?: boolean;
 }
 
 export interface CreatedBooking {
     id?: string;
     isWaitlist?: boolean;
+    /** Estado de la reserva creada (p.ej. PENDING_APPROVAL para grupos grandes). */
+    status?: string;
 }
