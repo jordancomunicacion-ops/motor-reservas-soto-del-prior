@@ -6,7 +6,7 @@ import { CrmService } from '../crm/crm.service';
 import { CrmIntegrationService } from '../crm/crm-integration.service';
 import { MailService } from '../mail/mail.service';
 import { ResBookingOrigin, ResBookingStatus } from '../../common/enums';
-import { $Enums } from '@prisma/client';
+import { $Enums, Prisma } from '@prisma/client';
 import { getUserScope, assertRestaurantAccess, ensureRestaurantAccess, ensureHotelAccess, type AuthenticatedUser } from '../../common/scope';
 import { RestaurantAvailabilityService } from './restaurant-availability.service';
 import { RestaurantAccessService } from './restaurant-access.service';
@@ -1326,8 +1326,49 @@ export class RestaurantService {
         if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
         if (!data.date) throw new BadRequestException('La fecha es obligatoria');
 
-        const shiftIds = Array.isArray(data.shiftIds) ? data.shiftIds.filter(Boolean) : [];
-        const customShifts = Array.isArray(data.customShifts) ? data.customShifts : [];
+        const { shiftIds, customShifts } = await this.validateOpeningShifts(restaurantId, data.shiftIds, data.customShifts);
+
+        const extraTablesData = await this.buildOpeningTablesData(restaurantId, data.extraTables ?? []);
+
+        return this.prisma.$transaction(async (tx) => {
+            const opening = await tx.restaurantOpening.create({
+                data: {
+                    restaurantId,
+                    date: new Date(data.date),
+                    endDate: data.endDate ? new Date(data.endDate) : null,
+                    reason: data.reason,
+                    shiftIds: shiftIds.join(','),
+                    customShifts: customShifts.length > 0 ? customShifts : undefined
+                }
+            });
+
+            for (const td of extraTablesData) {
+                await tx.table.create({ data: { ...td, openingId: opening.id } });
+            }
+
+            return tx.restaurantOpening.findUnique({
+                where: { id: opening.id },
+                include: {
+                    tables: {
+                        select: { id: true, name: true, capacity: true, minPax: true, maxPax: true, zoneId: true },
+                        orderBy: { name: 'asc' },
+                    },
+                },
+            });
+        });
+    }
+
+    /**
+     * Valida y normaliza los turnos (reutilizados y puntuales) de una apertura.
+     * Comparte reglas entre createOpening y updateOpening.
+     */
+    private async validateOpeningShifts(
+        restaurantId: string,
+        shiftIdsRaw?: string[],
+        customShiftsRaw?: Array<{ name: string; type: string; startTime: string; endTime: string; slotInterval: number }>,
+    ): Promise<{ shiftIds: string[]; customShifts: Array<{ name: string; type: string; startTime: string; endTime: string; slotInterval: number }> }> {
+        const shiftIds = Array.isArray(shiftIdsRaw) ? shiftIdsRaw.filter(Boolean) : [];
+        const customShifts = Array.isArray(customShiftsRaw) ? customShiftsRaw : [];
 
         if (shiftIds.length === 0 && customShifts.length === 0) {
             throw new BadRequestException('Selecciona al menos un turno existente o define uno puntual');
@@ -1363,33 +1404,49 @@ export class RestaurantService {
             }
         }
 
-        const extraTablesData = await this.buildOpeningTablesData(restaurantId, data.extraTables ?? []);
+        return { shiftIds, customShifts };
+    }
 
-        return this.prisma.$transaction(async (tx) => {
-            const opening = await tx.restaurantOpening.create({
-                data: {
-                    restaurantId,
-                    date: new Date(data.date),
-                    endDate: data.endDate ? new Date(data.endDate) : null,
-                    reason: data.reason,
-                    shiftIds: shiftIds.join(','),
-                    customShifts: customShifts.length > 0 ? customShifts : undefined
-                }
-            });
+    /**
+     * Actualiza fecha(s), motivo y turnos de una apertura excepcional existente.
+     * Las mesas extra se gestionan aparte (addOpeningTables / deleteTable).
+     */
+    async updateOpening(
+        openingId: string,
+        data: {
+            date?: string;
+            endDate?: string | null;
+            reason?: string;
+            shiftIds?: string[];
+            customShifts?: Array<{ name: string; type: string; startTime: string; endTime: string; slotInterval: number }>;
+        },
+        user?: AuthenticatedUser
+    ) {
+        const restaurantId = await this.restaurantIdForOpening(openingId);
+        if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
+        if (!data.date) throw new BadRequestException('La fecha es obligatoria');
 
-            for (const td of extraTablesData) {
-                await tx.table.create({ data: { ...td, openingId: opening.id } });
+        const { shiftIds, customShifts } = await this.validateOpeningShifts(restaurantId, data.shiftIds, data.customShifts);
+
+        await this.prisma.restaurantOpening.update({
+            where: { id: openingId },
+            data: {
+                date: new Date(data.date),
+                endDate: data.endDate ? new Date(data.endDate) : null,
+                reason: data.reason,
+                shiftIds: shiftIds.join(','),
+                customShifts: customShifts.length > 0 ? customShifts : Prisma.DbNull,
             }
+        });
 
-            return tx.restaurantOpening.findUnique({
-                where: { id: opening.id },
-                include: {
-                    tables: {
-                        select: { id: true, name: true, capacity: true, minPax: true, maxPax: true, zoneId: true },
-                        orderBy: { name: 'asc' },
-                    },
+        return this.prisma.restaurantOpening.findUnique({
+            where: { id: openingId },
+            include: {
+                tables: {
+                    select: { id: true, name: true, capacity: true, minPax: true, maxPax: true, zoneId: true },
+                    orderBy: { name: 'asc' },
                 },
-            });
+            },
         });
     }
 

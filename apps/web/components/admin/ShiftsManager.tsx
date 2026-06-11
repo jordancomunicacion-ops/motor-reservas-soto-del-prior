@@ -111,6 +111,7 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
 
     const [openings, setOpenings] = useState<Opening[]>([]);
     const [openingType, setOpeningType] = useState<'SINGLE' | 'PERIOD'>('SINGLE');
+    const [editingOpeningId, setEditingOpeningId] = useState<string | null>(null);
     const [newOpening, setNewOpening] = useState<{ date: string; endDate: string; reason: string; shiftIds: string[]; customShifts: CustomShift[]; extraTables: DraftExtraTable[] }>({ date: '', endDate: '', reason: '', shiftIds: [], customShifts: [], extraTables: [] });
     const [draftCustomShift, setDraftCustomShift] = useState<CustomShift>({ name: 'Comida', type: 'LUNCH', startTime: '13:00', endTime: '16:00', slotInterval: 30 });
 
@@ -246,6 +247,28 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
         }
     }
 
+    function resetOpeningForm() {
+        setNewOpening({ date: '', endDate: '', reason: '', shiftIds: [], customShifts: [], extraTables: [] });
+        setOpeningType('SINGLE');
+        setEditingOpeningId(null);
+    }
+
+    function handleStartEditOpening(opening: Opening) {
+        setEditingOpeningId(opening.id);
+        setOpeningType(opening.endDate ? 'PERIOD' : 'SINGLE');
+        setNewOpening({
+            // La fecha llega como ISO (medianoche UTC del día); cortamos a yyyy-MM-dd
+            // para el input date sin desfases de zona horaria.
+            date: String(opening.date).slice(0, 10),
+            endDate: opening.endDate ? String(opening.endDate).slice(0, 10) : '',
+            reason: opening.reason || '',
+            shiftIds: opening.shiftIds.split(',').map(x => x.trim()).filter(Boolean),
+            customShifts: opening.customShifts || [],
+            extraTables: [],
+        });
+        if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
     async function handleAddOpening() {
         if (!newOpening.date) return alert('La fecha es obligatoria');
         if (openingType === 'PERIOD' && !newOpening.endDate) return alert('La fecha de fin es obligatoria');
@@ -257,22 +280,30 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
             const payload = {
                 date: newOpening.date,
                 reason: newOpening.reason,
-                endDate: openingType === 'PERIOD' ? newOpening.endDate : undefined,
+                endDate: openingType === 'PERIOD' ? newOpening.endDate : null,
                 shiftIds: newOpening.shiftIds,
                 customShifts: newOpening.customShifts,
-                extraTables: newOpening.extraTables,
+                // Las mesas extra de una apertura existente se gestionan en su tarjeta.
+                ...(editingOpeningId ? {} : { extraTables: newOpening.extraTables }),
             };
 
-            await fetchAPIAdmin(`/restaurant/${restaurantId}/openings`, {
-                method: 'POST',
-                body: JSON.stringify(payload)
-            });
-            setNewOpening({ date: '', endDate: '', reason: '', shiftIds: [], customShifts: [], extraTables: [] });
+            if (editingOpeningId) {
+                await fetchAPIAdmin(`/restaurant/openings/${editingOpeningId}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify(payload)
+                });
+            } else {
+                await fetchAPIAdmin(`/restaurant/${restaurantId}/openings`, {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+            }
+            resetOpeningForm();
             loadOpenings();
         } catch (e) {
             console.error(e);
             const message = e instanceof Error ? e.message : 'Error desconocido';
-            alert(`Error al añadir la apertura: ${message}`);
+            alert(`Error al ${editingOpeningId ? 'guardar' : 'añadir'} la apertura: ${message}`);
         }
     }
 
@@ -649,6 +680,14 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
                 </div>
 
                 <div className="bg-emerald-500/5 p-5 rounded-md border border-dashed border-emerald-500/20 mb-6">
+                    {editingOpeningId && (
+                        <div className="flex items-center justify-between gap-2 mb-4 px-3 py-2 rounded-md bg-emerald-600/10 border border-emerald-600/30 text-sm text-emerald-800">
+                            <span className="inline-flex items-center gap-2">
+                                <CalendarCheck className="size-4" /> Editando una apertura existente. Las mesas extra se gestionan desde su tarjeta, más abajo.
+                            </span>
+                            <button type="button" onClick={resetOpeningForm} className="text-xs underline hover:no-underline">Cancelar</button>
+                        </div>
+                    )}
                     <div className="flex gap-2 mb-4">
                         <Button
                             variant={openingType === 'SINGLE' ? 'default' : 'outline'}
@@ -699,12 +738,21 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
                                 onChange={(e) => setNewOpening({ ...newOpening, reason: e.target.value })}
                             />
                         </div>
-                        <Button
-                            onClick={handleAddOpening}
-                            className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
-                        >
-                            <Plus className="size-4" /> {openingType === 'SINGLE' ? 'Abrir Día' : 'Abrir Periodo'}
-                        </Button>
+                        <div className="flex gap-2">
+                            <Button
+                                onClick={handleAddOpening}
+                                className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white flex-1"
+                            >
+                                {editingOpeningId
+                                    ? <><CalendarCheck className="size-4" /> Guardar cambios</>
+                                    : <><Plus className="size-4" /> {openingType === 'SINGLE' ? 'Abrir Día' : 'Abrir Periodo'}</>}
+                            </Button>
+                            {editingOpeningId && (
+                                <Button variant="outline" onClick={resetOpeningForm} className="gap-2">
+                                    Cancelar
+                                </Button>
+                            )}
+                        </div>
                     </div>
 
                     <div className="mt-5 space-y-5">
@@ -852,6 +900,7 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
                             )}
                         </div>
 
+                        {!editingOpeningId && (
                         <div className="pt-4 border-t border-dashed border-emerald-500/30">
                             <Label className="text-eyebrow mb-2 block">Mesas extra sólo para esta apertura</Label>
                             <p className="text-xs text-muted-foreground mb-3">
@@ -931,6 +980,7 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
                                 </div>
                             )}
                         </div>
+                        )}
                     </div>
                 </div>
 
@@ -1022,14 +1072,27 @@ export function ShiftsManager({ restaurantId }: { restaurantId: string }) {
                                         </div>
                                     </div>
                                 </div>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleDeleteOpening(opening.id)}
-                                    className="text-emerald-700 hover:text-emerald-800 hover:bg-emerald-500/10"
-                                >
-                                    Eliminar
-                                </Button>
+                                <div className="flex flex-col gap-1 shrink-0">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleStartEditOpening(opening)}
+                                        className={cn(
+                                            "border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10",
+                                            editingOpeningId === opening.id && "bg-emerald-500/10"
+                                        )}
+                                    >
+                                        Editar
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleDeleteOpening(opening.id)}
+                                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    >
+                                        Eliminar
+                                    </Button>
+                                </div>
                             </div>
                         );
                     })}
