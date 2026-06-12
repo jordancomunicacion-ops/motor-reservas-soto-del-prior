@@ -40,15 +40,15 @@ export function RestaurantWidget() {
             .catch(err => logWidgetError('load restaurant', err));
     }, [restaurantId]);
 
-    if (stripePromise && widgetConfig) {
-        return (
-            <Elements stripe={stripePromise}>
-                <RestaurantWidgetContent widgetConfig={widgetConfig} />
-            </Elements>
-        );
-    }
-
-    return <RestaurantWidgetContent widgetConfig={widgetConfig} />;
+    // Envolvemos SIEMPRE en <Elements> (acepta stripe=null y la transición
+    // null→promise una sola vez). Si la rama cambiara al llegar la config de
+    // Stripe, el widget se desmontaría y remontaría perdiendo todo lo que el
+    // usuario ya hubiera elegido (zona, pax, día).
+    return (
+        <Elements stripe={stripePromise}>
+            <RestaurantWidgetContent widgetConfig={widgetConfig} />
+        </Elements>
+    );
 }
 
 function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig | null }) {
@@ -157,8 +157,9 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
             .then(data => {
                 if (Array.isArray(data)) {
                     setZones(data);
-                    // El cliente siempre reserva en una zona concreta: por defecto la primera.
-                    if (data.length > 1) setSelectedZoneId(data[0].id);
+                    // Por defecto la primera zona, pero SIN pisar una elección que el
+                    // usuario ya haya hecho si esta respuesta llega tarde.
+                    if (data.length > 1) setSelectedZoneId(prev => prev ?? data[0].id);
                 }
             })
             .catch(err => logWidgetError('load zones', err));
