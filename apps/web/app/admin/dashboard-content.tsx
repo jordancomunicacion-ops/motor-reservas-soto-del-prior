@@ -96,6 +96,11 @@ interface DailyTrendsResponse {
 
 type MetricKey = 'revenue' | 'active' | 'occupancy' | 'covers';
 
+// Colores por año en el detalle mensual: paleta fija y estable (el mismo año
+// siempre se pinta igual), distinguible sobre el tema oscuro del admin.
+const YEAR_PALETTE = ['#10b981', '#3b82f6', '#f59e0b', '#ec4899', '#a78bfa'];
+const yearColor = (year: number) => YEAR_PALETTE[year % YEAR_PALETTE.length];
+
 const METRIC_DETAIL: Record<MetricKey, {
     title: string;
     description: string;
@@ -270,15 +275,13 @@ export default function DashboardContent() {
         if (!detail) return null;
         const years = [...selectedYears].sort((a, b) => a - b);
         if (years.some(y => !(y in yearlyByYear))) return null; // aún cargando
-        return years.map((y, idx) => {
+        return years.map((y) => {
             const byMonth = new Array(12).fill(0) as number[];
             for (const m of yearlyByYear[y]) {
                 const i = parseInt(m.month.slice(5), 10) - 1;
                 if (i >= 0 && i < 12) byMonth[i] = detail.pick(m);
             }
-            // El año más reciente a plena opacidad; los anteriores atenuados.
-            const opacity = idx === years.length - 1 ? 1 : 0.55 - (years.length - 2 - idx) * 0.15;
-            return { label: String(y), data: byMonth, color: detail.color, opacity: Math.max(opacity, 0.15) };
+            return { label: String(y), data: byMonth, color: yearColor(y) };
         });
     }, [detail, selectedYears, yearlyByYear]);
 
@@ -498,12 +501,17 @@ export default function DashboardContent() {
                                             onClick={() => toggleYear(y)}
                                             aria-pressed={active}
                                             className={cn(
-                                                "px-2.5 py-1 rounded-md border text-[11px] font-medium tabular-nums transition-colors",
+                                                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[11px] font-medium tabular-nums transition-colors",
                                                 active
-                                                    ? "bg-primary/10 border-primary/40 text-foreground"
+                                                    ? "text-foreground"
                                                     : "border-border/70 text-muted-foreground hover:bg-accent/40",
                                             )}
+                                            style={active ? { borderColor: yearColor(y), backgroundColor: `${yearColor(y)}1a` } : undefined}
                                         >
+                                            <span
+                                                className="size-1.5 rounded-full"
+                                                style={{ backgroundColor: active ? yearColor(y) : 'var(--muted-foreground)' }}
+                                            />
                                             {y}
                                         </button>
                                     );

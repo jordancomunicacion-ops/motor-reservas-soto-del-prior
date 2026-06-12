@@ -11,8 +11,6 @@ export interface MonthlySeries {
     /** 12 valores, índice 0 = enero. */
     data: number[];
     color: string;
-    /** Opacidad de la barra (años antiguos se atenúan). */
-    opacity?: number;
 }
 
 interface MonthlyBarChartProps {
@@ -31,8 +29,9 @@ function pctChange(curr: number, prev: number): number {
 
 /**
  * Gráfica de barras de 12 meses (ene-dic) sin dependencias, con comparación
- * entre años: una barra por serie y mes. Al pasar el ratón muestra los valores
- * de cada año y, si hay exactamente dos, la variación porcentual.
+ * entre años: una barra por serie y mes. Los valores se muestran siempre
+ * sobre cada mes, coloreados como su año; con exactamente dos años se añade
+ * la variación porcentual.
  */
 export function MonthlyBarChart({
     series,
@@ -52,10 +51,10 @@ export function MonthlyBarChart({
         <div className={cn("w-full", className)}>
             <div className="flex items-center gap-3 mb-2">
                 {series.map(s => (
-                    <span key={s.label} className="inline-flex items-center gap-1.5 text-[11px] tabular-nums text-muted-foreground">
+                    <span key={s.label} className="inline-flex items-center gap-1.5 text-[11px] font-medium tabular-nums" style={{ color: s.color }}>
                         <span
                             className="size-2 rounded-[2px] shrink-0"
-                            style={{ backgroundColor: s.color, opacity: s.opacity ?? 1 }}
+                            style={{ backgroundColor: s.color }}
                         />
                         {s.label}
                     </span>
@@ -75,13 +74,13 @@ export function MonthlyBarChart({
                         .map(s => `${s.label}: ${formatValue(s.data[i] ?? 0)}`)
                         .join(" · ");
                     return (
-                        <div key={label} className="flex-1 flex flex-col items-center gap-1 group min-w-0">
-                            <div className="flex flex-col items-center leading-tight opacity-0 group-hover:opacity-100 transition-opacity max-w-full">
+                        <div key={label} className="flex-1 flex flex-col items-center gap-1 min-w-0">
+                            <div className="flex flex-col items-center leading-tight max-w-full">
                                 {series.map((s, j) => (
                                     <span
                                         key={s.label}
-                                        className="text-[9px] tabular-nums text-muted-foreground truncate max-w-full"
-                                        style={{ opacity: 0.5 + 0.5 * ((j + 1) / series.length) }}
+                                        className="text-[9px] tabular-nums truncate max-w-full"
+                                        style={{ color: s.color, opacity: values[j] > 0 ? 1 : 0.35 }}
                                     >
                                         {formatValue(values[j])}
                                     </span>
@@ -106,7 +105,6 @@ export function MonthlyBarChart({
                                             style={{
                                                 height: `${Math.max(heightPct, value > 0 ? 3 : 1)}%`,
                                                 backgroundColor: value > 0 ? s.color : "var(--muted)",
-                                                opacity: s.opacity ?? 1,
                                             }}
                                         />
                                     );
