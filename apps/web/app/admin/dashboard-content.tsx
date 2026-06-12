@@ -479,7 +479,8 @@ export default function DashboardContent() {
 
             {/* Detalle mensual ene-dic al pulsar una tarjeta KPI */}
             <Dialog open={detailMetric !== null} onOpenChange={(open) => { if (!open) setDetailMetric(null); }}>
-                <DialogContent className="sm:max-w-xl">
+                {/* El portal monta fuera del layout admin: hay que re-aplicar el tema. */}
+                <DialogContent data-theme="admin-dark" className="sm:max-w-xl bg-background text-foreground">
                     {detail && (
                         <>
                             <DialogHeader>

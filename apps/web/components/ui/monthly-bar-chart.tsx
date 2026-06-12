@@ -39,7 +39,9 @@ export function MonthlyBarChart({
     formatValue = (v) => v.toLocaleString("es-ES"),
     className,
 }: MonthlyBarChartProps) {
-    const max = Math.max(1, ...series.flatMap(s => s.data));
+    const allValues = series.flatMap(s => s.data);
+    const hasData = allValues.some(v => v > 0);
+    const max = Math.max(1, ...allValues);
     const currentMonth = new Date().getMonth();
     // Si la serie más reciente es el año en curso, los meses futuros aún no
     // tienen datos: no tiene sentido mostrar su variación (-100% espurio).
@@ -59,7 +61,12 @@ export function MonthlyBarChart({
                     </span>
                 ))}
             </div>
-            <div className="flex items-end gap-1.5 h-44">
+            <div className="relative flex items-end gap-1.5 h-44">
+                {!hasData && (
+                    <p className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
+                        Sin datos en los años seleccionados
+                    </p>
+                )}
                 {MONTH_LABELS.map((label, i) => {
                     const values = series.map(s => s.data[i] ?? 0);
                     const isFutureMonth = latestIsCurrentYear && i > currentMonth;
