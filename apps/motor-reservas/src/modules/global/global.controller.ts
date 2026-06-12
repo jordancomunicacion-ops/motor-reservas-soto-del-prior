@@ -328,11 +328,16 @@ export class GlobalController {
     }
 
     /**
-     * Series temporales (mensuales) de los últimos N meses, agregadas según el scope
-     * del usuario + contexto seleccionado. Devuelve un array de 12 (por defecto) puntos
-     * con bookings totales, covers (pax restaurante) y revenue (€ hotel).
+     * Series temporales agregadas según el scope del usuario + contexto seleccionado.
      *
-     * Frontend lo usa para pintar sparklines reales en las MetricCard del dashboard.
+     * Modos:
+     *   - Por defecto: buckets mensuales de los últimos N meses (?months=12).
+     *   - ?year=YYYY: buckets mensuales de enero a diciembre de ese año natural.
+     *   - ?granularity=day&days=30: buckets diarios de los últimos N días (máx 90).
+     *   - ?granularity=day&year=YYYY: buckets diarios de todo el año natural (ene-dic).
+     *
+     * Frontend lo usa para los sparklines diarios de las MetricCard y para la
+     * gráfica mensual ene-dic que se abre al pulsar cada tarjeta.
      */
     @Get('trends')
     async getTrends(
@@ -340,10 +345,37 @@ export class GlobalController {
         @Query('ctxType') ctxType?: string,
         @Query('ctxId') ctxId?: string,
         @Query('months') monthsParam?: string,
+        @Query('granularity') granularity?: string,
+        @Query('days') daysParam?: string,
+        @Query('year') yearParam?: string,
     ) {
-        const months = Math.min(Math.max(parseInt(monthsParam || '12') || 12, 1), 24);
+        const byDay = granularity === 'day';
+        const year = parseInt(yearParam || '') || null;
         const now = new Date();
-        const startMonth = new Date(now.getFullYear(), now.getMonth() - (months - 1), 1);
+
+        let months: number;
+        let startMonth: Date;
+        let days = 0;
+        let startDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+        if (byDay) {
+            if (year) {
+                // Año natural completo: un punto por día de ene a dic.
+                startDay = new Date(year, 0, 1);
+                days = Math.round((new Date(year + 1, 0, 1).getTime() - startDay.getTime()) / (24 * 60 * 60 * 1000));
+            } else {
+                days = Math.min(Math.max(parseInt(daysParam || '30') || 30, 1), 90);
+                startDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (days - 1));
+            }
+            months = 0;
+            startMonth = startDay;
+        } else if (year) {
+            months = 12;
+            startMonth = new Date(year, 0, 1);
+        } else {
+            months = Math.min(Math.max(parseInt(monthsParam || '12') || 12, 1), 24);
+            startMonth = new Date(now.getFullYear(), now.getMonth() - (months - 1), 1);
+        }
 
         const scope = await getUserScope(req?.user, this.prisma);
         let hotelIdsAllowed: string[] | null = scope.hotelIds;
@@ -386,7 +418,9 @@ export class GlobalController {
         // Para occupancy: trae bookings que SOLAPEN con la ventana (no solo las que
         // empiezan en ella). Una reserva que checkIn=2026-04-20 / checkOut=2026-05-05
         // aporta noches tanto en abril como en mayo.
-        const windowEnd = new Date(startMonth.getFullYear(), startMonth.getMonth() + months, 1);
+        const windowEnd = byDay
+            ? new Date(startDay.getFullYear(), startDay.getMonth(), startDay.getDate() + days)
+            : new Date(startMonth.getFullYear(), startMonth.getMonth() + months, 1);
 
         const [hotelBookings, resBookings, totalRooms] = await Promise.all([
             hasHotelScope
@@ -426,6 +460,60 @@ export class GlobalController {
             occupancy: number;
         };
         const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+        if (byDay) {
+            // Buckets diarios: un punto por día en [startDay, hoy].
+            const dayBuckets = Array.from({ length: days }, (_, i) => {
+                const d = new Date(startDay.getFullYear(), startDay.getMonth(), startDay.getDate() + i);
+                const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                return {
+                    date: key,
+                    bookings: 0,
+                    covers: 0,
+                    revenue: 0,
+                    hotelBookings: 0,
+                    restaurantBookings: 0,
+                    nights: 0,
+                    capacity: totalRooms,
+                    occupancy: 0,
+                };
+            });
+            const dayIndexFor = (d: Date) => Math.round(
+                (new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() - startDay.getTime()) / MS_PER_DAY,
+            );
+
+            for (const b of hotelBookings) {
+                // Reservas y revenue atribuidos al día del checkIn.
+                const idx = dayIndexFor(b.checkInDate);
+                if (idx >= 0 && idx < dayBuckets.length) {
+                    dayBuckets[idx].bookings += 1;
+                    dayBuckets[idx].hotelBookings += 1;
+                    dayBuckets[idx].revenue += Number(b.totalPrice ?? 0);
+                }
+                // Noches: una por cada día en [checkIn, checkOut).
+                if (!b.checkOutDate || b.checkOutDate <= b.checkInDate) continue;
+                const startIdx = Math.max(0, dayIndexFor(b.checkInDate));
+                const endIdx = Math.min(dayBuckets.length - 1, dayIndexFor(new Date(b.checkOutDate.getTime() - 1)));
+                for (let i = startIdx; i <= endIdx; i++) {
+                    dayBuckets[i].nights += 1;
+                }
+            }
+            for (const b of resBookings) {
+                const idx = dayIndexFor(b.date);
+                if (idx >= 0 && idx < dayBuckets.length) {
+                    dayBuckets[idx].bookings += 1;
+                    dayBuckets[idx].restaurantBookings += 1;
+                    dayBuckets[idx].covers += b.pax;
+                }
+            }
+            for (const bucket of dayBuckets) {
+                bucket.occupancy = bucket.capacity > 0
+                    ? Math.round((bucket.nights / bucket.capacity) * 100)
+                    : 0;
+            }
+            return { days: dayBuckets };
+        }
+
         const buckets: Bucket[] = [];
         for (let i = 0; i < months; i++) {
             const monthStart = new Date(startMonth.getFullYear(), startMonth.getMonth() + i, 1);

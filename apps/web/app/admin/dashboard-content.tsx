@@ -5,6 +5,14 @@ import { useEffect, useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { MetricCard } from '@/components/ui/metric-card';
+import { MonthlyBarChart } from '@/components/ui/monthly-bar-chart';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { PageHeader } from '@/components/ui/page-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -66,9 +74,64 @@ interface TrendsMonth {
     occupancy: number;
 }
 
+interface TrendsDay {
+    date: string;
+    bookings: number;
+    covers: number;
+    revenue: number;
+    hotelBookings: number;
+    restaurantBookings: number;
+    nights: number;
+    capacity: number;
+    occupancy: number;
+}
+
 interface TrendsResponse {
     months: TrendsMonth[];
 }
+
+interface DailyTrendsResponse {
+    days: TrendsDay[];
+}
+
+type MetricKey = 'revenue' | 'active' | 'occupancy' | 'covers';
+
+const METRIC_DETAIL: Record<MetricKey, {
+    title: string;
+    description: string;
+    color: string;
+    pick: (m: TrendsMonth) => number;
+    format: (v: number) => string;
+}> = {
+    revenue: {
+        title: 'Ingresos por mes',
+        description: 'Total facturado cada mes del año en curso.',
+        color: 'var(--primary)',
+        pick: m => m.revenue,
+        format: v => `€${Math.round(v).toLocaleString('es-ES')}`,
+    },
+    active: {
+        title: 'Reservas por mes',
+        description: 'Reservas de hotel y restaurante registradas cada mes del año en curso.',
+        color: 'var(--success)',
+        pick: m => m.bookings,
+        format: v => v.toLocaleString('es-ES'),
+    },
+    occupancy: {
+        title: 'Ocupación por mes',
+        description: 'Porcentaje medio de ocupación de cada mes del año en curso.',
+        color: 'var(--success)',
+        pick: m => m.occupancy,
+        format: v => `${Math.round(v)}%`,
+    },
+    covers: {
+        title: 'Cubiertos por mes',
+        description: 'Comensales atendidos cada mes del año en curso.',
+        color: 'var(--success)',
+        pick: m => m.covers,
+        format: v => v.toLocaleString('es-ES'),
+    },
+};
 
 export default function DashboardContent() {
     const searchParams = useSearchParams();
@@ -79,8 +142,20 @@ export default function DashboardContent() {
     const [entity, setEntity] = useState<ContextEntity | null>(null);
     const [stats, setStats] = useState<DashboardStats | null>(null);
     const [reviews, setReviews] = useState<ReviewsSummary | null>(null);
-    const [trendsData, setTrendsData] = useState<TrendsResponse | null>(null);
+    const [trendsData, setTrendsData] = useState<DailyTrendsResponse | null>(null);
     const [loading, setLoading] = useState(true);
+
+    // Detalle mensual (ene-dic) que se abre al pulsar una tarjeta, con
+    // comparación entre años. Por defecto: año en curso vs año anterior.
+    const currentYear = new Date().getFullYear();
+    const yearOptions = useMemo(
+        () => Array.from({ length: 5 }, (_, i) => currentYear - 4 + i),
+        [currentYear],
+    );
+    const [detailMetric, setDetailMetric] = useState<MetricKey | null>(null);
+    const [selectedYears, setSelectedYears] = useState<number[]>([currentYear - 1, currentYear]);
+    const [yearlyByYear, setYearlyByYear] = useState<Record<number, TrendsMonth[]>>({});
+    const [yearlyLoading, setYearlyLoading] = useState(false);
 
     useEffect(() => {
         loadData();
@@ -89,17 +164,19 @@ export default function DashboardContent() {
 
     async function loadData() {
         setLoading(true);
+        setYearlyByYear({}); // el detalle mensual depende del contexto
         try {
             const ctxQs = contextId ? `?ctxType=${contextType}&ctxId=${encodeURIComponent(contextId)}` : '';
             const statsUrl = `/global/stats${ctxQs}`;
-            const trendsUrl = `/global/trends${ctxQs}${ctxQs ? '&' : '?'}months=12`;
+            // Sparklines: serie diaria de todo el año en curso (ene-dic).
+            const trendsUrl = `/global/trends${ctxQs}${ctxQs ? '&' : '?'}granularity=day&year=${new Date().getFullYear()}`;
 
             const [statsData, entityData, trendsResp] = await Promise.all([
                 fetchAPIAdmin<DashboardStats>(statsUrl),
                 contextId
                     ? fetchAPIAdmin<ContextEntity>(contextType === 'hotel' ? `/property/hotels/${contextId}` : `/restaurant/${contextId}`)
                     : Promise.resolve(null),
-                fetchAPIAdmin<TrendsResponse>(trendsUrl).catch(() => null),
+                fetchAPIAdmin<DailyTrendsResponse>(trendsUrl).catch(() => null),
             ]);
             setStats(statsData);
             setEntity(entityData);
@@ -139,18 +216,71 @@ export default function DashboardContent() {
     const showReviews = !isGlobal;
     const linkedRestaurant = !!entity?.restaurantId && contextType === 'hotel';
 
-    // Series mensuales reales del backend (últimos 12 meses).
+    // Series diarias reales del backend (año en curso, ene-dic).
     // Si aún no llegan los datos devolvemos arrays vacíos → MetricCard no pinta sparkline.
     const trends = useMemo(() => {
-        const months = trendsData?.months ?? [];
+        const days = trendsData?.days ?? [];
         return {
-            revenue: months.map(m => m.revenue),
-            active: months.map(m => m.bookings),
-            covers: months.map(m => m.covers),
-            occupancy: months.map(m => m.occupancy),
+            revenue: days.map(d => d.revenue),
+            active: days.map(d => d.bookings),
+            covers: days.map(d => d.covers),
+            occupancy: days.map(d => d.occupancy),
             visits: [] as number[], // pendiente — requiere integración analytics
         };
     }, [trendsData]);
+
+    // Carga (y cachea por contexto) la serie ene-dic de cada año seleccionado
+    // que aún no esté en memoria. Se dispara al abrir el diálogo o cambiar años.
+    useEffect(() => {
+        if (detailMetric === null) return;
+        const missing = selectedYears.filter(y => !(y in yearlyByYear));
+        if (missing.length === 0) return;
+        let cancelled = false;
+        setYearlyLoading(true);
+        const ctxQs = contextId ? `?ctxType=${contextType}&ctxId=${encodeURIComponent(contextId)}&` : '?';
+        Promise.all(missing.map(async (y) => {
+            const data = await fetchAPIAdmin<TrendsResponse>(`/global/trends${ctxQs}year=${y}`).catch(() => null);
+            return [y, data?.months ?? []] as const;
+        })).then(entries => {
+            if (cancelled) return;
+            setYearlyByYear(prev => ({ ...prev, ...Object.fromEntries(entries) }));
+        }).finally(() => {
+            if (!cancelled) setYearlyLoading(false);
+        });
+        return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [detailMetric, selectedYears, contextId, contextType]);
+
+    function openDetail(metric: MetricKey) {
+        setDetailMetric(metric);
+    }
+
+    function toggleYear(year: number) {
+        setSelectedYears(prev => {
+            if (prev.includes(year)) {
+                // Siempre debe quedar al menos un año seleccionado.
+                return prev.length > 1 ? prev.filter(y => y !== year) : prev;
+            }
+            return [...prev, year].sort((a, b) => a - b);
+        });
+    }
+
+    const detail = detailMetric ? METRIC_DETAIL[detailMetric] : null;
+    const detailSeries = useMemo(() => {
+        if (!detail) return null;
+        const years = [...selectedYears].sort((a, b) => a - b);
+        if (years.some(y => !(y in yearlyByYear))) return null; // aún cargando
+        return years.map((y, idx) => {
+            const byMonth = new Array(12).fill(0) as number[];
+            for (const m of yearlyByYear[y]) {
+                const i = parseInt(m.month.slice(5), 10) - 1;
+                if (i >= 0 && i < 12) byMonth[i] = detail.pick(m);
+            }
+            // El año más reciente a plena opacidad; los anteriores atenuados.
+            const opacity = idx === years.length - 1 ? 1 : 0.55 - (years.length - 2 - idx) * 0.15;
+            return { label: String(y), data: byMonth, color: detail.color, opacity: Math.max(opacity, 0.15) };
+        });
+    }, [detail, selectedYears, yearlyByYear]);
 
     return (
         <div className="space-y-6">
@@ -184,6 +314,7 @@ export default function DashboardContent() {
                             icon={CreditCard}
                             trend={trends.revenue}
                             trendColor="var(--primary)"
+                            onClick={() => openDetail('revenue')}
                         />
                         {showActive && (
                             <MetricCard
@@ -193,6 +324,7 @@ export default function DashboardContent() {
                                 change={stats?.activeReservations?.change ?? 0}
                                 icon={Calendar}
                                 trend={trends.active}
+                                onClick={() => openDetail('active')}
                             />
                         )}
                         {showOccupancy && (
@@ -203,6 +335,7 @@ export default function DashboardContent() {
                                 change={stats?.occupancy?.change ?? 0}
                                 icon={Building2}
                                 trend={trends.occupancy}
+                                onClick={() => openDetail('occupancy')}
                             />
                         )}
                         {showCovers && (
@@ -214,6 +347,7 @@ export default function DashboardContent() {
                                 icon={Utensils}
                                 highlight={linkedRestaurant}
                                 trend={trends.covers}
+                                onClick={() => openDetail('covers')}
                             />
                         )}
                         {showReviews && (
@@ -342,6 +476,55 @@ export default function DashboardContent() {
                     </CardContent>
                 </Card>
             </section>
+
+            {/* Detalle mensual ene-dic al pulsar una tarjeta KPI */}
+            <Dialog open={detailMetric !== null} onOpenChange={(open) => { if (!open) setDetailMetric(null); }}>
+                <DialogContent className="sm:max-w-xl">
+                    {detail && (
+                        <>
+                            <DialogHeader>
+                                <DialogTitle>{detail.title}</DialogTitle>
+                                <DialogDescription>{detail.description}</DialogDescription>
+                            </DialogHeader>
+                            {/* Selector de años a comparar */}
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                {yearOptions.map((y) => {
+                                    const active = selectedYears.includes(y);
+                                    return (
+                                        <button
+                                            key={y}
+                                            type="button"
+                                            onClick={() => toggleYear(y)}
+                                            aria-pressed={active}
+                                            className={cn(
+                                                "px-2.5 py-1 rounded-md border text-[11px] font-medium tabular-nums transition-colors",
+                                                active
+                                                    ? "bg-primary/10 border-primary/40 text-foreground"
+                                                    : "border-border/70 text-muted-foreground hover:bg-accent/40",
+                                            )}
+                                        >
+                                            {y}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            {yearlyLoading || !detailSeries ? (
+                                <div className="flex items-end gap-1.5 h-44 pt-2">
+                                    {Array.from({ length: 12 }).map((_, i) => (
+                                        <Skeleton key={i} className="flex-1" style={{ height: `${30 + ((i * 23) % 60)}%` }} />
+                                    ))}
+                                </div>
+                            ) : (
+                                <MonthlyBarChart
+                                    series={detailSeries}
+                                    formatValue={detail.format}
+                                    className="pt-1"
+                                />
+                            )}
+                        </>
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

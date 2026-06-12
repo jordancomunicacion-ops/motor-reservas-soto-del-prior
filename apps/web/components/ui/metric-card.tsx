@@ -13,6 +13,7 @@ interface MetricCardProps {
     highlight?: boolean;
     trend?: number[];
     trendColor?: string;
+    onClick?: () => void;
     className?: string;
 }
 
@@ -29,6 +30,7 @@ export function MetricCard({
     highlight,
     trend,
     trendColor,
+    onClick,
     className,
 }: MetricCardProps) {
     const hasChange = typeof change === "number";
@@ -36,12 +38,17 @@ export function MetricCard({
 
     return (
         <div
+            role={onClick ? "button" : undefined}
+            tabIndex={onClick ? 0 : undefined}
+            onClick={onClick}
+            onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } } : undefined}
             className={cn(
                 "group relative rounded-md border bg-card p-4 transition-colors",
                 "hover:bg-accent/30",
                 highlight
                     ? "border-primary/30 bg-primary/[0.03]"
                     : "border-border/70",
+                onClick && "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                 className,
             )}
         >
