@@ -83,6 +83,12 @@ export class RestaurantController {
         return this.service.getPublicZones(id);
     }
 
+    // Gestor de zonas del admin: incluye inactivas y nº de mesas por zona.
+    @Get(':id/zones/manage')
+    getManagedZones(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+        return this.service.getManagedZones(id, req?.user);
+    }
+
     @Post(':id/zones/sync')
     syncZones(@Param('id') id: string, @Body() body: any[], @Req() req: AuthenticatedRequest) {
         return this.service.syncZones(id, body, req?.user);

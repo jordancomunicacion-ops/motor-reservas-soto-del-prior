@@ -12,10 +12,10 @@ export default async function PlanGateLayout({
     const session = await auth();
     const role = session?.user?.role;
     const permissions = session?.user?.permissions ?? null;
-    // El editor del Arquitecto se accede desde Planning de ocupación.
-    // Quien tiene view_occupancy puede ver Plano/Lista/Valoraciones y
-    // también editar el plano. Sin ese permiso, redirigimos al dashboard.
-    if (!hasPermission(role, 'view_occupancy', permissions)) {
+    // El Arquitecto se accede desde la ficha del local y modifica la
+    // estructura del restaurante (zonas y mesas), así que exige
+    // manage_restaurant — view_occupancy (personal de sala) no basta.
+    if (!hasPermission(role, 'manage_restaurant', permissions)) {
         const { id } = await params;
         redirect(`/admin/restaurant/${id}`);
     }

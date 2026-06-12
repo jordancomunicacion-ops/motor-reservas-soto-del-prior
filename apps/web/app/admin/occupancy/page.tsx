@@ -259,10 +259,10 @@ function RestaurantPlanning({ contextId }: { contextId: string }) {
                                 onBookingMove={handleAssignTable}
                                 onTableSelect={handleQuickRes}
                                 onSelectProfile={(b) => setSelectedBookingForProfile(b)}
-                                /* Arquitecto visible para todos los que llegan aquí:
-                                   tener view_occupancy = haber accedido al Planning =
-                                   poder editar el plano. El editor (/plan) está gateado
-                                   por view_occupancy en su layout. */
+                                /* El Planning es vista de operación del servicio: el
+                                   Arquitecto y la gestión de zonas viven en la ficha
+                                   del local y exigen manage_restaurant. */
+                                hideArchitectButton
                                 className="h-full w-full"
                                 timezone={restaurantTz}
                             />

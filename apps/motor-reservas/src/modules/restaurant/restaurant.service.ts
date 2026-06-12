@@ -316,8 +316,33 @@ export class RestaurantService {
 
     async createZone(restaurantId: string, name: string, user?: AuthenticatedUser) {
         if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
+        // Las zonas nuevas se añaden al final del orden, no delante (index 0).
+        const last = await this.prisma.zone.findFirst({
+            where: { restaurantId },
+            orderBy: { index: 'desc' },
+            select: { index: true },
+        });
         return this.prisma.zone.create({
-            data: { restaurantId, name }
+            data: { restaurantId, name, index: (last?.index ?? -1) + 1 }
+        });
+    }
+
+    /**
+     * Zonas del restaurante para el gestor del admin: incluye las inactivas
+     * (para poder reactivarlas) y el nº de mesas de cada una.
+     */
+    async getManagedZones(restaurantId: string, user?: AuthenticatedUser) {
+        if (user) await ensureRestaurantAccess(user, this.prisma, restaurantId);
+        return this.prisma.zone.findMany({
+            where: { restaurantId },
+            select: {
+                id: true,
+                name: true,
+                index: true,
+                isActive: true,
+                _count: { select: { tables: true } },
+            },
+            orderBy: [{ index: 'asc' }, { name: 'asc' }],
         });
     }
 
@@ -517,7 +542,9 @@ export class RestaurantService {
 
         const zones = await this.prisma.zone.findMany({
             where: { restaurantId, isActive: true },
-            orderBy: { index: 'asc' },
+            // Desempate por nombre: con datos antiguos varias zonas comparten index 0
+            // y el orden quedaba indeterminado.
+            orderBy: [{ index: 'asc' }, { name: 'asc' }],
             include: {
                 tables: {
                     where: tableWhere,
@@ -928,7 +955,7 @@ export class RestaurantService {
         return this.prisma.zone.findMany({
             where: { restaurantId, isActive: true },
             select: { id: true, name: true, index: true },
-            orderBy: { index: 'asc' },
+            orderBy: [{ index: 'asc' }, { name: 'asc' }],
         });
     }
 
