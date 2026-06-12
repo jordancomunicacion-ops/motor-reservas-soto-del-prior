@@ -382,7 +382,7 @@ export default function RestaurantDashboard() {
         <Suspense
             fallback={
                 <div className="flex items-center justify-center h-screen text-sm text-muted-foreground">
-                    Cargando dashboard…
+                    Cargando configuración…
                 </div>
             }
         >

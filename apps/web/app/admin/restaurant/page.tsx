@@ -135,7 +135,7 @@ export default function RestaurantListPage() {
 function RestaurantCard({ restaurant }: { restaurant: RestaurantRow }) {
     const qs = `?context=restaurant&id=${restaurant.id}`;
     const actions: { icon: typeof Utensils; label: string; href: string }[] = [
-        { icon: LayoutDashboard, label: 'Dashboard', href: `/admin/restaurant/${restaurant.id}${qs}` },
+        { icon: LayoutDashboard, label: 'Configuración', href: `/admin/restaurant/${restaurant.id}${qs}` },
         { icon: Settings, label: 'Ajustes', href: `/admin/restaurant/${restaurant.id}/config?tab=general&context=restaurant&id=${restaurant.id}` },
         { icon: Share2, label: 'Conexiones', href: `/admin/restaurant/${restaurant.id}/connections${qs}` },
         { icon: Users, label: 'Accesos', href: `/admin/restaurant/${restaurant.id}/config?tab=access&context=restaurant&id=${restaurant.id}` },
