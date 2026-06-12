@@ -80,7 +80,8 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
     const [selectedEvent, setSelectedEvent] = useState<RestaurantEvent | null>(null);
     const [eventDates, setEventDates] = useState<string[]>([]);
     const [zones, setZones] = useState<WidgetZone[]>([]);
-    // null = sin preferencia de zona (el motor elige en cualquier zona del local)
+    // Zona donde reserva el cliente; null sólo mientras cargan las zonas o si el
+    // local tiene una única zona (en ese caso el motor usa la única que hay).
     const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
 
     const [additionalData, setAdditionalData] = useState({
@@ -154,7 +155,11 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
             .catch(err => logWidgetError('load events', err));
         fetchAPI<WidgetZone[]>(`/restaurant/${restaurantId}/public-zones`)
             .then(data => {
-                if (Array.isArray(data)) setZones(data);
+                if (Array.isArray(data)) {
+                    setZones(data);
+                    // El cliente siempre reserva en una zona concreta: por defecto la primera.
+                    if (data.length > 1) setSelectedZoneId(data[0].id);
+                }
             })
             .catch(err => logWidgetError('load zones', err));
     }, [restaurantId]);
@@ -430,18 +435,6 @@ function RestaurantWidgetContent({ widgetConfig }: { widgetConfig: WidgetConfig 
                                         <div className="mb-6 bg-gray-50 p-3 rounded-none border-l-4 border-[#C59D5F]">
                                             <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2 block" style={{ fontFamily: "'Oswald', sans-serif" }}>¿Dónde prefieres sentarte?</label>
                                             <div className="flex flex-wrap gap-2">
-                                                <button
-                                                    onClick={() => setSelectedZoneId(null)}
-                                                    className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-colors"
-                                                    style={{
-                                                        fontFamily: "'Oswald', sans-serif",
-                                                        backgroundColor: selectedZoneId === null ? colors.accent : 'white',
-                                                        color: selectedZoneId === null ? 'white' : colors.text,
-                                                        borderColor: selectedZoneId === null ? colors.accent : '#E5E7EB',
-                                                    }}
-                                                >
-                                                    Cualquiera
-                                                </button>
                                                 {zones.map(zone => (
                                                     <button
                                                         key={zone.id}
