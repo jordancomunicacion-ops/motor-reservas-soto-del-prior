@@ -4,7 +4,7 @@ import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, RefreshCw, PanelRightOpen, X, LayoutGrid, List, Map } from 'lucide-react';
+import { Plus, RefreshCw, PanelRightOpen, X, LayoutGrid, List } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -18,7 +18,6 @@ import { DateSelector } from '@/components/admin/DateSelector';
 import { formatTimeInTz } from '@/lib/timezone';
 
 import AccessManager from '@/components/admin/AccessManager';
-import ZoneManager from '@/components/restaurant/ZoneManager';
 import { useAdminSession } from '@/components/admin/AdminSessionContext';
 import type {
     ZoneWithTables,
@@ -49,9 +48,8 @@ function RestaurantDashboardContent() {
     const [editingBooking, setEditingBooking] = useState<GuestBookingProfile | null>(null);
     const [selectedBookingForProfile, setSelectedBookingForProfile] = useState<GuestBookingProfile | null>(null);
     const [sidePanelOpen, setSidePanelOpen] = useState(false);
-    const [zoneManagerOpen, setZoneManagerOpen] = useState(false);
-    // La gestión de zonas y el Arquitecto viven en la ficha del local y exigen
-    // manage_restaurant (Planning de ocupación es solo operación del servicio).
+    // El Arquitecto (donde vive la gestión de zonas y mesas) se abre desde la
+    // ficha del local y exige manage_restaurant.
     const { can } = useAdminSession();
     const canManageRestaurant = can('manage_restaurant');
 
@@ -223,12 +221,6 @@ function RestaurantDashboardContent() {
                         <Stat label="Pax" value={totalPax} />
                     </div>
                     <div className="h-6 w-px bg-border hidden md:block" />
-                    {canManageRestaurant && (
-                        <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setZoneManagerOpen(true)}>
-                            <Map className="size-3.5" />
-                            <span className="hidden sm:inline">Zonas</span>
-                        </Button>
-                    )}
                     <Button onClick={() => setIsFormOpen(true)} size="sm" className="gap-1.5">
                         <Plus className="size-4" />
                         <span className="hidden sm:inline">Nueva reserva</span>
@@ -340,13 +332,6 @@ function RestaurantDashboardContent() {
                     </div>
                 </div>
             )}
-
-            <ZoneManager
-                isOpen={zoneManagerOpen}
-                restaurantId={restaurantId}
-                onClose={() => setZoneManagerOpen(false)}
-                onSaved={loadData}
-            />
 
             <ReservationForm
                 isOpen={isFormOpen || !!editingBooking}

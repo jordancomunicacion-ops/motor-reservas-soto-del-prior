@@ -8,6 +8,8 @@ import {
     Plus,
     Trash2,
     RotateCw,
+    ChevronLeft,
+    ChevronRight,
     Square,
     Circle,
     Save,
@@ -22,6 +24,7 @@ import {
 } from "lucide-react";
 import { fetchAPIAdmin } from "@/lib/api-admin";
 import TablePlan, { type TableUpdates } from "./TablePlan";
+import ZoneManager from "./ZoneManager";
 import { cn } from "@/lib/utils";
 
 interface Zone {
@@ -58,6 +61,7 @@ export default function TablePlanEditor({ restaurantId }: { restaurantId: string
     // En xl+ el panel de propiedades vive a la derecha siempre.
     // En pantallas menores se abre como drawer al seleccionar mesa o pulsar el botón.
     const [propsOpenMobile, setPropsOpenMobile] = useState(false);
+    const [zoneManagerOpen, setZoneManagerOpen] = useState(false);
 
     useEffect(() => {
         loadData();
@@ -101,6 +105,29 @@ export default function TablePlanEditor({ restaurantId }: { restaurantId: string
             setActiveZoneId(newZone.id);
         } catch {
             alert("Error al crear área");
+        }
+    };
+
+    /**
+     * Mueve la zona activa una posición y persiste el orden al momento.
+     * El orden de las zonas manda en el plano, los listados y el widget
+     * público (que preselecciona la primera).
+     */
+    const moveZone = async (zoneId: string, dir: -1 | 1) => {
+        const i = zones.findIndex(z => z.id === zoneId);
+        const j = i + dir;
+        if (i < 0 || j < 0 || j >= zones.length) return;
+        const next = [...zones];
+        [next[i], next[j]] = [next[j], next[i]];
+        setZones(next);
+        try {
+            await fetchAPIAdmin(`/restaurant/${restaurantId}/zones/sync`, {
+                method: 'POST',
+                body: JSON.stringify(next.map((z, idx) => ({ id: z.id, name: z.name, index: idx, isActive: true }))),
+            });
+        } catch {
+            alert('Error al guardar el orden de las áreas');
+            loadData();
         }
     };
 
@@ -433,20 +460,51 @@ export default function TablePlanEditor({ restaurantId }: { restaurantId: string
         <div className="flex flex-col gap-3 sm:gap-4 h-full min-h-0">
             <div className="flex justify-between items-center gap-2 sm:gap-3 rounded-lg border border-border bg-card px-3 sm:px-4 py-2.5 sm:py-3 flex-wrap">
                 <div className="inline-flex rounded-md border border-border p-0.5 bg-background overflow-x-auto max-w-full">
-                    {zones.map(z => (
-                        <button
+                    {zones.map((z, i) => (
+                        <div
                             key={z.id}
-                            type="button"
-                            onClick={() => setActiveZoneId(z.id)}
                             className={cn(
-                                "px-3 h-8 rounded text-xs font-medium transition-colors whitespace-nowrap",
-                                activeZoneId === z.id
-                                    ? "bg-primary text-primary-foreground"
-                                    : "text-muted-foreground hover:text-foreground",
+                                "inline-flex items-center rounded whitespace-nowrap",
+                                activeZoneId === z.id && "bg-primary text-primary-foreground",
                             )}
                         >
-                            {z.name}
-                        </button>
+                            {activeZoneId === z.id && (
+                                <button
+                                    type="button"
+                                    onClick={() => moveZone(z.id, -1)}
+                                    disabled={i === 0}
+                                    className="pl-1.5 pr-0.5 h-8 inline-flex items-center disabled:opacity-30"
+                                    title="Mover área a la izquierda"
+                                    aria-label={`Mover ${z.name} a la izquierda`}
+                                >
+                                    <ChevronLeft className="size-3.5" />
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                onClick={() => setActiveZoneId(z.id)}
+                                className={cn(
+                                    "px-3 h-8 rounded text-xs font-medium transition-colors whitespace-nowrap",
+                                    activeZoneId === z.id
+                                        ? "bg-primary text-primary-foreground px-1.5"
+                                        : "text-muted-foreground hover:text-foreground",
+                                )}
+                            >
+                                {z.name}
+                            </button>
+                            {activeZoneId === z.id && (
+                                <button
+                                    type="button"
+                                    onClick={() => moveZone(z.id, 1)}
+                                    disabled={i === zones.length - 1}
+                                    className="pr-1.5 pl-0.5 h-8 inline-flex items-center disabled:opacity-30"
+                                    title="Mover área a la derecha"
+                                    aria-label={`Mover ${z.name} a la derecha`}
+                                >
+                                    <ChevronRight className="size-3.5" />
+                                </button>
+                            )}
+                        </div>
                     ))}
                     <button
                         type="button"
@@ -460,6 +518,10 @@ export default function TablePlanEditor({ restaurantId }: { restaurantId: string
                 </div>
 
                 <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                    <Button variant="outline" size="sm" onClick={() => setZoneManagerOpen(true)} className="gap-1">
+                        <Settings2 className="size-3.5" />
+                        <span className="hidden sm:inline">Zonas</span>
+                    </Button>
                     <Button variant="outline" size="sm" onClick={handleAddTable} disabled={!activeZoneId} className="gap-1">
                         <Plus className="size-3.5" />
                         <span className="hidden sm:inline">Añadir mesa</span>
@@ -503,6 +565,13 @@ export default function TablePlanEditor({ restaurantId }: { restaurantId: string
                     {propertiesCard}
                 </aside>
             </div>
+
+            <ZoneManager
+                isOpen={zoneManagerOpen}
+                restaurantId={restaurantId}
+                onClose={() => setZoneManagerOpen(false)}
+                onSaved={loadData}
+            />
 
             {/* Drawer móvil/tablet con propiedades de mesa */}
             {propsOpenMobile && (
